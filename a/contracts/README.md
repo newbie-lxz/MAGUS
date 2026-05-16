@@ -66,13 +66,14 @@ Graph and flow semantics:
 - `analyzer_stats.cross_function_budget_hit` is true when same-module callee expansion hit the analyzer depth budget; the sample also carries a matching `cross_function_budget_hit` warning.
 - `graph_stats` currently records structural counts for the normalized graph, including `node_count` and `edge_count`.
 
-Artifacts written per project:
+Artifacts are written per project while mining runs:
 
 - `out/a.artifacts/<project_id>/run_manifest.json`
 - `out/a.artifacts/<project_id>/bitcode_manifest.json`
 - `out/a.artifacts/<project_id>/dfa_summary.json`
 - `out/a.artifacts/<project_id>/failures.json` on failure
-- SecVulEval batch runs additionally write `out/<project_id>/batch.result.json`; any miner non-zero exit, failure manifest, or zero-line `samples.raw.jsonl` marks that project and the batch as failed
+
+Successful project artifact directories are removed after `samples.raw.jsonl` and `samples.stats.jsonl` are written. Failed project artifacts are retained for diagnosis. SecVulEval batch runs additionally write `out/<project_id>/batch.result.json`; any miner non-zero exit, failure manifest, or zero-line `samples.raw.jsonl` marks that project and the batch as failed.
 
 ## Derived Views
 

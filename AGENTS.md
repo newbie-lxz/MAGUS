@@ -11,7 +11,7 @@
 
 - `pipeline.py`: root orchestration entrypoint for `build-analyzer`, `a`, `llm`, `b`, `ab`, and `stats-path`
 - `Makefile`: convenience wrappers around `pipeline.py`
-- `a/`: standalone Stage `A` project, docs, and artifacts
+- `a/`: standalone Stage `A` project, docs, and transient/failure artifacts
 - `b/b_miner.py`: Stage `B` entrypoint
 - `b/README.md`: Stage `B` usage and contract notes
 - `README.md`: root overview for the combined pipeline
@@ -25,8 +25,10 @@
 - Stage `A` raw output paths used by root orchestration must end with `.raw.jsonl`.
 - `make run-a`, `make run-llm`, `make run-b`, and `make run-ab` are thin wrappers over `pipeline.py`.
 - Root `LLM_OUTPUT` overrides the LLM evidence path for `make run-llm` and `make run-ab`; otherwise the path is derived from the raw output name.
+- Root `B_WORKERS` overrides the Stage `B` process-pool worker count for `make run-b` and `make run-ab`; otherwise Stage `B` defaults to `CPU/4`.
 - Stage `A` default runs emit `samples.raw.jsonl` and `samples.stats.jsonl`; root `run-ab` also emits `samples.llm.jsonl` before Stage `B`.
 - Stage `B` expects Stage `A` `samples.stats.jsonl` records and validates that contract before mining.
+- Stage `B` multiprocessing is used for large frequent-pattern prefix groups and must preserve global mining semantics; do not silently switch it to independent per-API mining.
 - Stage `B` must reject `samples.raw.jsonl` input rather than trying to reinterpret Stage `A` raw records.
 - Stage `A` documentation under `a/` remains authoritative for Stage `A` internals and field semantics.
 

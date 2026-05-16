@@ -42,6 +42,7 @@ make run-llm LLM_OUTPUT=/tmp/samples.llm.jsonl
 
 ```bash
 make run-b
+make run-b B_WORKERS=2
 ```
 
 - Run the full `A -> LLM export -> B` pipeline:
@@ -49,6 +50,7 @@ make run-b
 ```bash
 make run-ab
 make run-ab LLM_OUTPUT=/tmp/samples.llm.jsonl
+make run-ab B_WORKERS=2
 ```
 
 - Show the derived `samples.stats.jsonl` path for a given Stage `A` raw output:
@@ -82,3 +84,5 @@ Default outputs:
 - Stage `B` outputs: `b/b_output/patterns.json`, `b/b_output/candidates.scored.jsonl`, `b/b_output/b_miner_stats.json`
 
 If you override `A_OUTPUT`, the path must end with `.raw.jsonl`; `pipeline.py` derives the matching `.llm.jsonl` and `.stats.jsonl` paths automatically during `run-ab`. Set `LLM_OUTPUT` to override only the LLM evidence path for `run-llm` or `run-ab`.
+
+Stage `B` uses a process pool for large frequent-pattern prefix groups. By default it uses `CPU/4` workers to limit memory pressure; set `B_WORKERS=1` to run the mining step without multiprocessing, or set a larger value when the machine has enough RAM.

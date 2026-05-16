@@ -31,10 +31,10 @@
 - `extensions.analyzer_jobs` is required and must be greater than `1`.
 - Stage `A` splits `bc.list` into contiguous chunks so analyzer subprocesses run in parallel before Stage `A` reassembles stable module-indexed DFA output and removes successful-run chunk temp files.
 - The analyzer owns sink classification through `config/sink_taxonomy.json`; normalization consumes emitted `sink_kind`.
-- Project artifacts are written under `out/a.artifacts/<project_id>/`.
+- Project artifacts are written under `out/a.artifacts/<project_id>/` during mining, then removed for successful projects after raw/stats JSON outputs are written.
 - SecVulEval batch outputs are written under `out/<project_id>/`.
 - SecVulEval source checkouts live under `input/secvuleval/src/`, not under `out/`.
-- Project failures are written to `failures.json`.
+- Project failures are written to `failures.json`, and failed project artifacts are retained for diagnosis.
 - Normalized output is `samples.raw.jsonl`.
 - Stage `A` output paths must end with `.raw.jsonl`.
 - Default derived output is `samples.stats.jsonl`.

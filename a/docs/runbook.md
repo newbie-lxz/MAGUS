@@ -53,8 +53,9 @@ Analyzer timeout thresholds are fixed:
 
 - normalized samples: `out/samples.raw.jsonl`
 - stats samples: `out/samples.stats.jsonl` for frequency mining over `edge_tokens`, `seed_token`, `sink_types`, and `location`
-- per-project artifacts: `out/a.artifacts/<project_id>/`
-- SecVulEval batch project outputs: `out/<project_id>/samples.raw.jsonl`, `out/<project_id>/samples.stats.jsonl`, `out/<project_id>/batch.result.json`, and `out/<project_id>/a.artifacts/<project_id>/`
+- successful per-project artifacts are removed after `samples.raw.jsonl` and `samples.stats.jsonl` are written
+- failed per-project artifacts are retained under `out/a.artifacts/<project_id>/`
+- SecVulEval batch project outputs: `out/<project_id>/samples.raw.jsonl`, `out/<project_id>/samples.stats.jsonl`, `out/<project_id>/batch.result.json`, and retained `out/<project_id>/a.artifacts/<project_id>/` only when mining fails
 - SecVulEval planning files: `out/secvuleval/`
 - SecVulEval source checkouts: `input/secvuleval/src/`
 
@@ -68,6 +69,8 @@ Important artifact files:
 - `bitcode_manifest.json`
 - `dfa_summary.json`
 - `failures.json` when a project fails
+
+These files are normally transient on successful runs and remain available only for failed projects.
 
 ## Troubleshooting
 

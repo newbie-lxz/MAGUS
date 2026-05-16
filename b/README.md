@@ -20,18 +20,21 @@ Direct run:
 
 ```bash
 python3 b/b_miner.py --input a/out/samples.stats.jsonl --output-dir b/b_output
+python3 b/b_miner.py --input a/out/samples.stats.jsonl --output-dir b/b_output --workers 2
 ```
 
 Root orchestration:
 
 ```bash
 make run-b
+make run-b B_WORKERS=2
 ```
 
 Chained execution through the root pipeline, which also writes the matching Stage `A` `samples.llm.jsonl` evidence view before Stage `B` starts:
 
 ```bash
 make run-ab
+make run-ab B_WORKERS=2
 ```
 
 You can also validate Stage `B` independently against any per-project Stage `A` stats file, for example:
@@ -39,6 +42,8 @@ You can also validate Stage `B` independently against any per-project Stage `A` 
 ```bash
 python3 pipeline.py b --input a/out/<project_id>/samples.stats.jsonl --output-dir /tmp/stageb-check
 ```
+
+Use `--workers` or `B_WORKERS` to tune the mining process pool. The default is `CPU/4` workers; `--workers 1` disables multiprocessing for the frequent-pattern expansion stage.
 
 ## Outputs
 
@@ -54,4 +59,5 @@ The default root-level destination is `b/b_output/`.
 
 - The mining and scoring logic live entirely in `b_miner.py`.
 - The root `pipeline.py` connects Stage `A` stats output to Stage `B` input and separately exports the Stage `A` LLM evidence view; it does not rewrite Stage `B` internals.
+- Stage `B` keeps global mining semantics: multiprocessing is used only to parallelize large prefix-group expansion, not to split the input into independent per-API mining jobs.
 - `risk_score >= 0.50` is the current threshold gate used in the output summary.

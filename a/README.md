@@ -39,8 +39,9 @@ Stage `A` builds target projects to LLVM bitcode, runs the bundled LLVM API-leve
 - uses `input/secvuleval/src/` for SecVulEval source checkouts; `out/` is reserved for planning files and analysis outputs
 - preserves the original input-file base for relative `repo_path` values when running SecVulEval projects through the per-project batch runner
 - retains non-intrinsic call operations in raw samples instead of pre-filtering ordinary helpers like allocation, free, logging, or string utilities
-- writes project artifacts under `out/a.artifacts/<project_id>/`
-- SecVulEval batch output is written under `out/<project_id>/`, including `samples.raw.jsonl`, `samples.stats.jsonl`, `batch.result.json`, and that project's artifacts; a miner failure manifest or zero raw samples marks that project failed
+- writes temporary project artifacts under `out/a.artifacts/<project_id>/` during mining, then removes successful project artifact directories after `samples.raw.jsonl` and `samples.stats.jsonl` are written
+- retains failed project artifacts, including `failures.json`, for diagnosis
+- SecVulEval batch output is written under `out/<project_id>/`, including `samples.raw.jsonl`, `samples.stats.jsonl`, `batch.result.json`, and retained failure artifacts when mining fails; a miner failure manifest or zero raw samples marks that project failed
 - emits one normalized source-sink-aware sample per analyzer seed record into `samples.raw.jsonl`
 - requires the Stage `A` output path to end with `.raw.jsonl` so derived output names are unambiguous
 - derives `samples.stats.jsonl` for frequency mining
