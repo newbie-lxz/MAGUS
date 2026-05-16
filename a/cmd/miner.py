@@ -370,28 +370,8 @@ def ensure_clean_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def cleanup_successful_artifacts(artifact_roots: list[Path]) -> None:
-    """Remove per-project working artifacts after canonical JSON outputs exist."""
-    removed = 0
-    parent_dirs: set[Path] = set()
-    for artifact_root in artifact_roots:
-        parent_dirs.add(artifact_root.parent)
-        if not artifact_root.exists():
-            continue
-        if artifact_root.is_dir():
-            shutil.rmtree(artifact_root)
-        else:
-            artifact_root.unlink()
-        removed += 1
-
-    for parent_dir in sorted(parent_dirs, key=lambda path: len(path.parts), reverse=True):
-        try:
-            parent_dir.rmdir()
-        except OSError:
-            pass
-
-    if removed:
-        print(f"removed {removed} successful Stage A artifact dirs", file=sys.stderr)
+def artifact_root_for(output_path: Path, project: ProjectInput) -> Path:
+    return output_path.parent / "a.artifacts" / project.project_id
 
 
 # 3. 环境发现与命令执行
@@ -417,51 +397,6 @@ def sink_taxonomy_path() -> Path:
             {"expected": str(path)},
         )
     return path
-
-
-def candidate_llvm_bin_dirs(env: dict[str, str] | None = None) -> list[Path]:
-    environment = env or os.environ
-    candidates: list[Path] = []
-    for env_name in ("LLVM_BIN_DIR", "LLVM_HOME"):
-        raw = environment.get(env_name, "").strip()
-        if not raw:
-            continue
-        path = Path(raw)
-        if env_name == "LLVM_HOME":
-            path = path / "bin"
-        candidates.append(path)
-
-    path_entries = environment.get("PATH", "").split(os.pathsep)
-    candidates.extend(Path(entry) for entry in path_entries if entry)
-    candidates.extend(sorted(Path("/usr/lib").glob("llvm-*/bin"), reverse=True))
-    candidates.extend(
-        [
-            Path("/usr/local/opt/llvm/bin"),
-            Path("/opt/homebrew/opt/llvm/bin"),
-        ]
-    )
-
-    seen: set[str] = set()
-    deduped: list[Path] = []
-    for candidate in candidates:
-        key = str(candidate)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(candidate)
-    return deduped
-
-
-def discover_executable(name: str, env: dict[str, str] | None = None) -> str | None:
-    search_path = (env or os.environ).get("PATH")
-    override = shutil.which(name, path=search_path)
-    if override:
-        return override
-    for bin_dir in candidate_llvm_bin_dirs(env):
-        candidate = bin_dir / name
-        if candidate.exists() and os.access(candidate, os.X_OK):
-            return str(candidate)
-    return None
 
 
 def detect_bitcode_format(path: Path) -> str:
@@ -974,17 +909,7 @@ def cleanup_analyzer_chunk_temps(chunks: list[AnalyzerChunk]) -> None:
             pass
 
 
-def find_prebuilt_analyzer(env: dict[str, str]) -> AnalyzerBinary | None:
-    override = env.get("LLVM_API_ANALYZER", "").strip()
-    if override:
-        candidate = Path(override)
-        if candidate.exists() and os.access(candidate, os.X_OK):
-            return AnalyzerBinary(path=str(candidate), source="env")
-
-    discovered = discover_executable("llvm-api-analyzer", env)
-    if discovered:
-        return AnalyzerBinary(path=discovered, source="path")
-
+def bundled_analyzer_binary() -> AnalyzerBinary | None:
     candidate = stage_a_root() / "analyzer" / "llvm-api-analyzer"
     if candidate.exists() and os.access(candidate, os.X_OK):
         return AnalyzerBinary(path=str(candidate), source="workspace")
@@ -996,7 +921,7 @@ def ensure_llvm_api_analyzer(
     timeout: int,
     env: dict[str, str],
 ) -> AnalyzerBinary:
-    existing = find_prebuilt_analyzer(env)
+    existing = bundled_analyzer_binary()
     if existing is not None:
         return existing
 
@@ -1870,7 +1795,7 @@ def formal_mine(project: ProjectInput, artifact_root: Path) -> list[dict]:
 
 def mine(project: ProjectInput, output_path: Path) -> list[dict]:
     """包装正式流程，并在失败时落盘 failure manifest。"""
-    artifact_root = output_path.parent / "a.artifacts" / project.project_id
+    artifact_root = artifact_root_for(output_path, project)
     ensure_clean_dir(artifact_root)
 
     try:
@@ -1878,6 +1803,34 @@ def mine(project: ProjectInput, output_path: Path) -> list[dict]:
     except ProjectFailure as failure:
         write_failure_manifest(artifact_root, failure)
         raise
+
+
+def prepare_project(project: ProjectInput, base_dir: Path) -> bool:
+    try:
+        project.normalize(base_dir)
+        project.validate()
+    except Exception as exc:
+        print(f'skip invalid project "{project.project_id}": {exc}', file=sys.stderr)
+        return False
+    return True
+
+
+def run_project(project: ProjectInput, output_path: Path) -> list[dict] | None:
+    try:
+        return mine(project, output_path)
+    except ProjectFailure as exc:
+        print(
+            f'mine failed for "{project.project_id}" during {exc.stage}: {exc.reason}',
+            file=sys.stderr,
+        )
+    except Exception as exc:
+        print(f'mine failed for "{project.project_id}": {exc}', file=sys.stderr)
+    return None
+
+
+def write_outputs(output_path: Path, samples: list[dict[str, Any]]) -> None:
+    write_samples(output_path, samples)
+    write_stats_output(output_path, samples)
 
 
 def main() -> None:
@@ -1894,38 +1847,21 @@ def main() -> None:
         raise SystemExit(1) from exc
 
     all_samples: list[dict] = []
-    successful_artifact_roots: list[Path] = []
     for project in projects:
-        try:
-            project.normalize(base_dir)
-            project.validate()
-        except Exception as exc:
-            print(f'skip invalid project "{project.project_id}": {exc}', file=sys.stderr)
+        if not prepare_project(project, base_dir):
             continue
 
-        try:
-            samples = mine(project, output_path)
-        except ProjectFailure as exc:
-            print(
-                f'mine failed for "{project.project_id}" during {exc.stage}: {exc.reason}',
-                file=sys.stderr,
-            )
+        samples = run_project(project, output_path)
+        if samples is None:
             continue
-        except Exception as exc:
-            print(f'mine failed for "{project.project_id}": {exc}', file=sys.stderr)
-            continue
-
         all_samples.extend(samples)
-        successful_artifact_roots.append(output_path.parent / "a.artifacts" / project.project_id)
 
     all_samples.sort(key=lambda sample: (sample.get("project_id", ""), sample.get("sample_id", "")))
 
     try:
-        write_samples(output_path, all_samples)
-        write_stats_output(output_path, all_samples)
-        cleanup_successful_artifacts(successful_artifact_roots)
+        write_outputs(output_path, all_samples)
     except Exception as exc:
-        print(f"write output or cleanup failed: {exc}", file=sys.stderr)
+        print(f"write output failed: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
     print(f"wrote {len(all_samples)} samples to {output_path}", file=sys.stderr)

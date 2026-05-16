@@ -90,10 +90,7 @@ class StageAStatsSample:
 
     @property
     def primary_line(self) -> int:
-        try:
-            return int(self.focus.get("line", 0))
-        except (TypeError, ValueError):
-            return 0
+        return int(self.focus.get("line", 0))
 
     @property
     def evidence_slice(self) -> str:
@@ -166,30 +163,6 @@ def load_stats_samples(path: Path) -> list[StageAStatsSample]:
 # 3. 进程池辅助函数（模块级，必须能被 pickle）
 # ============================================================
 
-_WORKER_TOKEN_BITMASK: list[int] | None = None
-_WORKER_ORDER_BITMASK: dict[tuple[int, int], int] | None = None
-_WORKER_MIN_SUPPORT_ABS: int | None = None
-
-
-def default_worker_count() -> int:
-    """默认使用 CPU/4，避免 Stage B 在大输入上把内存和 IPC 打满。"""
-    return max(1, multiprocessing.cpu_count() // 4)
-
-
-def _init_prefix_group_worker(
-    token_bitmask: list[int],
-    order_bitmask: dict[tuple[int, int], int],
-    min_support_abs: int,
-) -> None:
-    global _WORKER_TOKEN_BITMASK
-    global _WORKER_ORDER_BITMASK
-    global _WORKER_MIN_SUPPORT_ABS
-
-    _WORKER_TOKEN_BITMASK = token_bitmask
-    _WORKER_ORDER_BITMASK = order_bitmask
-    _WORKER_MIN_SUPPORT_ABS = min_support_abs
-
-
 def _process_prefix_group_serial(
     group: list[tuple[list[int], int, int]],
     token_bitmask: list[int],
@@ -239,20 +212,9 @@ def _process_prefix_group_serial(
 def _process_prefix_group_worker(
     args: tuple,
 ) -> list[tuple[list[int], int, int]]:
-    """进程池入口函数，任务参数只携带 prefix group。"""
-    _, group = args
-    if (
-        _WORKER_TOKEN_BITMASK is None
-        or _WORKER_ORDER_BITMASK is None
-        or _WORKER_MIN_SUPPORT_ABS is None
-    ):
-        raise RuntimeError("prefix group worker is not initialized")
-    return _process_prefix_group_serial(
-        group,
-        _WORKER_TOKEN_BITMASK,
-        _WORKER_ORDER_BITMASK,
-        _WORKER_MIN_SUPPORT_ABS,
-    )
+    """进程池入口函数，解包参数后调用串行处理"""
+    prefix_key, group, token_bitmask, order_bitmask, min_support_abs = args
+    return _process_prefix_group_serial(group, token_bitmask, order_bitmask, min_support_abs)
 
 
 # ============================================================
@@ -405,7 +367,7 @@ class BitIndexMiner:
 
     # ---------- 逐层BFS + 下闭性质 ----------
 
-    def mine(self, max_length: int = 16, workers: int | None = None) -> list[PatternRecord]:
+    def mine(self, max_length: int = 16) -> list[PatternRecord]:
         """
         分层BFS挖掘（完全对齐 APP-Miner）：
 
@@ -424,7 +386,6 @@ class BitIndexMiner:
         """
         all_patterns: list[PatternRecord] = []
         pattern_id_counter = [0]
-        n_workers = default_worker_count() if workers is None else max(1, workers)
 
         # ----- Level 2: 频繁 token 对 -----
         freq_pairs: list[tuple[int, int, int]] = []  # (a, b, support_count)
@@ -451,10 +412,9 @@ class BitIndexMiner:
                 current_level[(a,)].append(([a, b], cnt, mask))
 
         level_num = 2
-        if n_workers > 1:
-            print(f"    进程池 workers={n_workers} (默认 CPU/4，可用 --workers 调整)")
-        else:
-            print("    进程池关闭: workers=1")
+        n_workers = max(1, multiprocessing.cpu_count())
+        if n_workers > 4:
+            n_workers = min(n_workers, 8)  # 避免过多进程的 IPC 开销
 
         while current_level and level_num < max_length:
             next_level: dict[tuple[int, ...], list[tuple[list[int], int, int]]] = defaultdict(list)
@@ -483,37 +443,18 @@ class BitIndexMiner:
                     total_candidates += 1
 
             # 2. 进程池并行处理大前缀组
-            if n_workers > 1 and parallel_groups:
+            if parallel_groups:
                 parallel_items = list(parallel_groups.items())
-                worker_args = [(pk, group) for pk, group in parallel_items]
-                pool = multiprocessing.Pool(
-                    processes=n_workers,
-                    initializer=_init_prefix_group_worker,
-                    initargs=(self.token_bitmask, self.order_bitmask, self.min_support_abs),
-                )
-                try:
-                    for results in pool.imap(_process_prefix_group_worker, worker_args):
+                worker_args = [
+                    (pk, group, self.token_bitmask, self.order_bitmask, self.min_support_abs)
+                    for pk, group in parallel_items
+                ]
+                with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                    for results in executor.map(_process_prefix_group_worker, worker_args):
                         for candidate_tuple, cnt, verified_mask in results:
                             new_prefix = tuple(candidate_tuple[:-1])
                             next_level[new_prefix].append((candidate_tuple, cnt, verified_mask))
                             total_candidates += 1
-                except BaseException:
-                    pool.terminate()
-                    pool.join()
-                    raise
-                else:
-                    pool.close()
-                    pool.join()
-            elif parallel_groups:
-                for prefix_key, group in parallel_groups.items():
-                    results = _process_prefix_group_serial(
-                        group, self.token_bitmask, self.order_bitmask,
-                        self.min_support_abs,
-                    )
-                    for candidate_tuple, cnt, verified_mask in results:
-                        new_prefix = tuple(candidate_tuple[:-1])
-                        next_level[new_prefix].append((candidate_tuple, cnt, verified_mask))
-                        total_candidates += 1
 
             print(f"    Level-{level_num + 1}: {total_candidates} 个候选")
 
@@ -744,12 +685,6 @@ def main() -> None:
     parser.add_argument("--output-dir", "-o", required=True, help="输出目录")
     parser.add_argument("--min-support", type=int, default=3, help="频繁模式最低支持度（绝对计数）")
     parser.add_argument("--max-length", type=int, default=16, help="模式最大长度上限")
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        help="进程池 worker 数；默认 CPU/4，设为 1 可关闭多进程",
-    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -765,7 +700,7 @@ def main() -> None:
     miner = BitIndexMiner(samples, min_support_abs=min_support)
     print(f"  索引: {miner.n_tokens} tokens, {len(miner.order_bitmask)} 个顺序关系")
 
-    patterns = miner.mine(max_length=max_length, workers=args.workers)
+    patterns = miner.mine(max_length=max_length)
     print(f"  发现 {len(patterns)} 个最大频繁模式")
 
     patterns_output = [asdict(p) for p in patterns]
@@ -815,7 +750,6 @@ def main() -> None:
         "passed_threshold": len(passed),
         "failed_threshold": len(candidates) - len(passed),
         "index_type": "python_int_bitmask",
-        "workers": default_worker_count() if args.workers is None else max(1, args.workers),
         "n_tokens": miner.n_tokens,
         "n_order_relations": len(miner.order_bitmask),
         "risk_score_distribution": {

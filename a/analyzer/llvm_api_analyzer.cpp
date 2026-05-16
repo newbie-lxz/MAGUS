@@ -18,7 +18,6 @@
 #include <cctype>
 #include <cstdio>
 #include <ctime>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -26,7 +25,6 @@
 #include <memory>
 #include <optional>
 #include <set>
-#include <sstream>
 #include <string>
 #include <system_error>
 #include <unordered_map>
@@ -304,43 +302,6 @@ std::string sanitizeBucketName(const std::string &name) {
     return sanitized.empty() ? "unknown_api" : sanitized;
 }
 
-size_t parsePositiveEnvOrDefault(const char *name, size_t fallback) {
-    const char *raw = std::getenv(name);
-    if (raw == nullptr) {
-        return fallback;
-    }
-
-    const std::string text = trim(raw);
-    if (text.empty()) {
-        return fallback;
-    }
-
-    char *end = nullptr;
-    const unsigned long long parsed = std::strtoull(text.c_str(), &end, 10);
-    if (end == text.c_str() || (end != nullptr && *end != '\0') || parsed == 0) {
-        return fallback;
-    }
-    return static_cast<size_t>(parsed);
-}
-
-std::vector<std::string> splitEnvList(const char *name) {
-    const char *raw = std::getenv(name);
-    if (raw == nullptr) {
-        return {};
-    }
-
-    std::vector<std::string> items;
-    std::stringstream stream(raw);
-    std::string item;
-    while (std::getline(stream, item, ',')) {
-        item = trim(item);
-        if (!item.empty()) {
-            items.push_back(item);
-        }
-    }
-    return items;
-}
-
 void loadHelperBlacklist(AnalyzerContext &ctx) {
     // 过滤 LLVM/sanitizer/runtime 等工具链辅助函数，减少分析噪声。
     static const std::vector<std::string> builtinExact = {};
@@ -362,14 +323,6 @@ void loadHelperBlacklist(AnalyzerContext &ctx) {
         builtinPrefix.begin(),
         builtinPrefix.end()
     );
-
-    for (const std::string &entry : splitEnvList("LLVM_API_ANALYZER_HELPER_BLACKLIST")) {
-        if (entry.size() > 1 && entry.back() == '*') {
-            ctx.helperBlacklistPrefix.push_back(entry.substr(0, entry.size() - 1));
-            continue;
-        }
-        ctx.helperBlacklistExact.insert(entry);
-    }
 }
 
 bool isUnderRoot(const fs::path &root, const fs::path &path) {
@@ -2072,31 +2025,52 @@ std::vector<std::pair<std::string, std::string>> analyzeModule(
     return results;
 }
 
-}  // namespace
-
-// 9. 主流程
-int main(int argc, char **argv) {
-    // 入口只负责加载配置、遍历 bitcode 模块、落盘各 bucket 结果。
-    cl::ParseCommandLineOptions(argc, argv, "LLVM API-level analyzer\n");
-
+AnalyzerContext makeAnalyzerContext() {
     AnalyzerContext ctx;
     ctx.projectId = ProjectId.getValue();
     ctx.repoRoot = fs::path(RepoPath.getValue()).lexically_normal();
     ctx.outputRoot = fs::path(OutputRoot.getValue()).lexically_normal();
     ctx.timeoutLog = ctx.outputRoot.parent_path() / "timeout";
-    ctx.maxCrossFunctionDepth = parsePositiveEnvOrDefault(
-        "LLVM_API_ANALYZER_MAX_CROSS_FUNCTION_DEPTH",
-        ctx.maxCrossFunctionDepth
-    );
     loadHelperBlacklist(ctx);
+    return ctx;
+}
 
+bool loadAnalyzerConfig(AnalyzerContext &ctx) {
     Expected<std::vector<SinkRuleSet>> sinkRules = loadSinkTaxonomy(fs::path(SinkConfig.getValue()));
     if (!sinkRules) {
         errs() << toString(sinkRules.takeError()) << "\n";
-        return 1;
+        return false;
     }
     ctx.sinkRules = std::move(*sinkRules);
+    return true;
+}
 
+bool writeModuleRecords(
+    const AnalyzerContext &ctx,
+    const std::vector<std::pair<std::string, std::string>> &records,
+    size_t moduleIndex
+) {
+    for (const auto &record : records) {
+        const fs::path bucketPath = ctx.outputRoot / record.first;
+        if (!ensureDirectory(bucketPath)) {
+            errs() << "failed to create bucket: " << bucketPath.generic_string() << "\n";
+            return false;
+        }
+        std::ofstream handle(bucketPath / std::to_string(moduleIndex), std::ios::app);
+        handle << record.second << "\n";
+    }
+    return true;
+}
+
+}  // namespace
+
+int main(int argc, char **argv) {
+    cl::ParseCommandLineOptions(argc, argv, "LLVM API-level analyzer\n");
+
+    AnalyzerContext ctx = makeAnalyzerContext();
+    if (!loadAnalyzerConfig(ctx)) {
+        return 1;
+    }
     if (!ensureDirectory(ctx.outputRoot)) {
         errs() << "failed to create output root: " << OutputRoot << "\n";
         return 1;
@@ -2119,14 +2093,8 @@ int main(int argc, char **argv) {
         }
 
         const std::vector<std::pair<std::string, std::string>> records = analyzeModule(ctx, *module);
-        for (const auto &record : records) {
-            const fs::path bucketPath = ctx.outputRoot / record.first;
-            if (!ensureDirectory(bucketPath)) {
-                errs() << "failed to create bucket: " << bucketPath.generic_string() << "\n";
-                return 1;
-            }
-            std::ofstream handle(bucketPath / std::to_string(moduleIndex), std::ios::app);
-            handle << record.second << "\n";
+        if (!writeModuleRecords(ctx, records, moduleIndex)) {
+            return 1;
         }
     }
 
