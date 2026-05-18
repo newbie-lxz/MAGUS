@@ -1497,14 +1497,52 @@ def sample_direct_edges(sample: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def sample_direct_edge_tokens(sample: dict[str, Any]) -> list[str]:
-    tokens: list[str] = []
+def sample_node_index(sample: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    graph = sample.get("graph", {}) or {}
+    nodes = graph.get("nodes") or []
+    return {
+        str(node.get("id", "")).strip(): node
+        for node in nodes
+        if str(node.get("id", "")).strip()
+    }
+
+
+def sample_feature_records(sample: dict[str, Any]) -> list[dict[str, Any]]:
+    node_index = sample_node_index(sample)
+    feature_index: dict[str, dict[str, Any]] = {}
+
     for edge in sample_direct_edges(sample):
         source_token = str(edge.get("from_token", "")).strip()
         target_token = str(edge.get("to_token", "")).strip()
-        if source_token and target_token:
-            tokens.append(f"{source_token}->{target_token}")
-    return unique_text(tokens)
+        if not source_token or not target_token:
+            continue
+
+        token = f"{source_token}->{target_token}"
+        source_id = str(edge.get("from", "")).strip()
+        target_id = str(edge.get("to", "")).strip()
+        source_node = node_index.get(source_id, {})
+        target_node = node_index.get(target_id, {})
+
+        if token not in feature_index:
+            feature_index[token] = {
+                "token": token,
+                "from_node_id": source_id,
+                "to_node_id": target_id,
+                "from_token": source_token,
+                "to_token": target_token,
+                "from_name": str(edge.get("from_name") or source_node.get("name", "")).strip(),
+                "to_name": str(edge.get("to_name") or target_node.get("name", "")).strip(),
+                "from_file": str(source_node.get("file", "")).strip(),
+                "from_line": int(source_node.get("line", 0) or 0),
+                "to_file": str(target_node.get("file", "")).strip(),
+                "to_line": int(target_node.get("line", 0) or 0),
+                "from_params": source_node.get("parameter", []),
+                "to_params": target_node.get("parameter", []),
+                "occurrence_count": 0,
+            }
+        feature_index[token]["occurrence_count"] += 1
+
+    return [feature_index[token] for token in sorted(feature_index)]
 
 
 # 5. 派生视图构建
@@ -1522,15 +1560,7 @@ def stats_records_for_samples(samples: list[dict[str, Any]]) -> list[dict[str, A
             for sample in samples
         }
     )
-    edge_tokens = sorted(
-        {
-            token
-            for sample in samples
-            for token in sample_direct_edge_tokens(sample)
-        }
-    )
     location_ids = {key: index for index, key in enumerate(location_keys)}
-    edge_ids = {token: index for index, token in enumerate(edge_tokens)}
 
     records: list[dict[str, Any]] = []
     for sample in samples:
@@ -1540,17 +1570,21 @@ def stats_records_for_samples(samples: list[dict[str, Any]]) -> list[dict[str, A
             "function": str(entrypoint.get("function", "")).strip(),
         }
         location_key = json.dumps(location, sort_keys=True)
-        tokens = sample_direct_edge_tokens(sample)
+        feature_details = sample_feature_records(sample)
+        feature_tokens = [detail["token"] for detail in feature_details]
+        direct_edge_count = len(sample_direct_edges(sample))
         records.append(
             {
+                "schema_version": "stagea.stats.features.v1",
                 "project_id": sample.get("project_id", ""),
                 "sample_id": sample.get("sample_id", ""),
+                "api_group": sample.get("api_group", ""),
                 "location_id": location_ids[location_key],
                 "location": location,
                 "seed_id": sample_seed_id(sample),
                 "seed_token": str(sample.get("seed", {}).get("token", "")).strip(),
-                "edge_ids": [edge_ids[token] for token in tokens],
-                "edge_tokens": tokens,
+                "feature_tokens": feature_tokens,
+                "feature_details": feature_details,
                 "source_kinds": unique_text(
                     [str(item.get("kind", "")).strip() for item in (sample.get("source_candidates") or [])]
                 ),
@@ -1558,6 +1592,11 @@ def stats_records_for_samples(samples: list[dict[str, Any]]) -> list[dict[str, A
                     [str(item.get("type", "")).strip() for item in (sample.get("sink_candidates") or [])]
                 ),
                 "focus": sample.get("focus", {}),
+                "feature_stats": {
+                    "direct_edge_count": direct_edge_count,
+                    "feature_count": len(feature_tokens),
+                    "duplicate_edge_count": max(0, direct_edge_count - len(feature_tokens)),
+                },
             }
         )
     return records
@@ -1833,6 +1872,26 @@ def write_outputs(output_path: Path, samples: list[dict[str, Any]]) -> None:
     write_stats_output(output_path, samples)
 
 
+def cleanup_successful_artifacts(output_path: Path, projects: list[ProjectInput]) -> None:
+    """Delete per-project artifacts after raw/stats outputs are durable."""
+    artifacts_root = output_path.parent / "a.artifacts"
+    removed = 0
+    for project in projects:
+        artifact_root = artifact_root_for(output_path, project)
+        if not artifact_root.exists():
+            continue
+        shutil.rmtree(artifact_root)
+        removed += 1
+
+    try:
+        artifacts_root.rmdir()
+    except OSError:
+        pass
+
+    if removed:
+        print(f"removed artifacts for {removed} successful projects", file=sys.stderr)
+
+
 def main() -> None:
     """Stage A CLI 入口。"""
     args = parse_args()
@@ -1847,6 +1906,7 @@ def main() -> None:
         raise SystemExit(1) from exc
 
     all_samples: list[dict] = []
+    successful_projects: list[ProjectInput] = []
     for project in projects:
         if not prepare_project(project, base_dir):
             continue
@@ -1854,12 +1914,14 @@ def main() -> None:
         samples = run_project(project, output_path)
         if samples is None:
             continue
+        successful_projects.append(project)
         all_samples.extend(samples)
 
     all_samples.sort(key=lambda sample: (sample.get("project_id", ""), sample.get("sample_id", "")))
 
     try:
         write_outputs(output_path, all_samples)
+        cleanup_successful_artifacts(output_path, successful_projects)
     except Exception as exc:
         print(f"write output failed: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
