@@ -1,0 +1,60 @@
+{
+  "targets": [
+    {
+      "project_id": "repo_source_api_xxx",
+      "target_type": "source_api",
+      "env_profile": "source_repository",
+      "cases": {
+        "hyp_source_api_0001": {
+          "name": "auto_null_deref",
+          "target_type": "source_api",
+          "attack_type": "null_deref",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "unknown",
+          "source_file": "src/crypto/example.c",
+          "entry_symbol": "parse_request",
+          "api_sequence": [
+            "parse_request -> ASN1_OCTET_STRING_new -> use pointer"
+          ],
+          "poc_plan": [
+            "Build or load project containing src/crypto/example.c",
+            "Construct or locate a harness that reaches parse_request",
+            "Drive the API sequence with misuse-oriented inputs for CWE-476",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_source_api_0001",
+            "entry_symbol": "parse_request",
+            "input_source": null,
+            "seed_inputs": [
+              "empty input",
+              "malformed serialized bytes",
+              "allocation failure path"
+            ]
+          },
+          "oracle": {
+            "accepted_evidence": [
+              "ASan/UBSan crash",
+              "non-zero test exit caused by crafted source/API input",
+              "unexpected success on invalid API state",
+              "differential behavior between vulnerable and fixed revision"
+            ],
+            "failure_patterns": [
+              "AddressSanitizer",
+              "UndefinedBehaviorSanitizer",
+              "runtime error:",
+              "Segmentation fault",
+              "null pointer",
+              "heap-use-after-free",
+              "stack-buffer-overflow",
+              "heap-buffer-overflow",
+              "double-free"
+            ],
+            "expect_nonzero_exit": true
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "status": "confirmed",
+  "reason": "ORACLE_MATCH",
+  "failure_code": null,
+  "failure_note": null,
+  "observations": [
+    "oracle matched patterns: AddressSanitizer, null pointer"
+  ],
+  "runtime_trace": [
+    {
+      "cmd": "/usr/bin/python3 poc.py",
+      "cwd": "/home/sq_hu/MAGUS/d/memberD_verifier/01_demo_test/mock_source_project",
+      "exit_code": 1,
+      "elapsed_ms": 8,
+      "stdout_tail": "triggering mock source/API misuse path\nAddressSanitizer: SEGV on unknown address\nSUMMARY: AddressSanitizer: null pointer dereference\n",
+      "stderr_tail": "",
+      "timed_out": false
+    }
+  ],
+  "timestamps": {
+    "finished_at": "2026-05-19T11:41:30Z"
+  }
+}

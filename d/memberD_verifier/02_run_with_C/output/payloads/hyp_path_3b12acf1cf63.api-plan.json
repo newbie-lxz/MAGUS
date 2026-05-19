@@ -1,0 +1,76 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "juliet_api_expanded_c",
+  "sample_id": "path_3b12acf1cf63",
+  "hypothesis_id": "hyp_path_3b12acf1cf63",
+  "claim": "存在格式化字符串漏洞：printf(data)使用用户可控的字符串作为格式化参数，攻击者可以通过精心构造的输入读取或修改任意内存。",
+  "cwe_candidates": [
+    "CWE-134"
+  ],
+  "source_file": "/home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE134_Uncontrolled_Format_String/s02/CWE134_Uncontrolled_Format_String__char_file_printf_01.c",
+  "entry_symbol": "CWE134_Uncontrolled_Format_String__char_file_printf_01_bad",
+  "api_sequence": [
+    {
+      "step": 1,
+      "loc": "文件: CWE134_Uncontrolled_Format_String__char_file_printf_01.c, 函数: CWE134_Uncontrolled_Format_String__char_file_printf_01_bad, 行: 59",
+      "code": "printf(data);"
+    }
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_3b12acf1cf63",
+    "entry_symbol": "CWE134_Uncontrolled_Format_String__char_file_printf_01_bad",
+    "input_source": null,
+    "seed_inputs": [
+      "boundary-sized input",
+      "null/zero/negative argument where type permits",
+      "malformed serialized bytes",
+      "state-transition sequence that violates inferred API pattern"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing /home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE134_Uncontrolled_Format_String/s02/CWE134_Uncontrolled_Format_String__char_file_printf_01.c",
+    "Construct or locate a harness that reaches CWE134_Uncontrolled_Format_String__char_file_printf_01_bad",
+    "Drive the API sequence with misuse-oriented inputs for CWE-134",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "ASan/UBSan crash",
+      "non-zero test exit caused by crafted source/API input",
+      "unexpected success on invalid API state",
+      "differential behavior between vulnerable and fixed revision"
+    ],
+    "failure_patterns": [
+      "AddressSanitizer",
+      "UndefinedBehaviorSanitizer",
+      "runtime error:",
+      "Segmentation fault",
+      "null pointer",
+      "heap-use-after-free",
+      "stack-buffer-overflow",
+      "heap-buffer-overflow",
+      "double-free"
+    ],
+    "expect_nonzero_exit": true
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": null,
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": null,
+    "poc_cmd": null,
+    "test_cmd": null,
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "/home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE134_Uncontrolled_Format_String/s02/CWE134_Uncontrolled_Format_String__char_file_printf_01.c::CWE134_Uncontrolled_Format_String__char_file_printf_01_bad",
+    "file": "/home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE134_Uncontrolled_Format_String/s02/CWE134_Uncontrolled_Format_String__char_file_printf_01.c",
+    "line": 59,
+    "evidence_slice": "call:printf"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-19T12:43:37Z"
+  }
+}

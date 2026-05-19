@@ -1,0 +1,79 @@
+# Member D Verification Summary
+
+- generated_at: 2026-05-19T12:43:37Z
+- target_type: source_api
+- confirmed: 0
+- failed: 69
+
+
+## Failed / 回流
+
+- hyp_path_79fcc857abea | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_285b129483bd | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_80e43fede9b4 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_9d81a90557ca | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_8ffca0a46973 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_53cce5b7f793 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_52b6e15a1654 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_f7d8fa56d896 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_8722f21d6e11 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_3b12acf1cf63 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_cd729695024a | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_39ed113c0e04 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_348c1cb061e8 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_5a855620fa92 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_1b45ca7e7d49 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_6ca348cb487c | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_02afb469d38d | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_dfb1e2e70d8c | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_4fe8d331d02f | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_d8828814025c | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_3fc7abb7e876 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_f0c740d9429e | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_23959ed2bd13 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_fd5656e4688e | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_bc034bf84db1 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_f3022931e3b4 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_87c8efacc8ea | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_893c813b8f2e | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_72632cc0cad0 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_f20fbf343bb2 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_e55f294dd45a | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_55fde6d31f7b | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_584b3bbffa26 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_26d8135a9014 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_933803ffb499 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_2492458d65bb | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_4d5bd95a7b11 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_faab0976f07e | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_b1b0ccc46669 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_fda2d71775ea | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_0490e3b775ba | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_ae9ec7192a7d | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_546423185208 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_bce006144fd3 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_a636d39439c6 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_ce817148fd0e | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_7108e561f13d | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_2a663514be05 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_d9b1cb331e91 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_944f6dfd0bc1 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_630626c07fa8 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_272a70db12fe | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_5a814292e3b6 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_a2e8d6da45de | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_2d8ac52dcaa6 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_811796924050 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_655ca856c7d9 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_bbc48ce26da3 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_5fdc703d676d | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_3ca73c771cb0 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_f6230ef57e64 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_e2929389cf46 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_0348e0c94199 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_9f179fa7f32f | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_1a42c74ce632 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_2ebe9aa373d8 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_8f1dd08d7c17 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses
+- hyp_path_28d1ff9f3499 | ENV_MISSING | executable source/API payload generated but execution config is incomplete: repo_path, run_cmd/poc_cmd/test_cmd | action: provide repo_path plus run_cmd/poc_cmd/test_cmd; optional config_cmd/build_cmd can prepare the project
+- hyp_path_64666e59dda2 | HYPOTHESIS_WRONG | agent_verdict is 'reject' | action: send only accepted C hypotheses

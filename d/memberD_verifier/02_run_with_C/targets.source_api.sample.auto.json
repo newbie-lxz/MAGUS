@@ -1,0 +1,60 @@
+{
+  "targets": [
+    {
+      "project_id": "repo_xxx",
+      "target_type": "source_api",
+      "env_profile": "source_repository",
+      "cases": {
+        "hyp_9001": {
+          "name": "auto_null_deref",
+          "target_type": "source_api",
+          "attack_type": "null_deref",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "unknown",
+          "source_file": "crypto/asn1/a_object.c",
+          "entry_symbol": "parse_cert",
+          "api_sequence": [
+            "parse_cert -> ASN1_OCTET_STRING_new -> dereference"
+          ],
+          "poc_plan": [
+            "Build or load project containing crypto/asn1/a_object.c",
+            "Construct or locate a harness that reaches parse_cert",
+            "Drive the API sequence with misuse-oriented inputs for CWE-476",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_9001",
+            "entry_symbol": "parse_cert",
+            "input_source": "DER certificate file",
+            "seed_inputs": [
+              "empty DER",
+              "oversized DER",
+              "malformed bytes"
+            ]
+          },
+          "oracle": {
+            "accepted_evidence": [
+              "ASan/UBSan crash",
+              "non-zero test exit caused by crafted source/API input",
+              "unexpected success on invalid API state",
+              "differential behavior between vulnerable and fixed revision"
+            ],
+            "failure_patterns": [
+              "AddressSanitizer",
+              "Segmentation fault",
+              "null pointer"
+            ],
+            "expect_nonzero_exit": true
+          },
+          "execution": {
+            "repo_path": "D:/datasets/openssl",
+            "config_cmd": "./Configure enable-asan",
+            "build_cmd": "make -j4",
+            "run_cmd": "${PYTHON} poc_parse_cert.py"
+          }
+        }
+      }
+    }
+  ]
+}

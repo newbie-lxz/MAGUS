@@ -1,0 +1,8 @@
+﻿{
+  "dataset": "/home/sq_hu/a/input/SecVulEval/data/train-00000-of-00001.parquet",
+  "checkout_root": "/home/sq_hu/a/input/secvuleval/src",
+  "target_count": 455,
+  "local_relic_project_count": 3,
+  "canonical_file_count": 73,
+  "run_count": 6
+}

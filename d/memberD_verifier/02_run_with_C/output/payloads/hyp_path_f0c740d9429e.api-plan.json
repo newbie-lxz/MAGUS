@@ -1,0 +1,86 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "juliet_api_expanded_c",
+  "sample_id": "path_f0c740d9429e",
+  "hypothesis_id": "hyp_path_f0c740d9429e",
+  "claim": "资源重复操作：对同一个文件指针 data 连续调用两次 fclose，可能导致未定义行为（如双重释放或访问已关闭的文件描述符）。",
+  "cwe_candidates": [
+    "CWE-675"
+  ],
+  "source_file": "/home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE675_Duplicate_Operations_on_Resource/CWE675_Duplicate_Operations_on_Resource__fopen_01.c",
+  "entry_symbol": "CWE675_Duplicate_Operations_on_Resource__fopen_01_bad",
+  "api_sequence": [
+    {
+      "step": 1,
+      "loc": "L26",
+      "code": "data = fopen(\"BadSource_fopen.txt\", \"w+\");"
+    },
+    {
+      "step": 2,
+      "loc": "L28",
+      "code": "fclose(data);"
+    },
+    {
+      "step": 3,
+      "loc": "L30",
+      "code": "fclose(data);"
+    }
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_f0c740d9429e",
+    "entry_symbol": "CWE675_Duplicate_Operations_on_Resource__fopen_01_bad",
+    "input_source": null,
+    "seed_inputs": [
+      "boundary-sized input",
+      "null/zero/negative argument where type permits",
+      "malformed serialized bytes",
+      "state-transition sequence that violates inferred API pattern"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing /home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE675_Duplicate_Operations_on_Resource/CWE675_Duplicate_Operations_on_Resource__fopen_01.c",
+    "Construct or locate a harness that reaches CWE675_Duplicate_Operations_on_Resource__fopen_01_bad",
+    "Drive the API sequence with misuse-oriented inputs for CWE-675",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "ASan/UBSan crash",
+      "non-zero test exit caused by crafted source/API input",
+      "unexpected success on invalid API state",
+      "differential behavior between vulnerable and fixed revision"
+    ],
+    "failure_patterns": [
+      "AddressSanitizer",
+      "UndefinedBehaviorSanitizer",
+      "runtime error:",
+      "Segmentation fault",
+      "null pointer",
+      "heap-use-after-free",
+      "stack-buffer-overflow",
+      "heap-buffer-overflow",
+      "double-free"
+    ],
+    "expect_nonzero_exit": true
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": null,
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": null,
+    "poc_cmd": null,
+    "test_cmd": null,
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "/home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE675_Duplicate_Operations_on_Resource/CWE675_Duplicate_Operations_on_Resource__fopen_01.c::CWE675_Duplicate_Operations_on_Resource__fopen_01_bad",
+    "file": "/home/sq_hu/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3/C/testcases/CWE675_Duplicate_Operations_on_Resource/CWE675_Duplicate_Operations_on_Resource__fopen_01.c",
+    "line": 28,
+    "evidence_slice": "resource:fclose"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-19T12:43:37Z"
+  }
+}

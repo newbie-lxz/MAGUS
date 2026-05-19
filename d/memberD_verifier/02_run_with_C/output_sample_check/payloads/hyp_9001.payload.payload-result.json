@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "failure_code": "ENV_MISSING",
+  "failure_note": "repo_path does not exist: /home/sq_hu/MAGUS/D:/datasets/openssl",
+  "observations": [
+    "payload runner could not find the configured source repository"
+  ],
+  "runtime_trace": [],
+  "timestamps": {
+    "finished_at": "2026-05-19T11:41:49Z"
+  }
+}
