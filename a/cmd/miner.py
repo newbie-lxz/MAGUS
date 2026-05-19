@@ -378,22 +378,22 @@ def artifact_root_for(output_path: Path, project: ProjectInput) -> Path:
 def stage_a_root() -> Path:
     """定位 Stage A 根目录并校验关键配置文件存在。"""
     root = Path(__file__).resolve().parents[1]
-    if (root / "config" / "sink_taxonomy.json").is_file():
+    if (root / "config" / "call_taxonomy.json").is_file():
         return root
     raise ProjectFailure(
         "analysis_setup",
         "stage_a_root_not_found",
-        {"expected": str(root / "config" / "sink_taxonomy.json")},
+        {"expected": str(root / "config" / "call_taxonomy.json")},
     )
 
 
-def sink_taxonomy_path() -> Path:
-    """返回 analyzer 使用的 sink taxonomy 绝对路径。"""
-    path = stage_a_root() / "config" / "sink_taxonomy.json"
+def call_taxonomy_path() -> Path:
+    """返回 analyzer 使用的 call taxonomy 绝对路径。"""
+    path = stage_a_root() / "config" / "call_taxonomy.json"
     if not path.is_file():
         raise ProjectFailure(
             "analysis_setup",
-            "sink_taxonomy_missing",
+            "call_taxonomy_missing",
             {"expected": str(path)},
         )
     return path
@@ -784,7 +784,7 @@ def run_dfa_analyzer_chunk(
     analyzer: AnalyzerBinary,
     project: ProjectInput,
     chunk: AnalyzerChunk,
-    sink_config: Path,
+    call_taxonomy: Path,
     workdir: Path,
     env: dict[str, str],
     timeout: int,
@@ -799,8 +799,8 @@ def run_dfa_analyzer_chunk(
         str(chunk.output_root.resolve()),
         "--bc-list",
         str(chunk.bc_list_path.resolve()),
-        "--sink-config",
-        str(sink_config),
+        "--call-taxonomy",
+        str(call_taxonomy),
     ]
     try:
         return run_command(
@@ -974,7 +974,7 @@ def run_dfa_analyzer(
     bitcode_paths = read_bitcode_list_file(bc_list_abs)
 
     analyzer = ensure_llvm_api_analyzer(run_manifest, timeout, env)
-    sink_config = sink_taxonomy_path()
+    call_taxonomy = call_taxonomy_path()
     chunks = plan_analyzer_chunks(bitcode_paths, requested_jobs, workdir, dfa_root)
     if not chunks:
         raise ProjectFailure("dfa_analyzer", "no_bitcode_paths", {"bc_list": str(bc_list_abs)})
@@ -983,7 +983,7 @@ def run_dfa_analyzer(
         "backend": "llvm_api_analyzer",
         "binary": analyzer.path,
         "binary_source": analyzer.source,
-        "sink_config": str(sink_config),
+        "call_taxonomy": str(call_taxonomy),
         "bc_list": str(bc_list_abs),
         "bcfs_root": str(bcfs_root.resolve()),
         "output_root": str(dfa_root_abs),
@@ -1011,7 +1011,7 @@ def run_dfa_analyzer(
                 analyzer,
                 project,
                 chunk,
-                sink_config,
+                call_taxonomy,
                 workdir,
                 env,
                 timeout,

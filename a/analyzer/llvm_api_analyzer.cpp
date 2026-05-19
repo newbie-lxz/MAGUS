@@ -42,10 +42,10 @@ cl::opt<std::string> ProjectId("project-id", cl::Required, cl::desc("Project ide
 cl::opt<std::string> RepoPath("repo-path", cl::Required, cl::desc("Repository root"));
 cl::opt<std::string> OutputRoot("output-root", cl::Required, cl::desc("DFA output root"));
 cl::opt<std::string> BitcodeList("bc-list", cl::Required, cl::desc("Path to bc.list"));
-cl::opt<std::string> SinkConfig("sink-config", cl::Required, cl::desc("Path to sink taxonomy JSON"));
+cl::opt<std::string> CallTaxonomyConfig("call-taxonomy", cl::Required, cl::desc("Path to call taxonomy JSON"));
 
-struct SinkRuleSet {
-    // 单类 sink 的 exact/prefix/contains 匹配规则。
+struct CallRuleSet {
+    // 单类 call taxonomy 的 exact/prefix/contains 匹配规则。
     std::string kind;
     std::set<std::string> exact;
     std::vector<std::string> prefix;
@@ -84,7 +84,7 @@ struct AnalyzerContext {
     fs::path repoRoot;
     fs::path outputRoot;
     fs::path timeoutLog;
-    std::vector<SinkRuleSet> sinkRules;
+    std::vector<CallRuleSet> callRules;
     size_t maxCrossFunctionDepth = 5;
     std::unordered_set<std::string> helperBlacklistExact;
     std::vector<std::string> helperBlacklistPrefix;
@@ -153,41 +153,41 @@ std::string toLowerCopy(const std::string &value) {
     return lowered;
 }
 
-Expected<std::vector<SinkRuleSet>> loadSinkTaxonomy(const fs::path &path) {
-    // 读取与 Python 侧共享的 sink taxonomy，保持分类口径一致。
+Expected<std::vector<CallRuleSet>> loadCallTaxonomy(const fs::path &path) {
+    // 读取与 Python 侧共享的 call taxonomy，保持分类口径一致。
     ErrorOr<std::unique_ptr<MemoryBuffer>> buffer = MemoryBuffer::getFile(path.generic_string());
     if (!buffer) {
-        return createStringError(inconvertibleErrorCode(), "failed to read sink taxonomy: %s", path.c_str());
+        return createStringError(inconvertibleErrorCode(), "failed to read call taxonomy: %s", path.c_str());
     }
 
     Expected<json::Value> parsed = json::parse(buffer.get()->getBuffer());
     if (!parsed) {
-        return createStringError(inconvertibleErrorCode(), "failed to parse sink taxonomy JSON: %s", path.c_str());
+        return createStringError(inconvertibleErrorCode(), "failed to parse call taxonomy JSON: %s", path.c_str());
     }
 
     json::Object *root = parsed->getAsObject();
     if (root == nullptr) {
-        return createStringError(inconvertibleErrorCode(), "sink taxonomy root must be an object");
+        return createStringError(inconvertibleErrorCode(), "call taxonomy root must be an object");
     }
 
     json::Array *categories = root->getArray("categories");
     if (categories == nullptr || categories->empty()) {
-        return createStringError(inconvertibleErrorCode(), "sink taxonomy must contain a non-empty categories array");
+        return createStringError(inconvertibleErrorCode(), "call taxonomy must contain a non-empty categories array");
     }
 
-    std::vector<SinkRuleSet> rules;
+    std::vector<CallRuleSet> rules;
     for (size_t index = 0; index < categories->size(); ++index) {
         json::Object *entry = (*categories)[index].getAsObject();
         if (entry == nullptr) {
-            return createStringError(inconvertibleErrorCode(), "sink taxonomy category %zu must be an object", index);
+            return createStringError(inconvertibleErrorCode(), "call taxonomy category %zu must be an object", index);
         }
 
         std::optional<StringRef> kind = entry->getString("kind");
         if (!kind || kind->trim().empty()) {
-            return createStringError(inconvertibleErrorCode(), "sink taxonomy category %zu is missing kind", index);
+            return createStringError(inconvertibleErrorCode(), "call taxonomy category %zu is missing kind", index);
         }
 
-        SinkRuleSet rule;
+        CallRuleSet rule;
         rule.kind = toLowerCopy(kind->trim().str());
 
         auto loadStrings = [&](const char *fieldName, std::set<std::string> *targetSet, std::vector<std::string> *targetList) -> Error {
@@ -198,7 +198,7 @@ Expected<std::vector<SinkRuleSet>> loadSinkTaxonomy(const fs::path &path) {
             for (const json::Value &item : *items) {
                 std::optional<StringRef> text = item.getAsString();
                 if (!text) {
-                    return createStringError(inconvertibleErrorCode(), "sink taxonomy field %s must contain only strings", fieldName);
+                    return createStringError(inconvertibleErrorCode(), "call taxonomy field %s must contain only strings", fieldName);
                 }
                 const std::string normalized = toLowerCopy(text->trim().str());
                 if (normalized.empty()) {
@@ -630,9 +630,9 @@ std::string displayCallName(const CallBase &call, const ResolvedCallTargets &tar
     return "INDIRECT_CALL";
 }
 
-std::string classifySinkName(const AnalyzerContext &ctx, const std::string &name) {
+std::string classifyCallKind(const AnalyzerContext &ctx, const std::string &name) {
     const std::string loweredName = toLowerCopy(name);
-    for (const SinkRuleSet &rule : ctx.sinkRules) {
+    for (const CallRuleSet &rule : ctx.callRules) {
         if (rule.exact.find(loweredName) != rule.exact.end()) {
             return rule.kind;
         }
@@ -754,7 +754,7 @@ APIPath *makeOperationPath(
     node->parameter = params;
     node->file = location.file;
     node->line = location.line;
-    node->sinkKind = classifySinkName(ctx, name);
+    node->sinkKind = classifyCallKind(ctx, name);
     node->order = orderIt->second;
     node->serial = state.nextSerial++;
     state.nodeCount += 1;
@@ -2036,12 +2036,12 @@ AnalyzerContext makeAnalyzerContext() {
 }
 
 bool loadAnalyzerConfig(AnalyzerContext &ctx) {
-    Expected<std::vector<SinkRuleSet>> sinkRules = loadSinkTaxonomy(fs::path(SinkConfig.getValue()));
-    if (!sinkRules) {
-        errs() << toString(sinkRules.takeError()) << "\n";
+    Expected<std::vector<CallRuleSet>> callRules = loadCallTaxonomy(fs::path(CallTaxonomyConfig.getValue()));
+    if (!callRules) {
+        errs() << toString(callRules.takeError()) << "\n";
         return false;
     }
-    ctx.sinkRules = std::move(*sinkRules);
+    ctx.callRules = std::move(*callRules);
     return true;
 }
 

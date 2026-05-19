@@ -7,7 +7,7 @@
 - `a/cmd/miner.py`：Stage A 主入口，负责输入校验、构建命令、bitcode 收集、analyzer 并行调度、DFA 记录归一化、`raw/stats` 输出。
 - `a/cmd/gen_input.py`：Stage A 输入生成器，从 `compile_commands.json` 改写出能生成 LLVM bitcode 的 `projects.in.jsonl`。
 - `a/analyzer/llvm_api_analyzer.cpp`：LLVM IR analyzer，负责真正的数据流/控制流分析，产出低层 DFA JSON 记录。
-- `a/config/sink_taxonomy.json`：sink 分类规则，供 C++ analyzer 给调用打 `sink_kind`。
+- `a/config/call_taxonomy.json`：call taxonomy 规则，供 C++ analyzer 给调用打 `sink_kind`。
 - `a/cmd/llm_export.py`：可选导出器，从 `samples.raw.jsonl` 和项目源码恢复 Stage C 使用的 `samples.llm.jsonl` 证据。
 - `pipeline.py`、`Makefile`、`a/Makefile`：根管线和 Stage A 便捷命令。
 
@@ -27,7 +27,7 @@ Stage A 当前有三个主要产物。
 - `seed`：当前样本的 root 调用点，包含 API 名、IR 派生地址、参数标签、源码位置、token、源码切片。
 - `graph`：相关 API/check 子图，包含 `nodes/direct_edges/roots/leaves/checks`。
 - `source_candidates`：根据 API 名识别出的外部输入来源，如 `stdin/network/filesystem/environment/argv`。
-- `sink_candidates`：根据 sink taxonomy 识别出的敏感 API 调用。
+- `sink_candidates`：根据 call taxonomy 打出的 `sink_kind` 标签识别出的敏感 API 调用。
 - `source_sink_flows`：source 到 sink 的最短候选路径，最多保留 3 条。
 - `evidence_slice`：由相关节点源码行拼接出的可读证据片段。
 - `context_signature_tokens`：样本结构签名，优先使用图边 token。
@@ -308,7 +308,7 @@ llvm-api-analyzer \
   --repo-path <repo_path> \
   --output-root <chunk_output_root> \
   --bc-list <chunk_bc_list> \
-  --sink-config a/config/sink_taxonomy.json
+  --call-taxonomy a/config/call_taxonomy.json
 ```
 
 并行执行使用 Python `ThreadPoolExecutor(max_workers=len(chunks))`。每个 chunk 内部的 module index 从 0 开始，所以运行完成后 `relocate_chunk_outputs()` 会把 chunk 局部文件名映射回全局 bitcode index。
@@ -333,7 +333,7 @@ C++ analyzer 是 Stage A 的核心。它对每个 LLVM module 做 seed-centric �
 
 ```text
 main()
-  -> load sink taxonomy
+  -> load call taxonomy
   -> read bc.list
   -> for each bitcode module:
        parseIRFile()
@@ -358,16 +358,16 @@ system+1/2
 
 `positive-parameter-count` 不包含 seed 调用自身的返回值标签 `0`，只统计大于 0 的参数标签。
 
-### 4.2 sink taxonomy 分类
+### 4.2 call taxonomy 分类
 
-`sink_taxonomy.json` 中每个类别有：
+`call_taxonomy.json` 中每个类别有：
 
 - `kind`
 - `exact`
 - `prefix`
 - `contains`
 
-`classifySinkName()` 的匹配顺序：
+`classifyCallKind()` 的匹配顺序：
 
 1. API 名小写化。
 2. 遍历 categories。
@@ -894,7 +894,7 @@ source candidate 字段：
 - `token`
 - `source_slice`
 
-sink taxonomy 的分类在 C++ analyzer 阶段完成，Python 不重复分类。
+call taxonomy 的分类在 C++ analyzer 阶段完成，Python 不重复分类。
 
 ### 5.6 source-sink flow
 
@@ -1216,3 +1216,478 @@ seed + focus + 局部图 + source-sink trace + 源码窗口 + 内部函数摘要
 
 - `samples.stats.jsonl`：可挖掘的离散图边特征。
 - `samples.llm.jsonl`：可审计的证据切片。
+
+## 13. 两个 Python 入口的函数级流程图
+
+本节只描述两个重点代码文件：
+
+- `a/cmd/gen_input.py`：把 `compile_commands.json` 转成 Stage A 项目输入。
+- `a/cmd/miner.py`：执行 Stage A 主流程，写出 raw 和 stats。
+
+### 13.1 `gen_input.py` 总调用图
+
+```mermaid
+flowchart TD
+  GI_MAIN["main()"] --> GI_ARGS["parse_args()"]
+  GI_MAIN --> GI_REPO["resolve_path(args.repo_path)"]
+  GI_MAIN --> GI_CC["resolve_path(args.compile_commands) 或 repo/compile_commands.json"]
+  GI_MAIN --> GI_OUT["resolve_path(args.output)"]
+  GI_MAIN --> GI_BUILD["build_project_record(args, repo_path, compile_commands_path, output_path)"]
+  GI_BUILD --> GI_LOAD["load_compile_commands()"]
+  GI_BUILD --> GI_BCDIR["校验 --bc-dir"]
+  GI_BUILD --> GI_LOOP["逐条 compile command record"]
+  GI_LOOP --> GI_DIR["record_directory()"]
+  GI_LOOP --> GI_SRC["record_source()"]
+  GI_SRC --> GI_IS_SRC["is_source_path()"]
+  GI_IS_SRC -->|否| GI_SKIP["跳过非 C/C++ 源文件"]
+  GI_IS_SRC -->|是| GI_BC_PATH["output_path_for_source()"]
+  GI_LOOP --> GI_TOKENS["command_tokens()"]
+  GI_TOKENS --> GI_NORM["normalize_compile_tokens()"]
+  GI_NORM --> GI_COMPILER_IDX["compiler_index()"]
+  GI_COMPILER_IDX --> GI_COMPILER_MATCH["compiler_name_matches()"]
+  GI_NORM --> GI_STRIP_O["strip_output_option()"]
+  GI_NORM --> GI_STRIP_DEP["strip_dependency_options()"]
+  GI_NORM --> GI_CMD["拼出 clang -emit-llvm -c -g ... -o *.bc"]
+  GI_LOOP --> GI_APPEND["append_shell_command() 去重追加 mkdir/build 命令"]
+  GI_BUILD --> GI_GLOBS["source_globs_for()"]
+  GI_BUILD --> GI_RECORD["返回 ProjectInput JSON record"]
+  GI_MAIN --> GI_WRITE["write_output()"]
+```
+
+核心数据流：
+
+```text
+compile_commands.json
+  -> load_compile_commands()
+  -> 每条记录抽 directory/file/arguments 或 command
+  -> 过滤 .c/.cc/.cpp/.cxx
+  -> 保留原编译参数中的 include/define/std/arch 等有效参数
+  -> 删除原 -o、依赖文件参数、-c/-S/-E
+  -> 改写为生成 LLVM bitcode 的命令
+  -> 合并成 extensions.build_cmd
+  -> 写出 projects.in.jsonl 单行 JSON
+```
+
+失败边界：
+
+- `repo_path` 不存在：`main()` 直接失败。
+- `compile_commands.json` 缺失或不是合法 JSON array：`load_compile_commands()` 失败。
+- 单条 compile command 缺 `directory`、`file`、`arguments/command`：对应解析函数失败。
+- 无法识别编译器 token：`compiler_index()` 失败。
+- 源文件不在 `repo_path` 下：`output_path_for_source()` 失败。
+- 没有任何 C/C++ 源文件记录：`build_project_record()` 或 `source_globs_for()` 失败。
+- 输出文件已存在且没传 `--force`：`write_output()` 失败。
+
+### 13.2 `miner.py` 总调用图
+
+```mermaid
+flowchart TD
+  M_MAIN["main()"] --> M_PARSE["parse_args()"]
+  M_MAIN --> M_READ["read_projects(input_path)"]
+  M_READ --> M_PROJECT["ProjectInput(...)"]
+  M_MAIN --> M_LOOP["逐项目处理"]
+  M_LOOP --> M_PREP["prepare_project(project, base_dir)"]
+  M_PREP --> M_NORM["ProjectInput.normalize()"]
+  M_PREP --> M_VALID["ProjectInput.validate()"]
+  M_LOOP --> M_RUN["run_project(project, output_path)"]
+  M_RUN --> M_MINE["mine(project, output_path)"]
+  M_MINE --> M_ART["artifact_root_for() + ensure_clean_dir()"]
+  M_MINE --> M_FORMAL["formal_mine(project, artifact_root)"]
+  M_FORMAL --> M_SETUP["校验 repo_path/build_cwd/env/timeout"]
+  M_FORMAL --> M_CONFIG["execute_optional_stage('config')"]
+  M_FORMAL --> M_BUILD["execute_optional_stage('build')"]
+  M_FORMAL --> M_BC["collect_bitcode()"]
+  M_FORMAL --> M_DFA["run_dfa_analyzer()"]
+  M_FORMAL --> M_NDFA["normalize_dfa()"]
+  M_NDFA --> M_ITER["iter_dfa_records()"]
+  M_ITER --> M_RECORD["record_to_sample()"]
+  M_RECORD --> M_GRAPH["build_record_graph() / build_graph_payload()"]
+  M_RECORD --> M_CAND["build_source_candidates() / build_sink_candidates()"]
+  M_RECORD --> M_FLOW["build_source_sink_flows()"]
+  M_RECORD --> M_SAMPLE["组装 canonical raw sample"]
+  M_MAIN --> M_SORT["按 project_id/sample_id 排序"]
+  M_MAIN --> M_WRITE["write_outputs(output_path, all_samples)"]
+  M_WRITE --> M_RAW["write_samples()"]
+  M_WRITE --> M_STATS["write_stats_output()"]
+  M_STATS --> M_STAT_REC["stats_records_for_samples()"]
+  M_MAIN --> M_CLEAN["cleanup_successful_artifacts()"]
+```
+
+Stage A 主流程按责任可分成 6 段：
+
+```text
+1. 输入层：read_projects -> ProjectInput.normalize/validate
+2. 构建层：formal_mine -> execute_optional_stage(config/build)
+3. bitcode 层：collect_bitcode -> detect_bitcode_format -> bc.list
+4. analyzer 层：run_dfa_analyzer -> chunk 并行 -> 合并 DFA 输出
+5. 归一化层：iter_dfa_records -> record_to_sample -> raw sample
+6. 派生层：write_outputs -> write raw -> write stats
+```
+
+### 13.3 `miner.py` analyzer chunk 流程图
+
+```mermaid
+flowchart TD
+  RDA["run_dfa_analyzer()"] --> WD["ensure_clean_dir(analysis_workdir)"]
+  RDA --> READ_BC["read_bitcode_list_file(bc.list)"]
+  RDA --> ENSURE_BIN["ensure_llvm_api_analyzer()"]
+  ENSURE_BIN --> EXIST["bundled_analyzer_binary()"]
+  ENSURE_BIN -->|不存在| MAKE["run_command('analyzer_build', ['make'])"]
+  RDA --> CALL_TAX["call_taxonomy_path()"]
+  RDA --> PLAN["plan_analyzer_chunks()"]
+  PLAN --> WRITE_CHUNK_LIST["write_bitcode_list_file(chunk-xxx.bc.list)"]
+  RDA --> POOL["ThreadPoolExecutor"]
+  POOL --> CHUNK["run_dfa_analyzer_chunk()"]
+  CHUNK --> CMD["run_command(llvm-api-analyzer ...)"]
+  POOL --> CHECK_FAIL["收集 chunk failure/returncode"]
+  CHECK_FAIL --> RELOC["relocate_chunk_outputs()"]
+  RELOC --> MERGE_TIMEOUT["merge_chunk_timeout_logs()"]
+  MERGE_TIMEOUT --> CLEAN_TMP["cleanup_analyzer_chunk_temps()"]
+  CLEAN_TMP --> SUMMARY["write_dfa_summary()"]
+  SUMMARY --> DFA_ROOT["返回 dfa_root"]
+```
+
+这一段的关键点是：每个 chunk 里的 analyzer 输出文件名使用局部 module index，合并时 `relocate_chunk_outputs()` 会把它们映射回原始 `bc.list` 的全局 index。这样并行执行不会改变最终输出布局。
+
+### 13.4 `miner.py` DFA 记录到 raw sample 流程图
+
+```mermaid
+flowchart TD
+  RTS["record_to_sample()"] --> BASIC["取 file/function/API/address"]
+  BASIC --> FILTER["filter_source_file() + entry_functions 过滤"]
+  FILTER --> GRAPH["build_record_graph()"]
+  GRAPH --> INDEX["build_record_node_index()"]
+  GRAPH --> NODE["DfaGraphNode(...) + read_source_line()"]
+  GRAPH --> EDGE["direct_next -> direct_graph"]
+  RTS --> REDUCE["reduce_record_graph()"]
+  RTS --> ORDER["ordered_context_node_ids()"]
+  RTS --> SIG["context_signature_tokens_for()"]
+  SIG --> EDGE_TOKEN["graph_edge_tokens()"]
+  SIG -->|无边| SEQ_TOKEN["sequence_tokens_for()"]
+  RTS --> SOURCE["build_source_candidates()"]
+  RTS --> SINK["build_sink_candidates()"]
+  RTS --> FLOW["build_source_sink_flows()"]
+  FLOW --> BFS["shortest_path_between()"]
+  RTS --> FOCUS["best_focus_location()"]
+  RTS --> GRAPH_PAYLOAD["build_graph_payload()"]
+  RTS --> SAMPLE_ID["sample_id()"]
+  RTS --> RAW["返回 raw sample dict"]
+```
+
+这里的 Python 归一化不重新做 LLVM 数据流分析，它只是把 C++ analyzer 的低层 JSON 记录变成下游稳定契约：
+
+- 低层 `path/direct_next` 变成 `graph.nodes/direct_edges`。
+- API 名和 `sink_kind` 变成统一 token。
+- 源码行恢复为 `source_slice/evidence_slice`。
+- source/sink/flow/focus 作为审计提示写入 raw。
+- graph edge token 后续派生为 Stage B 的 `feature_tokens`。
+
+### 13.5 `miner.py` stats 派生流程图
+
+```mermaid
+flowchart TD
+  WSO["write_stats_output(raw_output_path, samples)"] --> PATH["derived_stats_output_path()"]
+  WSO --> RECS["stats_records_for_samples(samples)"]
+  RECS --> LOCS["收集 entrypoint file/function 并排序编号"]
+  RECS --> LOOP["逐 sample"]
+  LOOP --> EDGES["sample_direct_edges()"]
+  LOOP --> NODE_INDEX["sample_node_index()"]
+  LOOP --> FEATURES["sample_feature_records()"]
+  FEATURES --> TOKEN["from_token->to_token"]
+  FEATURES --> DETAIL["feature_details + occurrence_count"]
+  LOOP --> SOURCE_KINDS["source_candidates.kind 去重"]
+  LOOP --> SINK_TYPES["sink_candidates.type 去重"]
+  LOOP --> STATS["feature_stats"]
+  RECS --> JSONL["write_jsonl(stats_path, records)"]
+```
+
+`stats` 是 raw 的降维视图，目的不是保留所有证据，而是给 Stage B 一个稳定、离散、可挖掘的 feature 集合。
+
+## 14. `a/cmd/gen_input.py` 逐函数说明
+
+### 14.1 顶层常量
+
+| 名称 | 作用 |
+| --- | --- |
+| `CANONICAL_ANALYSIS_BACKEND` | 固定写入 Stage A 输入的 backend，当前为 `llvm_api_dfa`。 |
+| `DEFAULT_ANALYZER_JOBS` | 默认 analyzer 并行 job 数，写入 `extensions.analyzer_jobs`。 |
+| `DEFAULT_ANALYSIS_TIMEOUT` | 默认命令超时，写入 `extensions.analysis_timeout`。 |
+| `SUPPORTED_SOURCE_SUFFIXES` | 允许从 compile database 转换的源文件后缀：`.c/.cc/.cpp/.cxx`。 |
+| `KNOWN_COMPILER_NAMES` | 可被识别为编译器的基础名称。 |
+| `COMPILER_WRAPPER_NAMES` | 可跳过的编译器包装器，如 `ccache/sccache/distcc`。 |
+
+### 14.2 函数职责表
+
+| 函数 | 输入 | 输出 | 做什么 | 失败条件/注意点 |
+| --- | --- | --- | --- | --- |
+| `parse_args()` | 命令行参数 | `argparse.Namespace` | 定义 `gen_input.py` 的 CLI，包括 repo、compile database、输出路径、项目字段、clang/clangxx、bc-dir、source-glob、force。 | 只负责解析，不校验路径存在。 |
+| `resolve_path(raw)` | 字符串路径 | 绝对 `Path` | 展开 `~` 并解析成绝对路径。 | 不检查路径是否存在。 |
+| `relative_or_absolute(path, base_dir)` | 目标路径和基准目录 | 字符串 | 如果 `path` 在 `base_dir` 内，返回相对路径；否则返回绝对路径。用于让输出 JSONL 尽量可移植。 | 只做展示/记录，不改变文件系统。 |
+| `output_path_for_source(repo_path, source_path, bc_dir, variant)` | repo 根、源文件、bitcode 目录、变体名 | bitcode 输出路径 | 把 `repo/foo/bar.c` 映射成 `repo/<bc_dir>/foo/bar.bc`；如果同源多编译变体，则写成 `bar.variantN-hash.bc`。 | 源文件不在 repo 下会失败，防止把 repo 外文件写进项目记录。 |
+| `load_compile_commands(path)` | compile database 路径 | list[dict] | 读取并解析 `compile_commands.json`。 | 文件不存在、JSON 非法、根不是数组都会失败。 |
+| `command_tokens(record, index)` | 单条 compile command | token 列表 | 优先读取标准字段 `arguments`；没有时读取 shell 字符串 `command` 并用 `shlex.split()` 分词。 | `arguments` 不是字符串列表，或 `command` 缺失/为空时失败。 |
+| `record_directory(record, index)` | 单条 compile command | 绝对目录路径 | 读取 `directory` 字段并解析成绝对路径。 | `directory` 缺失或为空时失败。 |
+| `record_source(record, directory, index)` | compile record 和 directory | 绝对源文件路径 | 读取 `file` 字段；相对路径按 `directory` 解析。 | `file` 缺失或为空时失败。 |
+| `is_source_path(path)` | 文件路径 | bool | 判断后缀是否是 Stage A 支持的 C/C++ 源文件。 | 只看后缀，不检查文件是否存在。 |
+| `strip_output_option(tokens)` | 编译命令 token | token 列表 | 删除原命令里的 `-o out` 或 `-oout`，避免和新的 `.bc` 输出冲突。 | 如果原命令有异常 token 排布，只按 token 规则跳过。 |
+| `strip_dependency_options(tokens)` | 编译命令 token | token 列表 | 删除依赖文件生成参数：`-M/-MM/-MD/-MMD/-MF/-MT/-MQ/-MJ/-MP/-MG` 等。 | 这些参数对 bitcode 生成不是核心输入，删除后避免写出额外 dep 文件。 |
+| `compiler_name_matches(name)` | 编译器 basename | bool | 判断 token 是否像 C/C++ 编译器。支持固定名称和交叉编译器后缀如 `aarch64-linux-gnu-gcc`、`foo-clang++`。 | 目前不识别 `clang-20` 这种版本后缀；这也是为什么 `compile_commands.json` 里建议保留标准 token，真实 clang 路径通过 `--clang` 注入。 |
+| `compiler_index(tokens, source_path)` | 命令 token 和源文件路径 | 编译器 token 下标 | 在命令中找到真实编译器位置；遇到 `ccache/sccache/distcc` 会跳过继续找。 | 找不到可识别编译器时失败。 |
+| `normalize_compile_tokens(tokens, source_path, output_path, clang, clangxx)` | 原编译 token、源文件、bc 输出、实际 clang 路径 | 新 bitcode 编译 token | 将原命令改写为 `<clang> -emit-llvm -c -g <保留参数> -o <output.bc>`；C 文件用 `clang`，C++ 用 `clangxx`。 | 输入 token 为空、无法识别编译器时失败。 |
+| `source_globs_for(sources, repo_path, explicit_globs)` | 已接受源文件、repo、显式 glob | glob 列表 | 如果用户传了 `--source-glob` 就用用户值；否则根据源文件后缀生成 `**/*.c`、`**/*.cc`、`**/*.cpp`、`**/*.cxx`。 | 没有任何可支持源文件时失败。 |
+| `build_project_record(args, repo_path, compile_commands_path, input_jsonl_path)` | CLI 参数、路径 | 单个 Stage A project dict | 核心生成函数：读取 compile database，逐条改写编译命令，生成 `extensions.build_cmd`、`bitcode_globs`、`source_globs` 等字段。 | `--bc-dir` 为空、绝对路径或包含 `..` 时失败；无 C/C++ 记录时失败。 |
+| `write_output(path, record, force)` | 输出路径、项目记录、覆盖标志 | 无 | 创建父目录并写一行 JSONL。 | 输出已存在且未传 `--force` 时失败。 |
+| `main()` | CLI | exit code | 串起完整流程：解析参数、校验 repo、确定 compile database、构建记录、写输出。 | 捕获所有异常，打印 `gen input failed: ...` 并返回 1。 |
+
+### 14.3 `build_project_record()` 的内部细节
+
+`build_project_record()` 是 `gen_input.py` 最重要的函数，它在一轮循环里完成 5 件事：
+
+```text
+1. 初始化 build_cmd：
+   commands = ["mkdir -p <bc_dir>"]
+
+2. 逐条处理 compile_commands：
+   - 校验 record 是 object
+   - 解析 directory
+   - 解析 file
+   - 非 C/C++ 后缀直接跳过
+
+3. 处理同源多变体：
+   - 第一次出现：foo.c -> foo.bc
+   - 第二次以后：foo.c -> foo.variant<N>-<sha1>.bc
+
+4. 改写命令：
+   - 从 arguments/command 得到 tokens
+   - 找到编译器位置
+   - 去掉原输出和依赖参数
+   - 改为 clang/clang++ 生成 bitcode
+   - 包成 `( cd <directory> && <bitcode command> )`
+
+5. 组装 project record：
+   - repo_path 相对 output 所在目录优先
+   - build_cmd 用 ` && ` 串联所有 mkdir 和 clang 命令
+   - bitcode_globs 指向 `<bc_dir>/**/*.bc`
+   - source_globs 来自显式参数或源文件后缀推导
+```
+
+`append_shell_command()` 是 `build_project_record()` 内部闭包，用 `seen_shell_commands` 去重，避免相同 `mkdir -p` 或相同编译命令重复进入 `build_cmd`。
+
+## 15. `a/cmd/miner.py` 逐函数说明
+
+### 15.1 数据类和异常类
+
+| 类/方法 | 做什么 |
+| --- | --- |
+| `ProjectInput` | Stage A 单个项目输入记录，字段来自 `projects.in.jsonl`。它不只是数据容器，还负责 normalize/validate 和 extensions 字段解析。 |
+| `ProjectInput.normalize(base_dir)` | 归一化 `framework/language`，并把相对 `repo_path` 按输入 JSONL 所在目录解析成绝对路径。 |
+| `ProjectInput.validate()` | 校验项目必填字段、语言、backend、build_cmd、analyzer_jobs。它不会检查 repo 是否存在，repo 检查在 `formal_mine()`。 |
+| `ProjectInput.backend_mode()` / `backend_mode()` | 读取 `extensions.analysis_backend`，空值默认 `llvm_api_dfa`，非该 backend 直接失败。 |
+| `ProjectInput.build_command()` / `build_command()` | 读取并归一化 `extensions.build_cmd`，返回 shell 字符串或 None。 |
+| `ProjectInput.config_command()` / `config_command()` | 读取并归一化可选 `extensions.config_cmd`。 |
+| `ProjectInput.build_env()` | 读取 `extensions.build_env`，要求是对象，并把 key/value 转成字符串。 |
+| `ProjectInput.build_cwd()` | 读取 `extensions.build_cwd`，默认 repo 根；相对路径按 repo 根解析。 |
+| `ProjectInput.analysis_timeout()` | 读取 `extensions.analysis_timeout`，默认 900，必须是正整数且不能是 bool。 |
+| `ProjectInput.analyzer_jobs()` | 读取 `extensions.analyzer_jobs`，必须存在、是整数、大于 1。 |
+| `ProjectInput.target_subdirs()` | 读取过滤目录前缀，归一化为无首尾 `/` 的 posix 路径。 |
+| `ProjectInput.entry_functions()` | 读取入口函数白名单，只保留非空字符串。 |
+| `ProjectInput.source_globs()` | 读取源码 glob 过滤列表，只保留非空字符串。 |
+| `ProjectInput.bitcode_globs()` | 读取 bitcode glob，默认 `["**/*.bc"]`；空列表非法。 |
+| `CommandResult` | 保存一个外部命令的 stage、command、cwd、returncode、stdout、stderr。 |
+| `CommandResult.as_manifest()` / `as_manifest()` | 生成写入 `run_manifest.json` 的命令摘要，只保留 stdout/stderr 尾部。 |
+| `AnalyzerBinary` | 保存 analyzer 二进制路径和来源：workspace 或 built_workspace。 |
+| `AnalyzerChunk` | 保存一个 analyzer 并行分片：chunk index、chunk bc.list、chunk 输出目录、全局 module index 列表。 |
+| `DfaGraphNode` | Python 归一化后的图节点，统一承载 call 节点和 `CHECK` 节点。 |
+| `ProjectFailure` | Stage A 的结构化失败异常，带 `stage/reason/details`，用于 manifest 和 stderr。 |
+
+### 15.2 CLI、路径、基础 IO 函数
+
+| 函数 | 做什么 |
+| --- | --- |
+| `parse_args()` | 解析 Stage A 主入口参数：`--input projects.in.jsonl` 和 `--output samples.raw.jsonl`。 |
+| `normalize_language(language)` | 把 `c` 保持为 `c`，把 `c++/cpp/cc/cxx` 归一为 `cpp`，其他返回 None。 |
+| `normalize_prefix(value)` | 清理目录前缀，去掉空白和首尾 `/`，转成 posix 风格。 |
+| `expand_recursive_glob(pattern)` | 把 `**/foo` 逐步展开为多个可匹配模式，例如 `**/*.c` 会补出 `*.c`，用于 `Path.match()` 的兼容匹配。 |
+| `normalize_command(value, field_name)` | shell 命令字段必须是字符串；空字符串视为 None；非字符串失败。 |
+| `utc_now()` | 返回无微秒 UTC ISO 字符串，用于 manifest/sample 时间戳。 |
+| `read_projects(path)` | 逐行读取 JSONL，跳过空行，把每行转成 `ProjectInput`。 |
+| `write_samples(path, samples)` | 写 raw samples JSONL。 |
+| `write_json(path, payload)` | 写格式化 JSON 文件，自动创建父目录。 |
+| `write_jsonl(path, records)` | 写 JSONL 文件，自动创建父目录。 |
+| `derived_stats_output_path(raw_output_path)` | 要求 raw 输出名以 `.raw.jsonl` 结尾，并推导对应 `.stats.jsonl`。 |
+| `tail_text(text, max_lines=40, max_chars=4000)` | 截取命令输出尾部，用于失败摘要，避免 manifest 过大。 |
+| `ensure_clean_dir(path)` | 如果目录存在先删除，再创建空目录。用于 artifact 和 workdir。 |
+| `artifact_root_for(output_path, project)` | 返回 `<raw_output_dir>/a.artifacts/<project_id>`。 |
+
+### 15.3 环境发现、命令执行、失败记录
+
+| 函数 | 做什么 |
+| --- | --- |
+| `stage_a_root()` | 从当前文件位置定位 `a/` 根目录，并确认 `config/call_taxonomy.json` 存在。 |
+| `call_taxonomy_path()` | 返回 call taxonomy 配置路径；缺失时抛 `analysis_setup/call_taxonomy_missing`。 |
+| `detect_bitcode_format(path)` | 读取文件头识别 `llvm_bitcode`、`llvm_bitcode_wrapper`、`elf_object`、`llvm_ir_text` 或 `unknown`。 |
+| `run_command(stage, command, cwd, env, timeout)` | 执行外部命令。字符串命令走 `/bin/bash`，列表命令直接执行；捕获 stdout/stderr，返回 `CommandResult`。 |
+| `write_failure_manifest(artifact_root, failure)` | 把 `ProjectFailure` 写成 `failures.json`，包含 stage、reason、details、时间戳。 |
+| `command_failure(stage_name, command, cwd, timeout, exc)` | 把 `FileNotFoundError`、`TimeoutExpired` 或其他启动异常转成 `ProjectFailure`。 |
+| `execute_optional_stage(stage_name, command, cwd, env, timeout, run_manifest)` | 执行 config/build 这类可选阶段。命令为空则跳过；非 0 返回码变成 `ProjectFailure(stage_name, command_failed)`；结果写入 manifest。 |
+
+### 15.4 bitcode 收集和 analyzer 调度
+
+| 函数 | 做什么 |
+| --- | --- |
+| `collect_bitcode(project, artifact_root)` | 按 `project.bitcode_globs()` 在 repo 下找 `.bc`，复制到 artifact 的 `bcfs`，检查格式，写 `bitcode_manifest.json` 和 `bc.list`。没有 bitcode 或格式非法都会失败。 |
+| `write_dfa_summary(artifact_root, dfa_root, backend, toolchain)` | 汇总 DFA 输出文件列表、timeout log 和 analyzer toolchain 信息，写 `dfa_summary.json`；没有任何输出文件时失败。 |
+| `read_bitcode_list_file(path)` | 读取 `bc.list`，返回非空行列表。 |
+| `write_bitcode_list_file(path, bitcode_paths)` | 写 chunk 级 `bc.list`。 |
+| `plan_analyzer_chunks(bitcode_paths, requested_jobs, workdir, dfa_root)` | 根据 bitcode 数和 job 数平均切分 chunk，写每个 chunk 的输入列表，返回 `AnalyzerChunk` 列表。 |
+| `run_dfa_analyzer_chunk(analyzer, project, chunk, sink_config, workdir, env, timeout)` | 对单个 chunk 调用 `llvm-api-analyzer`，传入 project id、repo path、output root、bc-list、sink config。 |
+| `relocate_chunk_outputs(chunk, dfa_root)` | 把 chunk 输出中的局部 module index 文件名映射成全局 module index，并移动到最终 `dfa_root`。遇到非法文件名、越界 index、重复目标文件时失败。 |
+| `merge_chunk_timeout_logs(chunks, dfa_root)` | 把各 chunk 目录旁的 `timeout` 日志合并到最终 workdir 的 timeout 文件。 |
+| `cleanup_analyzer_chunk_temps(chunks)` | 删除 chunk 输入列表和空的临时目录。 |
+| `bundled_analyzer_binary()` | 检查 `a/analyzer/llvm-api-analyzer` 是否存在且可执行，若存在返回 `AnalyzerBinary`。 |
+| `ensure_llvm_api_analyzer(run_manifest, timeout, env)` | 优先使用已存在 analyzer；否则在 `a/analyzer` 执行 `make` 构建，并校验构建产物可执行。 |
+| `run_dfa_analyzer(project, artifact_root, bcfs_root, bc_list_path, timeout, run_manifest, env)` | analyzer 层总入口：准备 workdir、读 bc.list、确保 analyzer、规划 chunk、并行执行、检查失败、合并输出、写 summary，最后返回 `dfa_root`。 |
+
+### 15.5 源码过滤、token 和图辅助函数
+
+| 函数 | 做什么 |
+| --- | --- |
+| `filter_source_file(project, relative_path)` | 对 analyzer record 的源码路径做项目过滤：`target_subdirs` 优先，其次 `source_globs`，都没有则放行。 |
+| `sample_id(project_id, entrypoint_id, seed_api, seed_address, context_signature_tokens)` | 用 SHA1 生成稳定样本 ID：`path_<12 hex>`。 |
+| `parse_parameter_list(values)` | 把参数标签列表转成去重排序后的 int 列表，非法值跳过。 |
+| `node_order_from_id(node_id, fallback)` | 从节点 ID 最后的 `:<order>` 解析 IR 顺序号；失败用 fallback。 |
+| `sort_node_ids(node_ids, nodes)` | 按节点 order 再按 ID 排序，确保输出稳定。 |
+| `node_token(node)` | 统一节点 token：`CHECK` 为 `check:CHECK`；sink 为 `<sink_kind>:<name>`；普通 call 为 `call:<name>`。 |
+| `sequence_tokens_for(entry_name, path_ids, nodes)` | 在没有图边时，用 entry + 线性节点序列生成签名 token。 |
+| `ordered_context_node_ids(root_id, nodes)` | 返回按 order 排序的上下文节点 ID。当前只排序全体节点，不做可达裁剪。 |
+| `context_signature_tokens_for(entry_name, children_map, nodes, context_node_ids)` | 优先使用 `graph_edge_tokens()`；如果没有边 token，退回 `sequence_tokens_for()`。 |
+| `unique_locations(items)` | 对 `(file,line)` 去重，过滤空文件和非正行号，输出 dict 列表。 |
+| `graph_sources(children_map)` | 从 children map 计算入度为 0 的 root 节点。 |
+| `graph_leaves(children_map)` | 找出没有 children 的叶子节点。 |
+| `unique_text(items)` | 对字符串去空白、去重，并保留首次出现顺序。 |
+| `normalized_warning_list(*groups)` | 合并多组 warning 字符串，去空白、去重、保序。 |
+| `path_evidence_slice(path_ids, nodes)` | 把路径节点的 `source_slice` 去重拼接成证据文本。 |
+
+### 15.6 DFA 输出读取和源码恢复
+
+| 函数 | 做什么 |
+| --- | --- |
+| `iter_dfa_records(dfa_root)` | 遍历 analyzer 输出目录下所有文件，逐行解析 JSON，并加 `_record_file` 字段标记来源文件。 |
+| `positive_parameter_arity(parameters)` | 统计参数标签中大于 0 的数量；标签 0 不算 API 实参。 |
+| `resolve_source_path(repo_path, file_path)` | 把 record 中的源码路径解析到真实文件；不存在则返回 None。 |
+| `read_source_lines(repo_path, file_path)` | 读取源码文件所有行，并用全局 `SOURCE_CACHE` 缓存。 |
+| `read_source_line(repo_path, file_path, line_no)` | 返回指定源码行的 strip 文本；行号非法或文件不可读则返回空字符串。 |
+| `build_record_node_index(record)` | 从低层 record 的 `path` 和每个节点的 `direct_next` 中抽取所有节点，以 `address` 去重。 |
+| `build_record_graph(record, repo_path, source_file)` | 把低层节点 payload 转成 `DfaGraphNode`，读取源码行，恢复 direct graph，返回 `nodes/direct_graph/root_id`。 |
+| `reduce_record_graph(graph, nodes)` | 把 `dict[str,set[str]]` 转成 children list，并按节点顺序排序。 |
+
+### 15.7 source/sink/flow 识别
+
+| 函数 | 做什么 |
+| --- | --- |
+| `classify_source_name(name)` | 根据 Python 侧硬编码 exact/prefix 规则，把 API 名分类为 `filesystem/stdin/network/environment/argv` 等 source kind。 |
+| `build_source_candidates(nodes)` | 遍历节点，使用 `classify_source_name()` 找 source candidate，输出 id、kind、call、file、line、token。 |
+| `shortest_path_between(children_map, start_id, goal_id, nodes)` | BFS 查找从 source 节点到 sink 节点的最短路径，按节点顺序稳定遍历。 |
+| `build_source_sink_flows(source_candidates, sink_candidates, children_map, nodes)` | 对 source/sink 组合找最短路径，生成最多 3 条 candidate flow，按路径长度和 ID 排序。 |
+| `build_sink_candidates(nodes)` | 遍历节点，凡是带 `sink_kind` 的节点都成为 sink candidate。sink 分类来自 C++ analyzer，不在 Python 重算。 |
+| `best_focus_location(sink_candidates, seed_node)` | 如果有 sink，选择行号最早的 sink 作为 focus；否则 focus 是 seed 节点。 |
+
+### 15.8 raw graph 和 sample 组装
+
+| 函数 | 做什么 |
+| --- | --- |
+| `build_graph_payload(nodes, direct_children_map, root_id)` | 生成 raw sample 的 `graph` 字段：节点列表、direct_edges、roots、leaves、checks。 |
+| `graph_edge_tokens(entry_name, children_map, nodes)` | 生成结构签名边 token，包含 `entry:<function>-><root_token>` 和所有 `from_token->to_token`。 |
+| `source_locations_for_sample(source_file, source_line, nodes)` | 收集 entrypoint 和所有节点位置，去重后写入 `source_locs`。 |
+| `record_to_sample(project, repo_path, record, bitcode_status)` | 低层 DFA record 到 canonical raw sample 的核心函数。它完成字段校验、过滤、图构建、token、source/sink/flow、focus、sample_id、graph_stats、时间戳等全部组装。 |
+| `normalize_dfa(project, artifact_root, dfa_root)` | 遍历所有 DFA record，调用 `record_to_sample()`，按 `sample_id` 去重并排序；无记录或过滤后无样本时失败。 |
+
+`record_to_sample()` 的字段生成可以按下面理解：
+
+```text
+低层 record 基础字段
+  file/function/API/address/parameter/function_line
+
+Python 恢复字段
+  nodes/direct_edges/source_slice/token/source_candidates/sink_candidates/source_sink_flows
+
+最终 raw 字段
+  project_id/sample_id/language/framework/entrypoint/source_locs/sink_locs
+  evidence_slice/api_group/context_signature_tokens/bitcode/dfa/seed/graph
+  analysis_warnings/analyzer_stats/indirect_call_stats/focus/graph_stats/timestamps
+```
+
+### 15.9 stats 派生函数
+
+| 函数 | 做什么 |
+| --- | --- |
+| `sample_seed_id(sample)` | 从 raw sample 的 `seed.id` 或 `seed.address` 取稳定 seed ID。 |
+| `sample_direct_edges(sample)` | 安全读取 `sample.graph.direct_edges`，不是列表则返回空列表。 |
+| `sample_node_index(sample)` | 把 raw graph 节点按 `id` 建索引，供 edge feature 补充源码位置和参数。 |
+| `sample_feature_records(sample)` | 从 direct_edges 派生 feature detail。token 是 `from_token->to_token`，同 token 在单个 sample 内合并并累计 `occurrence_count`。 |
+| `stats_records_for_samples(samples)` | 从全部 raw samples 生成 Stage B stats 记录，包括 location_id、feature_tokens/details、source_kinds、sink_types、focus、feature_stats。 |
+| `write_stats_output(raw_output_path, samples)` | 推导 `.stats.jsonl` 路径，并写 stats JSONL。 |
+
+### 15.10 单项目运行和顶层调度
+
+| 函数 | 做什么 |
+| --- | --- |
+| `formal_mine(project, artifact_root)` | 单项目正式执行流程：校验 repo/build_cwd，准备 env，执行 config/build，收集 bitcode，运行 analyzer，归一化 DFA，写 run_manifest。 |
+| `mine(project, output_path)` | 为项目创建/清理 artifact root，调用 `formal_mine()`；若发生 `ProjectFailure`，额外写 `failures.json` 后继续抛出。 |
+| `prepare_project(project, base_dir)` | 调用 `normalize()` 和 `validate()`；失败时打印 `skip invalid project ...` 并返回 False。 |
+| `run_project(project, output_path)` | 调用 `mine()`；捕获 `ProjectFailure` 和其他异常，打印项目失败摘要，返回 None。 |
+| `write_outputs(output_path, samples)` | 先写 raw，再写 stats。stats 路径由 raw 路径推导。 |
+| `cleanup_successful_artifacts(output_path, projects)` | 在 raw/stats 都写成功后，删除成功项目的 artifact root；失败项目 artifact 保留。 |
+| `main()` | Stage A CLI 顶层：读输入、逐项目 prepare/run、聚合样本、排序、写输出、清理成功 artifact、打印样本数。 |
+
+### 15.11 `formal_mine()` 的失败和 manifest 语义
+
+`formal_mine()` 用 `try/except/finally` 保证无论成功或失败都会写 `run_manifest.json`：
+
+```text
+try:
+  config/build/collect/analyze/normalize
+  run_manifest["sample_count"] = len(samples)
+  return samples
+except ProjectFailure as failure:
+  run_manifest["failure"] = {stage, reason, details}
+  raise
+finally:
+  run_manifest["finished_at"] = utc_now()
+  write_json(artifact_root / "run_manifest.json", run_manifest)
+```
+
+因此失败排查的第一入口通常是：
+
+```text
+<raw_output_dir>/a.artifacts/<project_id>/run_manifest.json
+<raw_output_dir>/a.artifacts/<project_id>/failures.json
+```
+
+### 15.12 这两个代码文件的边界关系
+
+```text
+gen_input.py
+  只负责把真实 compile_commands.json 改写成 Stage A 项目输入。
+  它不运行 build，也不运行 analyzer。
+
+miner.py
+  只消费项目输入里的 build_cmd/config/build_env/bitcode_globs 等字段。
+  它不推断 compile flags，也不生成 compile_commands.json。
+
+二者之间的唯一稳定交接物：
+  projects.in.jsonl 的 ProjectInput 记录。
+```
+
+实际运行时的连接关系：
+
+```text
+真实项目构建系统或专用 helper
+  -> compile_commands.json
+  -> a/cmd/gen_input.py
+  -> a/input/<project>.in.jsonl
+  -> a/cmd/miner.py
+  -> samples.raw.jsonl + samples.stats.jsonl
+```
+
+对 `srcs/juliet-small`，`tools/gen_srcs_compile_commands.py` 只是生成 compile database 的专用 helper；它不属于 Stage A 通用输入合同。对 Linux kernel 这类项目，应先用 kernel 构建系统或未来专用工具生成真实 `compile_commands.json`，再进入 `gen_input.py`。

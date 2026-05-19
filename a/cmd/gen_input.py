@@ -8,7 +8,7 @@ import shlex
 from pathlib import Path
 from typing import Any
 
-
+//这个脚本从compile_commands.json生成一个projects.in.jsonl记录，供Stage A使用。
 CANONICAL_ANALYSIS_BACKEND = "llvm_api_dfa"
 DEFAULT_ANALYZER_JOBS = 2
 DEFAULT_ANALYSIS_TIMEOUT = 900
@@ -29,6 +29,7 @@ COMPILER_WRAPPER_NAMES = {
 
 
 def parse_args() -> argparse.Namespace:
+    //解析命令行参数
     parser = argparse.ArgumentParser(
         description="Generate a Stage A projects.in.jsonl record from compile_commands.json"
     )
@@ -61,10 +62,8 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
-
 def resolve_path(raw: str) -> Path:
     return Path(raw).expanduser().resolve()
-
 
 def relative_or_absolute(path: Path, base_dir: Path) -> str:
     try:
