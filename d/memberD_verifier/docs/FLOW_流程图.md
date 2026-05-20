@@ -1,7 +1,7 @@
 # 最简单流程
 
 ```text
-C 分流：P0 写 c/final，P1/P2 写 c/out，P3 写 c/audit
+C 分流：P1/P2 写 c/out；P0 有时间预算写 c/out，deadline 后写 c/final；P3 写 c/audit
         ↓
 D 读取 c/out/*.jsonl 动态验证队列
         ↓

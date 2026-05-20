@@ -20,7 +20,7 @@ MODEL_NAME = "deepseek-v4-flash"          # 使用Flash模型，速度更快
 API_KEY = ""
 BASE_URL = "https://api.deepseek.com/v1"
 CONFIDENCE_THRESHOLD = 0.60               # 放宽到0.60，让更多假设进入D阶段（原0.65）
-STATIC_CONFIDENCE_THRESHOLD = 0.90        # P0：C阶段静态强确认，直接进入静态报告
+STATIC_CONFIDENCE_THRESHOLD = 0.90        # P0：静态强确认；有时间时进入D，否则落回C静态报告
 MAX_WORKERS = 5                           # 并发线程数，平衡速度与稳定性
 LLM_MAX_OUTPUT_TOKENS = 4096              # max_tokens只限制模型输出长度，不扩大输入上下文
 LLM_REQUEST_TIMEOUT_SECONDS = 60.0        # 单次LLM请求上限，会被全局deadline进一步收紧
@@ -40,7 +40,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="C阶段：基于B阶段C-ready候选执行双Agent审计")
     parser.add_argument("--candidates", default="data/candidates.for_c.jsonl", help="B阶段输出的 candidates.for_c.jsonl")
     parser.add_argument("--output", default="data/hypotheses.jsonl", help="C阶段输出给D验证的 hypotheses.jsonl")
-    parser.add_argument("--static-output", default="", help="P0静态强确认报告；默认从 --output 推导")
+    parser.add_argument("--static-output", default="", help="P0无剩余时间交给D时的C静态fallback报告；默认从 --output 推导")
     parser.add_argument("--audit-output", default="", help="P3和错误审计日志；默认从 --output 推导")
     parser.add_argument("--time-limit-seconds", type=float, default=None, help="C阶段提交候选的时间预算；默认不限制")
     return parser.parse_args()
@@ -644,7 +644,7 @@ def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, co
     if priority == "P0":
         record["status"] = "static_confirmed"
         record["verification_stage"] = "C"
-        record["d_verification"] = "skipped_by_policy"
+        record["d_verification"] = "pending_routing_decision"
     elif priority in {"P1", "P2"}:
         record["status"] = "pending_dynamic_verification"
         record["d_verification"] = "pending"
@@ -778,15 +778,36 @@ def audit_worker(cand, deadline, result_queue):
     result_queue.put({"pid": os.getpid(), "hyp": hyp})
 
 
-def process_completed_future(future, cand, d_file, static_file, audit_file):
+def route_p0_to_d(hyp):
+    hyp["status"] = "pending_dynamic_verification"
+    hyp["verification_stage"] = "D"
+    hyp["d_verification"] = "pending"
+    hyp["stage_c_static_verdict"] = "static_confirmed"
+    hyp["stage_c_p0_routing"] = "sent_to_d_with_time_remaining"
+    return hyp
+
+
+def route_p0_to_static_fallback(hyp):
+    hyp["status"] = "static_confirmed"
+    hyp["verification_stage"] = "C"
+    hyp["d_verification"] = "skipped_no_time_remaining"
+    hyp["stage_c_p0_routing"] = "static_fallback_no_time_remaining"
+    return hyp
+
+
+def process_completed_future(future, cand, d_file, static_file, audit_file, p0_to_d):
     try:
         hyp = future.result()
     except Exception as e:
         hyp = audit_error_record(cand, e)
 
     if hyp.get("priority") == "P0":
-        append_jsonl(static_file, hyp)
-        bucket = "static"
+        if p0_to_d:
+            append_jsonl(d_file, route_p0_to_d(hyp))
+            bucket = "p0_d"
+        else:
+            append_jsonl(static_file, route_p0_to_static_fallback(hyp))
+            bucket = "static"
     elif hyp.get("priority") in {"P1", "P2"}:
         append_jsonl(d_file, hyp)
         bucket = "d"
@@ -802,7 +823,7 @@ def process_completed_future(future, cand, d_file, static_file, audit_file):
 
 
 def process_hypothesis_record(hyp, cand, d_file, static_file, audit_file):
-    return process_completed_future(CompletedFuture(hyp), cand, d_file, static_file, audit_file)
+    return process_completed_future(CompletedFuture(hyp), cand, d_file, static_file, audit_file, p0_to_d=True)
 
 
 def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_file):
@@ -814,7 +835,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
     next_index = 0
     submitted_count = 0
     exhausted_reported = False
-    counts = {"d": 0, "static": 0, "audit": 0}
+    counts = {"d": 0, "p0_d": 0, "static": 0, "audit": 0}
 
     def within_budget():
         return deadline is None or time.monotonic() < deadline
@@ -851,7 +872,14 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
             process.join(timeout=0)
         if cand is None:
             return
-        bucket = process_hypothesis_record(message.get("hyp"), cand, d_file, static_file, audit_file)
+        bucket = process_completed_future(
+            CompletedFuture(message.get("hyp")),
+            cand,
+            d_file,
+            static_file,
+            audit_file,
+            p0_to_d=within_budget(),
+        )
         counts[bucket] += 1
 
     def drain_results():
@@ -872,7 +900,14 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
             if process.is_alive():
                 process.kill()
                 process.join(timeout=1)
-            bucket = process_hypothesis_record(audit_timeout_record(cand, []), cand, d_file, static_file, audit_file)
+            bucket = process_completed_future(
+                CompletedFuture(audit_timeout_record(cand, [])),
+                cand,
+                d_file,
+                static_file,
+                audit_file,
+                p0_to_d=False,
+            )
             counts[bucket] += 1
             running.pop(pid, None)
 
@@ -904,12 +939,18 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
                 if process.is_alive():
                     continue
                 process.join(timeout=0)
-                bucket = process_hypothesis_record(
-                    audit_error_record(cand, RuntimeError(f"worker exited without result: exitcode={process.exitcode}")),
+                bucket = process_completed_future(
+                    CompletedFuture(
+                        audit_error_record(
+                            cand,
+                            RuntimeError(f"worker exited without result: exitcode={process.exitcode}"),
+                        )
+                    ),
                     cand,
                     d_file,
                     static_file,
                     audit_file,
+                    p0_to_d=within_budget(),
                 )
                 counts[bucket] += 1
                 running.pop(pid, None)
@@ -920,7 +961,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
 
 
 def main():
-    """主流程：加载数据，并发处理每个候选样本，并按P0/P1/P2/P3即时分流写入。"""
+    """主流程：加载数据，并发处理候选，并按P0/P1/P2/P3即时分流写入。"""
     args = parse_args()
     candidates_path = Path(args.candidates)
     output_path = Path(args.output)
@@ -954,8 +995,10 @@ def main():
     print(f"[C] submitted candidates: {submitted_count}/{len(candidates)}")
     if skipped_count:
         print(f"[C] skipped by time budget: {skipped_count}")
-    print(f"[C] D candidates: {counts['d']} -> {output_path}")
-    print(f"[C] P0 static confirmed: {counts['static']} -> {static_output_path}")
+    d_candidate_count = counts["d"] + counts["p0_d"]
+    print(f"[C] D candidates: {d_candidate_count} -> {output_path}")
+    print(f"[C] P0 routed to D: {counts['p0_d']} -> {output_path}")
+    print(f"[C] P0 static fallback: {counts['static']} -> {static_output_path}")
     print(f"[C] audit only: {counts['audit']} -> {audit_output_path}")
 
 

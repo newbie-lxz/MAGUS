@@ -34,6 +34,10 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
           },
           "oracle": {
             "failure_patterns": ["AddressSanitizer", "Segmentation fault"],
+            "required_patterns": ["ROUTE_MARKER_FOR_hyp_api_0001"],
+            "failure_code_patterns": {
+              "NOT_ROUTE_BOUND": ["ROUTE_NOT_REACHED"]
+            },
             "expect_nonzero_exit": true
           }
         }
@@ -57,8 +61,10 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
 - `execution.config_cmd` / `build_cmd`：可选准备命令。
 - `execution.run_cmd` / `poc_cmd` / `test_cmd`：至少需要一个，用来实际触达 API 序列。
 - `oracle.failure_patterns`：stdout/stderr 中可确认漏洞的模式。
+- `oracle.required_patterns`：可选；confirmed 前必须同时出现在 stdout/stderr 中的模式，常用于证明当前 route / source API 序列已执行。
+- `oracle.failure_code_patterns`：可选；把 stdout/stderr 中的模式映射为失败码，例如 `NOT_ROUTE_BOUND` 或 `NOT_EXPLOITABLE`。
 - `oracle.expect_nonzero_exit`：是否把非零退出作为确认信号之一。
 
 ## 能否 confirmed
 
-只有生成 payload 不会自动 confirmed。要 confirmed，必须能在 `repo_path` 中运行具体命令，并且运行结果命中 oracle。
+只有生成 payload 不会自动 confirmed。要 confirmed，必须能在 `repo_path` 中运行具体命令，并且运行结果命中 oracle。若运行结果不能证明当前 `route` 或 source API 序列被触发，即使同项目里存在其他可触发路径，也不能写 confirmed，应回流为 failed。

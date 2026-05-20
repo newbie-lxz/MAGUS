@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
+import io
+import json
 import sys
 import types
 import unittest
@@ -86,6 +88,58 @@ class RouteRecordTests(unittest.TestCase):
             _candidate(), [_vuln(0.95), _vuln(0.95), _vuln(0.95)]
         )
         self.assertEqual((priority, verdict, reason), ("P0", "static_confirmed", "red_team_static_strong"))
+
+
+class OutputRoutingTests(unittest.TestCase):
+    def _p0_record(self):
+        return {
+            "project_id": "p",
+            "sample_id": "s",
+            "hypothesis_id": "hyp_s",
+            "priority": "P0",
+            "agent_verdict": "static_confirmed",
+            "routing_decision": "static_confirmed",
+            "route": "file.c::bad",
+            "file": "file.c",
+            "line": 10,
+            "evidence_slice": "call:sink",
+            "status": "static_confirmed",
+            "d_verification": "pending_routing_decision",
+        }
+
+    def test_p0_goes_to_d_when_time_remains(self):
+        d_file, static_file, audit_file = io.StringIO(), io.StringIO(), io.StringIO()
+        bucket = agent1.process_completed_future(
+            agent1.CompletedFuture(self._p0_record()),
+            _candidate(),
+            d_file,
+            static_file,
+            audit_file,
+            p0_to_d=True,
+        )
+        self.assertEqual(bucket, "p0_d")
+        self.assertEqual(static_file.getvalue(), "")
+        row = json.loads(d_file.getvalue())
+        self.assertEqual(row["status"], "pending_dynamic_verification")
+        self.assertEqual(row["d_verification"], "pending")
+        self.assertEqual(row["stage_c_p0_routing"], "sent_to_d_with_time_remaining")
+
+    def test_p0_falls_back_to_static_when_no_time_remains(self):
+        d_file, static_file, audit_file = io.StringIO(), io.StringIO(), io.StringIO()
+        bucket = agent1.process_completed_future(
+            agent1.CompletedFuture(self._p0_record()),
+            _candidate(),
+            d_file,
+            static_file,
+            audit_file,
+            p0_to_d=False,
+        )
+        self.assertEqual(bucket, "static")
+        self.assertEqual(d_file.getvalue(), "")
+        row = json.loads(static_file.getvalue())
+        self.assertEqual(row["status"], "static_confirmed")
+        self.assertEqual(row["d_verification"], "skipped_no_time_remaining")
+        self.assertEqual(row["stage_c_p0_routing"], "static_fallback_no_time_remaining")
 
 
 if __name__ == "__main__":

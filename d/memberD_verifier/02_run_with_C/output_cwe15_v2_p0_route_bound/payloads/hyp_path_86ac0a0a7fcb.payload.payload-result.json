@@ -1,0 +1,23 @@
+{
+  "status": "confirmed",
+  "reason": "ORACLE_MATCH",
+  "failure_code": null,
+  "failure_note": null,
+  "observations": [
+    "oracle matched patterns: MAGUS_CWE15_ROUTE_CONFIRMED"
+  ],
+  "runtime_trace": [
+    {
+      "cmd": "/home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_bad.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8369CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_badD2Ev --route juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_bad.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8369CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_badD2Ev",
+      "cwd": "/home/sq_hu/MAGUS",
+      "exit_code": 0,
+      "elapsed_ms": 273,
+      "stdout_tail": "Calling bad()...\nMAGUS_CWE15_SET_COMPUTER_NAME value=magus-cwe15-controlled-host\nMAGUS_CWE15_PAYLOAD_REACHED_SET_COMPUTER_NAME external payload reached SetComputerNameA\nFinished bad()\nMAGUS_CWE15_ROUTE_EXECUTED scenario=bad entry_symbol=_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8369CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_badD2Ev source_file=/home/sq_hu/MAGUS/srcs/juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_bad.cpp\nMAGUS_CWE15_ROUTE_CONFIRMED scenario=bad entry_symbol=_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8369CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_badD2Ev source_file=/home/sq_hu/MAGUS/srcs/juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_83_bad.cpp\nMAGUS_CWE15_CONFIRMED route-bound external payload reached SetComputerNameA\n",
+      "stderr_tail": "",
+      "timed_out": false
+    }
+  ],
+  "timestamps": {
+    "finished_at": "2026-05-20T16:32:25Z"
+  }
+}

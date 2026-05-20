@@ -8,7 +8,14 @@ from typing import Any, Dict, Iterable, List
 
 
 MIN_EVIDENCE_FIELDS = ["project_id", "sample_id", "route", "file", "line", "evidence_slice"]
-FAILURE_CODES = {"NOT_EXPLOITABLE", "ENV_MISSING", "HYPOTHESIS_WRONG", "TIMEOUT", "NON_DETERMINISTIC"}
+FAILURE_CODES = {
+    "NOT_EXPLOITABLE",
+    "NOT_ROUTE_BOUND",
+    "ENV_MISSING",
+    "HYPOTHESIS_WRONG",
+    "TIMEOUT",
+    "NON_DETERMINISTIC",
+}
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:

@@ -21,6 +21,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 FAILURE_CODES = {
     "NOT_EXPLOITABLE",
+    "NOT_ROUTE_BOUND",
     "ENV_MISSING",
     "HYPOTHESIS_WRONG",
     "TIMEOUT",
@@ -72,6 +73,21 @@ def as_list(value: Any) -> list[Any]:
     return [value]
 
 
+def pattern_list(value: Any) -> list[str]:
+    if value in (None, "", []):
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item)]
+    return [str(value)]
+
+
+def failure_code_patterns(oracle: dict[str, Any]) -> dict[str, list[str]]:
+    raw = oracle.get("failure_code_patterns") or {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(code): pattern_list(patterns) for code, patterns in raw.items()}
+
+
 def run_command(cmd: Any, cwd: Path, timeout: int) -> dict[str, Any]:
     started = time.perf_counter()
     if isinstance(cmd, str):
@@ -113,6 +129,8 @@ def run_command(cmd: Any, cwd: Path, timeout: int) -> dict[str, Any]:
 
 def decide(run_results: list[dict[str, Any]], oracle: dict[str, Any]) -> tuple[str, str, list[str]]:
     patterns = oracle.get("failure_patterns") or DEFAULT_FAILURE_PATTERNS
+    required_patterns = pattern_list(oracle.get("required_patterns"))
+    code_patterns = failure_code_patterns(oracle)
     expect_nonzero = bool(oracle.get("expect_nonzero_exit", True))
     observations: list[str] = []
     for result in run_results:
@@ -121,12 +139,27 @@ def decide(run_results: list[dict[str, Any]], oracle: dict[str, Any]) -> tuple[s
             observations.append(f"timeout while running {result.get('cmd')}")
             return "failed", "TIMEOUT", observations
         matched = [str(pattern) for pattern in patterns if str(pattern) and str(pattern) in output]
+        missing_required = [pattern for pattern in required_patterns if pattern not in output]
+        for code, code_pattern_values in code_patterns.items():
+            matched_code_patterns = [pattern for pattern in code_pattern_values if pattern in output]
+            if matched_code_patterns:
+                observations.append(f"{code} matched patterns: {', '.join(matched_code_patterns)}")
+                return "failed", code, observations
         if matched:
+            if missing_required:
+                observations.append(f"oracle matched but route-bound patterns were missing: {', '.join(missing_required)}")
+                return "failed", "NOT_ROUTE_BOUND", observations
             observations.append(f"oracle matched patterns: {', '.join(matched)}")
             return "confirmed", "ORACLE_MATCH", observations
         if expect_nonzero and result.get("exit_code") not in (0, None):
+            if missing_required:
+                observations.append(f"non-zero exit observed without route-bound patterns: {', '.join(missing_required)}")
+                return "failed", "NOT_ROUTE_BOUND", observations
             observations.append(f"non-zero exit observed: {result.get('exit_code')}")
             return "confirmed", "NONZERO_EXIT", observations
+        if missing_required:
+            observations.append(f"route-bound patterns missing: {', '.join(missing_required)}")
+            return "failed", "NOT_ROUTE_BOUND", observations
         observations.append(f"exit={result.get('exit_code')} for {result.get('cmd')}")
     return "failed", "NOT_EXPLOITABLE", observations
 

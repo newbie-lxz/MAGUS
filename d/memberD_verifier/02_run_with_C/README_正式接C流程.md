@@ -18,9 +18,10 @@ D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按�
 C 的分流约定是：
 
 ```text
-P0 -> c/final/static_confirmed.jsonl  # 静态强确认，不进入 D
-P1/P2 -> c/out/*.jsonl                # D 动态验证队列
-P3 -> c/audit/audit.jsonl             # 审计记录，不进入 D
+P0 + C还有时间预算 -> c/out/*.jsonl                 # D 动态验证队列
+P0 + C deadline已过 -> c/final/static_confirmed.jsonl # C 静态fallback
+P1/P2 -> c/out/*.jsonl                              # D 动态验证队列
+P3 -> c/audit/audit.jsonl                           # 审计记录，不进入 D
 ```
 
 如果多个文件里出现相同的 `project_id + hypothesis_id`，脚本会直接失败，要求先消除重复输入。
@@ -69,8 +70,20 @@ hypothesis_id > route > project_id
 
 当前仓库的 `project_id=cwe15` 使用项目级 sidecar 绑定到
 `tools/juliet_win_shim/run_cwe15_case.py`。该 runner 会在 Linux 下编译单个
-Juliet CWE15 Win32 样本，链接本仓库的 WinSock/Windows API runtime stub，并用
-`MAGUS_CWE15_CONFIRMED` 作为 oracle 标记确认外部输入到达 `SetComputerNameA`。
+Juliet CWE15 Win32 样本，链接本仓库的 WinSock/Windows API runtime stub。runner
+会根据 `${route}` / `${entry_symbol}` 选择 Juliet 的 bad 或 good 场景；遇到
+`*_bad.cpp`、`*_goodG2B.cpp`、`*b.c` 这类 helper 文件时，会回到同组主文件完整
+编译运行，不抽取 C 的 evidence slice。只有当前场景被执行且外部 payload 到达
+`SetComputerNameA` 时才输出 `MAGUS_CWE15_ROUTE_CONFIRMED`；仅能证明同文件其他
+路径触发时不会 confirmed。
+
+sidecar 的 oracle 支持：
+
+```text
+failure_patterns         # confirmed 模式
+required_patterns        # confirmed 前必须同时存在的 route-bound 模式
+failure_code_patterns    # 把输出模式映射为 NOT_ROUTE_BOUND / NOT_EXPLOITABLE 等失败码
+```
 
 自动脚本会先生成 `targets.auto.json`，如果发现 `verification_contexts.jsonl`，再通过 `bind_verification_contexts.py` 输出 `targets.executable.json` 给原 verifier 执行。
 sidecar 里的记录必须能命中当前 targets；如果出现未匹配的 `project_id`、`route` 或 `hypothesis_id`，脚本会直接失败。
@@ -118,6 +131,8 @@ output/verification.jsonl
 output/verification.failed.jsonl
 output/verification.summary.md
 ```
+
+`verification.failed.jsonl` 中的 `NOT_ROUTE_BOUND` 表示执行成功但不能把证据归因到当前候选 route。
 
 ## 4. 什么时候能执行
 

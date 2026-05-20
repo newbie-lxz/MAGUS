@@ -1,0 +1,73 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "cwe15",
+  "sample_id": "path_4f51c673a8ed",
+  "hypothesis_id": "hyp_path_4f51c673a8ed",
+  "claim": "从网络套接字接收的数据未经验证可能用于系统或配置设置，导致外部控制风险。",
+  "cwe_candidates": [
+    "CWE-15"
+  ],
+  "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+  "entry_symbol": "badSource",
+  "api_sequence": [
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:79",
+    "假设存在敏感操作如 system(data) 或 RegSetValueEx(...) 使用 data。 @ 未知（后续代码未提供）"
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_4f51c673a8ed",
+    "entry_symbol": "badSource",
+    "input_source": "Juliet CWE15 WinSock recv stub payload",
+    "seed_inputs": [
+      "magus-cwe15-controlled-host"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+    "Construct or locate a harness that reaches badSource",
+    "Drive the API sequence with misuse-oriented inputs for CWE-15",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "ASan/UBSan crash",
+      "non-zero test exit caused by crafted source/API input",
+      "unexpected success on invalid API state",
+      "differential behavior between vulnerable and fixed revision"
+    ],
+    "failure_patterns": [
+      "MAGUS_CWE15_ROUTE_CONFIRMED"
+    ],
+    "expect_nonzero_exit": false,
+    "required_patterns": [
+      "MAGUS_CWE15_ROUTE_EXECUTED"
+    ],
+    "failure_code_patterns": {
+      "NOT_ROUTE_BOUND": [
+        "MAGUS_CWE15_NOT_ROUTE_BOUND"
+      ],
+      "NOT_EXPLOITABLE": [
+        "MAGUS_CWE15_NOT_CONFIRMED"
+      ]
+    }
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": "/home/sq_hu/MAGUS",
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c --entry-symbol badSource --route juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c::badSource",
+    "poc_cmd": null,
+    "test_cmd": null,
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c::badSource",
+    "file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+    "line": 79,
+    "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-20T16:16:20Z"
+  }
+}

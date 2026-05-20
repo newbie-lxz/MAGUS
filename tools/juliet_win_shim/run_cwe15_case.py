@@ -17,12 +17,19 @@ SUPPORT_DIR = SRC_ROOT / "testcasesupport"
 SUPPORT_IO = SUPPORT_DIR / "io.c"
 STUBS = SHIM_DIR / "winapi_runtime_stubs.c"
 CONFIRM_MARKER = "MAGUS_CWE15_CONFIRMED"
+PAYLOAD_REACHED_MARKER = "MAGUS_CWE15_PAYLOAD_REACHED_SET_COMPUTER_NAME"
+ROUTE_EXECUTED_MARKER = "MAGUS_CWE15_ROUTE_EXECUTED"
+ROUTE_CONFIRMED_MARKER = "MAGUS_CWE15_ROUTE_CONFIRMED"
+NOT_ROUTE_BOUND_MARKER = "MAGUS_CWE15_NOT_ROUTE_BOUND"
+NOT_CONFIRMED_MARKER = "MAGUS_CWE15_NOT_CONFIRMED"
+SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build and run one Juliet CWE15 w32 testcase with Linux stubs")
     parser.add_argument("--source-file", required=True, help="C/C++ source file from the Stage C hypothesis")
     parser.add_argument("--entry-symbol", default="", help="Entry symbol from D target generation; kept for traceability")
+    parser.add_argument("--route", default="", help="Full Stage C route; used to bind the dynamic run to bad/good scenario")
     parser.add_argument("--payload", default="magus-cwe15-controlled-host", help="Payload returned by the recv stub")
     parser.add_argument("--cc", default=os.environ.get("MAGUS_CC", "/usr/bin/clang-20"))
     parser.add_argument("--cxx", default=os.environ.get("MAGUS_CXX", "/usr/bin/clang++-20"))
@@ -55,15 +62,65 @@ def compiler_for(path: Path, args: argparse.Namespace) -> str:
     return args.cc
 
 
-def companion_sources(source: Path) -> list[Path]:
-    match = re.match(r"(.+__w32_\d+)[a-z]\.(c|cpp|cc|cxx)$", source.name)
+def testcase_prefix(source: Path) -> str | None:
+    match = re.match(r"(.+__w32_\d+)(?:[a-z]|_(?:bad|goodG2B))?\.(c|cpp|cc|cxx|h)$", source.name)
     if not match:
+        return None
+    return match.group(1)
+
+
+def testcase_suffix(source: Path, prefix: str) -> str:
+    suffix = source.suffix.lower()
+    if suffix in SOURCE_SUFFIXES:
+        return suffix
+    for candidate_suffix in (".c", ".cpp", ".cc", ".cxx"):
+        if (source.parent / f"{prefix}a{candidate_suffix}").exists() or (source.parent / f"{prefix}{candidate_suffix}").exists():
+            return candidate_suffix
+    return ".c"
+
+
+def companion_sources(source: Path) -> list[Path]:
+    prefix = testcase_prefix(source)
+    if not prefix:
         return [source]
 
-    prefix = match.group(1)
-    suffix = match.group(2)
-    companions = sorted(source.parent.glob(f"{prefix}*.{suffix}"))
+    suffix = testcase_suffix(source, prefix)
+    companions = sorted(source.parent.glob(f"{prefix}*{suffix}"))
     return companions or [source]
+
+
+def main_source(companions: list[Path], source: Path) -> Path:
+    prefix = testcase_prefix(source)
+    if prefix:
+        suffix = testcase_suffix(source, prefix)
+        for name in (f"{prefix}a{suffix}", f"{prefix}{suffix}"):
+            candidate = source.parent / name
+            if candidate in companions:
+                return candidate
+
+    for candidate in companions:
+        try:
+            if "INCLUDEMAIN" in candidate.read_text(encoding="utf-8", errors="ignore"):
+                return candidate
+        except OSError:
+            continue
+    return source if source in companions else companions[0]
+
+
+def scenario_for(args: argparse.Namespace, source: Path) -> str:
+    text = f"{args.route} {args.entry_symbol} {source.name}".lower()
+    if "good" in text:
+        return "good"
+    if "bad" in text:
+        return "bad"
+    return "bad"
+
+
+def sanitized_stdout(stdout: str) -> str:
+    return stdout.replace(
+        f"{CONFIRM_MARKER} external payload reached SetComputerNameA",
+        f"{PAYLOAD_REACHED_MARKER} external payload reached SetComputerNameA",
+    )
 
 
 def run_checked(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -81,7 +138,11 @@ def run_checked(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) ->
 def main() -> int:
     args = parse_args()
     source = resolve_source(args.source_file)
-    compiler = compiler_for(source, args)
+    companions = companion_sources(source)
+    entry_unit = main_source(companions, source)
+    scenario = scenario_for(args, source)
+    omit_macro = "-DOMITBAD" if scenario == "good" else "-DOMITGOOD"
+    compiler = compiler_for(entry_unit, args)
 
     if not Path(compiler).exists():
         raise SystemExit(f"compiler not found: {compiler}")
@@ -91,14 +152,14 @@ def main() -> int:
         binary = Path(tmp) / "case_under_test"
 
         objects: list[Path] = []
-        for index, unit in enumerate(companion_sources(source)):
+        for index, unit in enumerate(companions):
             unit_compiler = compiler_for(unit, args)
             obj = tmp_path / f"case_{index}.o"
             command = [
                 unit_compiler,
                 "-c",
-                "-DINCLUDEMAIN" if unit == source else "-DMAGUS_COMPANION_UNIT",
-                "-DOMITGOOD",
+                "-DINCLUDEMAIN" if unit == entry_unit else "-DMAGUS_COMPANION_UNIT",
+                omit_macro,
                 "-I",
                 str(SHIM_DIR),
                 "-I",
@@ -149,13 +210,41 @@ def main() -> int:
         env = os.environ.copy()
         env["MAGUS_CWE15_PAYLOAD"] = args.payload
         run = run_checked([str(binary)], REPO_ROOT, env=env)
-        print(run.stdout, end="")
-        print(run.stderr, end="", file=sys.stderr)
-        if CONFIRM_MARKER in run.stdout:
+        raw_stdout = run.stdout or ""
+        raw_stderr = run.stderr or ""
+        print(sanitized_stdout(raw_stdout), end="")
+        print(raw_stderr, end="", file=sys.stderr)
+
+        expected_call = f"Calling {scenario}()..."
+        expected_finish = f"Finished {scenario}()"
+        unexpected_call = "Calling good()..." if scenario == "bad" else "Calling bad()..."
+        route_executed = expected_call in raw_stdout and expected_finish in raw_stdout and unexpected_call not in raw_stdout
+        payload_reached_sink = CONFIRM_MARKER in raw_stdout
+
+        if route_executed:
+            print(
+                f"{ROUTE_EXECUTED_MARKER} scenario={scenario} "
+                f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source}"
+            )
+        else:
+            print(
+                f"{NOT_ROUTE_BOUND_MARKER} expected_scenario={scenario} "
+                f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source} main_source={entry_unit}"
+            )
+
+        if route_executed and payload_reached_sink:
+            print(
+                f"{ROUTE_CONFIRMED_MARKER} scenario={scenario} "
+                f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source}"
+            )
+            print(f"{CONFIRM_MARKER} route-bound external payload reached SetComputerNameA")
             return 0
-        print("MAGUS_CWE15_NOT_CONFIRMED")
+
+        print(NOT_CONFIRMED_MARKER)
         print(f"entry_symbol={args.entry_symbol}")
+        print(f"route={args.route}")
         print(f"source_file={source}")
+        print(f"main_source={entry_unit}")
         return 1
 
 

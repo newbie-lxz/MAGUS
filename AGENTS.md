@@ -36,7 +36,7 @@
 - `pipeline.py a` runs Stage `A` only, including `samples.llm.jsonl` export beside the raw output.
 - `pipeline.py gen-input` generates a Stage `A` projects JSONL from `compile_commands.json`; it does not run Stage `A`.
 - `pipeline.py b` runs Stage `B` only over Stage `A` stats and matching LLM evidence.
-- `pipeline.py c` runs Stage `C` over Stage `B` `candidates.for_c.jsonl`, routing `P0` static confirmations, `P1`/`P2` D candidates, and `P3` audit-only records.
+- `pipeline.py c` runs Stage `C` over Stage `B` `candidates.for_c.jsonl`, routing `P0` static confirmations to Stage `D` while C still has time budget, routing late P0 records to static fallback, routing `P1`/`P2` D candidates, and routing `P3` audit-only records.
 - `pipeline.py d` runs Stage `D` over Stage `C` `c/out/*.jsonl` by calling `d/memberD_verifier/02_run_with_C/01_auto_attack_from_C_linux.sh`.
 - `pipeline.py abcd` chains Stage `A` and Stage `B`, then streams Stage `C` dynamic candidates into Stage `D` while Stage `C` is still running.
 - `make gen-input`, `make run-a`, `make run-b`, `make run-c`, `make run-d`, and `make run-abcd` are thin wrappers over `pipeline.py`.
@@ -48,12 +48,13 @@
 - Stage `B` writes complete seed-level scored candidates to `candidates.scored.jsonl` and writes the route-aggregated C-ready queue to `candidates.for_c.jsonl`; each C-ready record keeps only Stage `C` input fields, stores merged Stage `A` LLM evidence under `llm_evidence`, and carries route-level B metadata under `stage_b`.
 - Stage `C` expects Stage `B` `candidates.for_c.jsonl`; it must not read Stage `A` outputs directly, and it uses `stage_b` threshold/missing-feature/seed-token/reference-sample evidence as anti-hallucination constraints rather than vulnerability conclusions.
 - Stage `C` uses a process-based time budget when requested and does not expose a candidate-count limit; after the deadline plus grace, unfinished workers are terminated and their candidates are written as `P3` `stage_c_time_budget_exhausted` audit records.
-- Stage `C` writes `P1`/`P2` dynamic-verification candidates to `c/out/*.jsonl`, `P0` static confirmations to `c/final/static_confirmed.jsonl`, and `P3` audit-only records to `c/audit/audit.jsonl`; debated records enter `P3` only when every red-team round returns no vulnerability, while any round that reports a vulnerability keeps the record in `P1`/`P2` for dynamic verification even if later rounds mark hard contradictions or incomplete evidence.
+- Stage `C` writes `P1`/`P2` dynamic-verification candidates to `c/out/*.jsonl`. `P0` static confirmations are also written to `c/out/*.jsonl` when Stage `C` is still within its time budget so Stage `D` can route-bound verify them; if the Stage `C` deadline has elapsed, P0 records fall back to `c/final/static_confirmed.jsonl` to preserve C's static judgment. `P3` audit-only records go to `c/audit/audit.jsonl`; debated records enter `P3` only when every red-team round returns no vulnerability, while any round that reports a vulnerability keeps the record in the dynamic-verification path even if later rounds mark hard contradictions or incomplete evidence.
 - Stage `C` uses the DeepSeek-compatible OpenAI Python SDK client configured in `c/agent1.py`; `make run-abcd` reaches this networked LLM call.
 - Stage `D` batch mode expects Stage `C` dynamic-verification candidates under `c/out/*.jsonl`; it reads those files in filename order, trusts Stage `C` routing instead of re-checking `P1`/`P2` or `agent_verdict`, rejects duplicate `project_id + hypothesis_id` records, and must not read Stage `A` or Stage `B` outputs directly.
 - Stage `D` streaming mode is used by root `abcd`; it follows the current Stage `C --output` JSONL file, processes only complete newline-terminated records, rejects duplicate `project_id + hypothesis_id` records, and exits after the root pipeline marks Stage `C` done.
 - Stage `D` batch and streaming modes share an output lock under `d/memberD_verifier/02_run_with_C/.stage_d_output.lock`; do not run another D writer against the same output directory while one mode is active.
 - Stage `D` verifies C/C++ source/API misuse hypotheses and does not generate HTTP requests, `base_url` payloads, or `*.http` files.
+- Stage `D` confirmed output requires route-bound dynamic evidence. The executable harness can run the full source project/testcase, but its oracle must prove the candidate route or source/API sequence was reached; otherwise the record stays in failed output, using `NOT_ROUTE_BOUND` when route attribution cannot be proven.
 - The root pipeline does not currently expose a Stage `B` worker-count flag.
 
 ## Commands
