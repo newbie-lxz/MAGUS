@@ -37,8 +37,8 @@ def derived_llm_path(raw_output_path: Path) -> Path:
     return raw_output_path.with_suffix("").with_suffix(".llm.jsonl")
 
 
-def b_candidates_path(output_dir: Path) -> Path:
-    return output_dir / "candidates.scored.jsonl"
+def b_c_ready_path(output_dir: Path) -> Path:
+    return output_dir / "candidates.for_c.jsonl"
 
 
 def run_command(command: list[str], cwd: Path) -> None:
@@ -134,12 +134,14 @@ def run_stage_a_llm(raw_input_path: Path, projects_path: Path, output_path: Path
     )
 
 
-def run_stage_b(input_path: Path, output_dir: Path, min_support: int) -> None:
+def run_stage_b(input_path: Path, llm_input_path: Path, output_dir: Path, min_support: int) -> None:
     command = [
         sys.executable,
         "b_miner.py",
         "--input",
         str(input_path),
+        "--llm-input",
+        str(llm_input_path),
         "--output-dir",
         str(output_dir),
         "--min-support",
@@ -152,28 +154,25 @@ def run_stage_b(input_path: Path, output_dir: Path, min_support: int) -> None:
 
 
 def stage_c_command(
-    llm_input_path: Path,
-    b_candidates_path: Path,
+    candidates_path: Path,
     output_path: Path,
-    max_samples: int | None,
+    time_limit_seconds: float | None,
 ) -> list[str]:
     command = [
         sys.executable,
         "agent1.py",
-        "--llm-input",
-        str(llm_input_path),
-        "--b-candidates",
-        str(b_candidates_path),
+        "--candidates",
+        str(candidates_path),
         "--output",
         str(output_path),
     ]
-    if max_samples is not None:
-        command.extend(["--max-samples", str(max_samples)])
+    if time_limit_seconds is not None:
+        command.extend(["--time-limit-seconds", str(time_limit_seconds)])
     return command
 
 
-def run_stage_c(llm_input_path: Path, b_candidates_path: Path, output_path: Path, max_samples: int | None) -> None:
-    run_command(stage_c_command(llm_input_path, b_candidates_path, output_path, max_samples), STAGE_C_DIR)
+def run_stage_c(candidates_path: Path, output_path: Path, time_limit_seconds: float | None) -> None:
+    run_command(stage_c_command(candidates_path, output_path, time_limit_seconds), STAGE_C_DIR)
 
 
 def run_stage_d() -> None:
@@ -202,17 +201,16 @@ def terminate_process(process: subprocess.Popen, label: str) -> None:
 
 
 def run_stage_c_with_streaming_d(
-    llm_input_path: Path,
-    b_candidates_path: Path,
+    candidates_path: Path,
     output_path: Path,
-    max_samples: int | None,
+    time_limit_seconds: float | None,
 ) -> None:
     ensure_stage_d_python()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("", encoding="utf-8")
     with tempfile.TemporaryDirectory(prefix="magus-stage-c-") as temp_dir:
         done_file = Path(temp_dir) / "stage_c.done"
-        c_command = stage_c_command(llm_input_path, b_candidates_path, output_path, max_samples)
+        c_command = stage_c_command(candidates_path, output_path, time_limit_seconds)
         d_command = [
             str(STAGE_D_PYTHON),
             "stream_from_C.py",
@@ -323,6 +321,11 @@ def main() -> None:
         help="Stage B 输入 samples.stats.jsonl",
     )
     parser_b.add_argument(
+        "--llm-input",
+        default=str(derived_llm_path(DEFAULT_STAGE_A_OUTPUT)),
+        help="Stage B 输入 samples.llm.jsonl，用于生成 C-ready 队列",
+    )
+    parser_b.add_argument(
         "--output-dir",
         default=str(DEFAULT_STAGE_B_OUTPUT_DIR),
         help="Stage B 输出目录",
@@ -335,14 +338,9 @@ def main() -> None:
     )
     parser_c = subparsers.add_parser("c", help="只运行 Stage C")
     parser_c.add_argument(
-        "--llm-input",
-        default=str(derived_llm_path(DEFAULT_STAGE_A_OUTPUT)),
-        help="Stage C 输入 Stage A samples.llm.jsonl",
-    )
-    parser_c.add_argument(
-        "--b-candidates",
-        default=str(b_candidates_path(DEFAULT_STAGE_B_OUTPUT_DIR)),
-        help="Stage C 输入 Stage B candidates.scored.jsonl",
+        "--candidates",
+        default=str(b_c_ready_path(DEFAULT_STAGE_B_OUTPUT_DIR)),
+        help="Stage C 输入 Stage B candidates.for_c.jsonl",
     )
     parser_c.add_argument(
         "--output",
@@ -350,10 +348,10 @@ def main() -> None:
         help="Stage C 输出给 Stage D 的 P1/P2 hypotheses.jsonl",
     )
     parser_c.add_argument(
-        "--max-samples",
-        type=int,
+        "--time-limit-seconds",
+        type=float,
         default=None,
-        help="Stage C 可选候选数量上限",
+        help="Stage C 可选候选提交时间预算，默认不限制",
     )
     subparsers.add_parser("d", help="只运行 Stage D")
 
@@ -376,10 +374,10 @@ def main() -> None:
         help="Stage B 频繁模式最低支持度",
     )
     parser_abcd.add_argument(
-        "--c-max-samples",
-        type=int,
+        "--c-time-limit-seconds",
+        type=float,
         default=None,
-        help="Stage C 可选候选数量上限",
+        help="Stage C 可选候选提交时间预算，默认不限制",
     )
     args = parser.parse_args()
 
@@ -420,15 +418,14 @@ def main() -> None:
 
     if args.command == "b":
         input_path = resolve_path(args.input)
-        run_stage_b(input_path, resolve_path(args.output_dir), args.min_support)
+        run_stage_b(input_path, resolve_path(args.llm_input), resolve_path(args.output_dir), args.min_support)
         return
 
     if args.command == "c":
         run_stage_c(
-            resolve_path(args.llm_input),
-            resolve_path(args.b_candidates),
+            resolve_path(args.candidates),
             resolve_path(args.output),
-            args.max_samples,
+            args.time_limit_seconds,
         )
         return
 
@@ -449,11 +446,11 @@ def main() -> None:
 
         b_input = derived_stats_path(a_output)
         print(f"[pipeline] derived Stage B input={b_input}", flush=True)
-        run_stage_b(b_input, b_output_dir, args.min_support)
+        run_stage_b(b_input, llm_output, b_output_dir, args.min_support)
 
-        candidates_path = b_candidates_path(b_output_dir)
+        candidates_path = b_c_ready_path(b_output_dir)
         print(f"[pipeline] derived Stage C candidates input={candidates_path}", flush=True)
-        run_stage_c_with_streaming_d(llm_output, candidates_path, c_output, args.c_max_samples)
+        run_stage_c_with_streaming_d(candidates_path, c_output, args.c_time_limit_seconds)
         return
 
 

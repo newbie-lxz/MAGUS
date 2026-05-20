@@ -3,11 +3,13 @@
 Stage B feature-absence miner.
 
 Input: Stage A `samples.stats.jsonl` records with schema
-`stagea.stats.features.v1`.
+`stagea.stats.features.v1`, plus matching `samples.llm.jsonl` evidence.
 
 Stage B groups samples by `api_group`, finds high-support API relation
-features, and scores samples that miss those high-support features. It does not
-perform sequence mining and does not accept the old `edge_tokens` stats schema.
+features, scores samples that miss those high-support features, and writes a
+route-aggregated C-ready queue whose records are based on Stage A LLM evidence
+with Stage B scoring metadata attached. It does not perform sequence mining and
+does not accept the old `edge_tokens` stats schema.
 """
 
 import argparse
@@ -23,6 +25,23 @@ from typing import Any
 SCHEMA_VERSION = "stagea.stats.features.v1"
 PATTERN_SCHEMA_VERSION = "stageb.feature_patterns.v1"
 CANDIDATE_SCHEMA_VERSION = "stageb.feature_candidates.v1"
+C_READY_SCHEMA_VERSION = "stageb.c_ready_candidates.v2"
+C_READY_MAX_STAGE_B_CANDIDATES = 12
+C_READY_MAX_MERGED_LIST_ITEMS = 16
+C_READY_MAX_EVIDENCE_SLICES = 8
+C_READY_MAX_EVIDENCE_CHARS = 6000
+C_READY_LLM_FIELDS = {
+    "project_id",
+    "sample_id",
+    "repo_path",
+    "entrypoint",
+    "focus",
+    "evidence_slice",
+    "source_sink_flows",
+    "representative_traces",
+    "code_slices",
+    "internal_function_summaries",
+}
 
 REQUIRED_FIELDS = {
     "schema_version",
@@ -171,6 +190,7 @@ class ScoredCandidate:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Stage B high-support feature absence miner")
     parser.add_argument("--input", "-i", required=True, help="Stage A samples.stats.jsonl path")
+    parser.add_argument("--llm-input", required=True, help="Stage A samples.llm.jsonl path for C-ready evidence merge")
     parser.add_argument("--output-dir", "-o", required=True, help="Stage B output directory")
     parser.add_argument("--min-support", type=int, default=3, help="minimum absolute support")
     parser.add_argument(
@@ -272,6 +292,30 @@ def load_stats_samples(path: Path) -> list[StageAStatsSample]:
             samples.append(validate_record(data, line_no))
     require(bool(samples), f"no Stage A stats records found: {path}")
     return samples
+
+
+def load_llm_samples(path: Path) -> dict[str, dict[str, Any]]:
+    llm_map: dict[str, dict[str, Any]] = {}
+    with path.open("r", encoding="utf-8") as handle:
+        for line_no, line in enumerate(handle, 1):
+            line = line.strip()
+            if not line:
+                continue
+            data = json.loads(line)
+            require(isinstance(data, dict), f"{path}:{line_no}: record must be an object")
+            sample_id = require_string(data.get("sample_id"), "sample_id", line_no)
+            require(sample_id not in llm_map, f"{path}:{line_no}: duplicate LLM evidence sample_id={sample_id}")
+            llm_map[sample_id] = data
+    require(bool(llm_map), f"no Stage A LLM evidence records found: {path}")
+    return llm_map
+
+
+def validate_llm_coverage(samples: list[StageAStatsSample], llm_map: dict[str, dict[str, Any]], path: Path) -> None:
+    missing = sorted(sample.sample_id for sample in samples if sample.sample_id not in llm_map)
+    if missing:
+        preview = ", ".join(missing[:10])
+        suffix = "" if len(missing) <= 10 else f" ... (+{len(missing) - 10} more)"
+        raise ValueError(f"{path}: missing LLM evidence for Stage A stats sample_id(s): {preview}{suffix}")
 
 
 def write_json(path: Path, payload: Any) -> None:
@@ -516,8 +560,242 @@ def score_candidates(
             )
             candidates.append(candidate)
 
-    candidates.sort(key=lambda item: (item.risk_score, item.pattern_deviation_score, item.sink_score), reverse=True)
+    candidates.sort(key=candidate_priority_key)
     return candidates
+
+
+def candidate_priority_key(candidate: ScoredCandidate) -> tuple[int, float, float, float, float, int, str, str, str]:
+    return (
+        -int(candidate.threshold_pass),
+        -candidate.rarity_score,
+        -candidate.pattern_deviation_score,
+        -candidate.sink_score,
+        -candidate.risk_score,
+        -candidate.missing_feature_count,
+        candidate.project_id,
+        candidate.sample_id,
+        candidate.candidate_id,
+    )
+
+
+def c_ready_records(
+    candidates: list[ScoredCandidate],
+    llm_map: dict[str, dict[str, Any]],
+    risk_threshold: float,
+) -> list[dict[str, Any]]:
+    prepared_at = utc_now()
+    grouped: dict[tuple[str, str], list[ScoredCandidate]] = defaultdict(list)
+    for candidate in candidates:
+        route_key = candidate.route or candidate.sample_id
+        grouped[(candidate.project_id, route_key)].append(candidate)
+
+    route_records: list[dict[str, Any]] = []
+    for (project_id, route), group_candidates in grouped.items():
+        sorted_group = sorted(group_candidates, key=candidate_evidence_priority_key)
+        primary = sorted_group[0]
+        llm_records = [llm_map[c.sample_id] for c in sorted_group if c.sample_id in llm_map]
+        if not llm_records:
+            raise ValueError(f"missing LLM evidence for C-ready route={route}")
+        merged_llm = merge_llm_evidence(llm_records)
+        entrypoint = merged_llm.get("entrypoint") if isinstance(merged_llm.get("entrypoint"), dict) else {}
+        focus = merged_llm.get("focus") if isinstance(merged_llm.get("focus"), dict) else {}
+        stage_b = stage_b_route_payload(sorted_group, risk_threshold)
+        record = {
+            "schema_version": C_READY_SCHEMA_VERSION,
+            "candidate_id": stable_id("c_ready", project_id, route),
+            "project_id": project_id,
+            "sample_id": primary.sample_id,
+            "route": route,
+            "file": str(entrypoint.get("file") or focus.get("file") or primary.file),
+            "line": int(focus.get("line") or entrypoint.get("line") or primary.line or 0),
+            "evidence_slice": merged_llm.get("evidence_slice", ""),
+            "risk_threshold": risk_threshold,
+            "threshold_pass": stage_b["threshold_pass"],
+            "risk_score": stage_b["max_risk_score"],
+            "rarity_score": stage_b["max_rarity_score"],
+            "sink_score": stage_b["max_sink_score"],
+            "pattern_deviation_score": stage_b["max_pattern_deviation_score"],
+            "missing_feature_count": len(stage_b["missing_features"]),
+            "stage_b": stage_b,
+            "llm_evidence": merged_llm,
+            "prepared_for_c_at": prepared_at,
+        }
+        route_records.append(record)
+
+    route_records.sort(key=c_ready_record_priority_key)
+    records: list[dict[str, Any]] = []
+    for rank, record in enumerate(route_records, 1):
+        record["processing_rank"] = rank
+        record["stage_b"]["processing_rank"] = rank
+        record["priority_basis"] = {
+            "primary": "route_aggregated_threshold_pass_desc",
+            "secondary": [
+                "max_risk_score_desc",
+                "max_sink_score_desc",
+                "max_pattern_deviation_score_desc",
+                "max_rarity_score_desc",
+                "candidate_count_desc",
+            ],
+        }
+        records.append(record)
+    return records
+
+
+def candidate_evidence_priority_key(candidate: ScoredCandidate) -> tuple[int, float, float, float, str]:
+    system_header_penalty = 1 if str(candidate.file).startswith("/usr/include") else 0
+    token = candidate.evidence_slice
+    interest = token_interest_score(token)
+    return (
+        system_header_penalty,
+        -interest,
+        -candidate.risk_score,
+        -candidate.sink_score,
+        candidate.sample_id,
+    )
+
+
+def token_interest_score(token: str) -> float:
+    prefix, _, value = token.partition(":")
+    normalized = value.lower()
+    if normalized in {"printline", "exit"}:
+        return 0.1
+    prefix_weights = {
+        "command": 1.0,
+        "database": 1.0,
+        "network": 0.9,
+        "filesystem": 0.8,
+        "memory": 0.7,
+        "env": 0.7,
+        "crypto": 0.65,
+        "resource": 0.35,
+        "call": 0.6,
+        "check": 0.1,
+    }
+    return prefix_weights.get(prefix.lower(), 0.4)
+
+
+def unique_extend(result: list[Any], seen: set[str], values: list[Any], limit: int) -> None:
+    for value in values:
+        key = json.dumps(value, ensure_ascii=False, sort_keys=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+        if len(result) >= limit:
+            return
+
+
+def merge_llm_evidence(records: list[dict[str, Any]]) -> dict[str, Any]:
+    primary = records[0]
+    merged = {
+        field: primary[field]
+        for field in C_READY_LLM_FIELDS
+        if field in primary
+    }
+    evidence_parts: list[str] = []
+    evidence_seen: set[str] = set()
+    for record in records:
+        evidence = str(record.get("evidence_slice") or "").strip()
+        if not evidence or evidence in evidence_seen:
+            continue
+        evidence_seen.add(evidence)
+        evidence_parts.append(evidence)
+        if len(evidence_parts) >= C_READY_MAX_EVIDENCE_SLICES:
+            break
+    merged_evidence = "\n...\n".join(evidence_parts)
+    if len(merged_evidence) > C_READY_MAX_EVIDENCE_CHARS:
+        merged_evidence = merged_evidence[:C_READY_MAX_EVIDENCE_CHARS] + "..."
+    if merged_evidence:
+        merged["evidence_slice"] = merged_evidence
+
+    for field in ("source_sink_flows", "representative_traces", "code_slices", "internal_function_summaries"):
+        merged_items: list[Any] = []
+        seen: set[str] = set()
+        for record in records:
+            values = record.get(field) or []
+            if isinstance(values, list):
+                unique_extend(merged_items, seen, values, C_READY_MAX_MERGED_LIST_ITEMS)
+            if len(merged_items) >= C_READY_MAX_MERGED_LIST_ITEMS:
+                break
+        merged[field] = merged_items
+
+    return merged
+
+
+def stage_b_route_payload(candidates: list[ScoredCandidate], risk_threshold: float) -> dict[str, Any]:
+    missing_by_token: dict[str, dict[str, Any]] = {}
+    reference_ids: set[str] = set()
+    reason_tags: set[str] = set()
+    source_kinds: set[str] = set()
+    sink_types: set[str] = set()
+    api_groups: set[str] = set()
+    seed_tokens: set[str] = set()
+    for candidate in candidates:
+        api_groups.add(candidate.api_group)
+        seed_tokens.add(candidate.evidence_slice)
+        reason_tags.update(candidate.reason_tags)
+        source_kinds.update(candidate.source_kinds)
+        sink_types.update(candidate.sink_types)
+        reference_ids.update(candidate.reference_sample_ids)
+        for feature in candidate.missing_features:
+            token = str(feature.get("token") or "")
+            if token and token not in missing_by_token:
+                missing_by_token[token] = feature
+    threshold_pass = any(candidate.threshold_pass for candidate in candidates)
+    summaries = [candidate_summary(candidate) for candidate in candidates[:C_READY_MAX_STAGE_B_CANDIDATES]]
+    return {
+        "schema_version": "stageb.c_ready_route_augmentation.v1",
+        "aggregation": "route",
+        "candidate_count": len(candidates),
+        "candidate_ids": [candidate.candidate_id for candidate in candidates],
+        "primary_sample_id": candidates[0].sample_id,
+        "threshold_pass": threshold_pass,
+        "risk_threshold": risk_threshold,
+        "max_risk_score": round(max(candidate.risk_score for candidate in candidates), 4),
+        "max_rarity_score": round(max(candidate.rarity_score for candidate in candidates), 4),
+        "max_sink_score": round(max(candidate.sink_score for candidate in candidates), 4),
+        "max_pattern_deviation_score": round(max(candidate.pattern_deviation_score for candidate in candidates), 4),
+        "missing_features": list(missing_by_token.values()),
+        "reference_sample_ids": sorted(reference_ids)[:10],
+        "reason_tags": sorted(reason_tags),
+        "source_kinds": sorted(source_kinds),
+        "sink_types": sorted(sink_types),
+        "api_groups": sorted(api_groups),
+        "seed_tokens": sorted(seed_tokens, key=lambda token: (-token_interest_score(token), token)),
+        "top_candidates": summaries,
+    }
+
+
+def candidate_summary(candidate: ScoredCandidate) -> dict[str, Any]:
+    return {
+        "candidate_id": candidate.candidate_id,
+        "sample_id": candidate.sample_id,
+        "api_group": candidate.api_group,
+        "seed_token": candidate.evidence_slice,
+        "file": candidate.file,
+        "line": candidate.line,
+        "threshold_pass": candidate.threshold_pass,
+        "risk_score": candidate.risk_score,
+        "rarity_score": candidate.rarity_score,
+        "sink_score": candidate.sink_score,
+        "pattern_deviation_score": candidate.pattern_deviation_score,
+        "missing_feature_count": candidate.missing_feature_count,
+        "reason_tags": candidate.reason_tags,
+    }
+
+
+def c_ready_record_priority_key(record: dict[str, Any]) -> tuple[int, float, float, float, float, int, str, str]:
+    stage_b = record["stage_b"]
+    return (
+        -int(stage_b["threshold_pass"]),
+        -stage_b["max_risk_score"],
+        -stage_b["max_sink_score"],
+        -stage_b["max_pattern_deviation_score"],
+        -stage_b["max_rarity_score"],
+        -stage_b["candidate_count"],
+        record["project_id"],
+        record["route"],
+    )
 
 
 def risk_distribution(candidates: list[ScoredCandidate]) -> dict[str, int]:
@@ -530,15 +808,40 @@ def risk_distribution(candidates: list[ScoredCandidate]) -> dict[str, int]:
     }
 
 
-def stats_payload(samples: list[StageAStatsSample], models: dict[str, GroupModel], candidates: list[ScoredCandidate]) -> dict[str, Any]:
+def stats_payload(
+    samples: list[StageAStatsSample],
+    models: dict[str, GroupModel],
+    candidates: list[ScoredCandidate],
+    risk_threshold: float,
+) -> dict[str, Any]:
     passed = [candidate for candidate in candidates if candidate.threshold_pass]
+    c_ready_count = len({(candidate.project_id, candidate.route or candidate.sample_id) for candidate in candidates})
     return {
         "schema_version": "stageb.feature_miner_stats.v1",
         "input_schema_version": SCHEMA_VERSION,
+        "c_ready_schema_version": C_READY_SCHEMA_VERSION,
         "total_samples": len(samples),
         "total_groups": len(models),
         "total_patterns": sum(len(model.expected_features) for model in models.values()),
         "total_candidates": len(candidates),
+        "c_ready_candidates": c_ready_count,
+        "risk_threshold": risk_threshold,
+        "candidate_sort_order": [
+            "threshold_pass_desc",
+            "rarity_score_desc",
+            "pattern_deviation_score_desc",
+            "sink_score_desc",
+            "risk_score_desc",
+            "missing_feature_count_desc",
+        ],
+        "c_ready_sort_order": [
+            "route_aggregated_threshold_pass_desc",
+            "max_risk_score_desc",
+            "max_sink_score_desc",
+            "max_pattern_deviation_score_desc",
+            "max_rarity_score_desc",
+            "candidate_count_desc",
+        ],
         "passed_threshold": len(passed),
         "failed_threshold": len(candidates) - len(passed),
         "min_support_by_group": {
@@ -556,11 +859,17 @@ def stats_payload(samples: list[StageAStatsSample], models: dict[str, GroupModel
 def main() -> None:
     args = parse_args()
     input_path = Path(args.input)
+    llm_input_path = Path(args.llm_input)
     output_dir = Path(args.output_dir)
 
     print(f"加载输入: {input_path}")
     samples = load_stats_samples(input_path)
     print(f"共 {len(samples)} 个样本")
+
+    print(f"加载 LLM 证据: {llm_input_path}")
+    llm_map = load_llm_samples(llm_input_path)
+    validate_llm_coverage(samples, llm_map, llm_input_path)
+    print(f"共 {len(llm_map)} 条 LLM 证据")
 
     print(
         "阶段1: 高频 feature 统计 "
@@ -581,11 +890,15 @@ def main() -> None:
     write_jsonl(candidates_path, candidate_records)
     print(f"  输出 candidates.scored.jsonl -> {candidates_path}")
 
+    c_ready_path = output_dir / "candidates.for_c.jsonl"
+    write_jsonl(c_ready_path, c_ready_records(candidates, llm_map, args.risk_threshold))
+    print(f"  输出 candidates.for_c.jsonl -> {c_ready_path}")
+
     passed = [candidate for candidate in candidates if candidate.threshold_pass]
     print(f"质量门禁: risk_score >= {args.risk_threshold:.2f} 且存在缺失 feature 通过 {len(passed)}/{len(candidates)} 个")
 
     stats_path = output_dir / "b_miner_stats.json"
-    stats = stats_payload(samples, models, candidates)
+    stats = stats_payload(samples, models, candidates, args.risk_threshold)
     write_json(stats_path, stats)
     print(f"统计信息 -> {stats_path}")
     print(json.dumps(stats, ensure_ascii=False, indent=2))

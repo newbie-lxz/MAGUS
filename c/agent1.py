@@ -5,8 +5,11 @@
 import argparse
 import functools
 import json
+import multiprocessing as mp
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import queue
+import time
+from json import JSONDecodeError
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,21 +22,27 @@ BASE_URL = "https://api.deepseek.com/v1"
 CONFIDENCE_THRESHOLD = 0.60               # 放宽到0.60，让更多假设进入D阶段（原0.65）
 STATIC_CONFIDENCE_THRESHOLD = 0.90        # P0：C阶段静态强确认，直接进入静态报告
 MAX_WORKERS = 5                           # 并发线程数，平衡速度与稳定性
-MAX_CALL_CHAIN = 8                        # 调用序列最多保留个数（精简token）
-MAX_SINK_SOURCE = 3                       # sink/source最多保留个数（精简token）
+LLM_MAX_OUTPUT_TOKENS = 4096              # max_tokens只限制模型输出长度，不扩大输入上下文
+LLM_REQUEST_TIMEOUT_SECONDS = 60.0        # 单次LLM请求上限，会被全局deadline进一步收紧
+LLM_JSON_RETRY_ATTEMPTS = 1               # JSON解析失败后额外重试次数
+POST_DEADLINE_GRACE_SECONDS = 5.0         # 到达提交预算后等待已完成结果的宽限时间
+EVIDENCE_TEXT_MAX_CHARS = 1200            # 单段证据文本最多保留字符数
+MAX_CALL_CHAIN = 12                       # 调用序列最多保留个数
+MAX_SINK_SOURCE = 5                       # source/sink、trace、代码片段最多保留个数
+MAX_INTERNAL_SUMMARIES = 3                # 内部函数摘要最多保留个数
+C_READY_SCHEMA_VERSION = "stageb.c_ready_candidates.v2"
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=60, max_retries=0)
 
 
 # ==================== 数据加载模块 ====================
 def parse_args():
-    parser = argparse.ArgumentParser(description="C阶段：基于A阶段LLM证据和B阶段候选执行双Agent审计")
-    parser.add_argument("--llm-input", default="data/samples.llm.jsonl", help="A阶段导出的 samples.llm.jsonl")
-    parser.add_argument("--b-candidates", default="data/candidates.scored.jsonl", help="B阶段输出 candidates.scored.jsonl")
+    parser = argparse.ArgumentParser(description="C阶段：基于B阶段C-ready候选执行双Agent审计")
+    parser.add_argument("--candidates", default="data/candidates.for_c.jsonl", help="B阶段输出的 candidates.for_c.jsonl")
     parser.add_argument("--output", default="data/hypotheses.jsonl", help="C阶段输出给D验证的 hypotheses.jsonl")
     parser.add_argument("--static-output", default="", help="P0静态强确认报告；默认从 --output 推导")
     parser.add_argument("--audit-output", default="", help="P3和错误审计日志；默认从 --output 推导")
-    parser.add_argument("--max-samples", type=int, default=None, help="最多审计候选数量；默认不限制")
+    parser.add_argument("--time-limit-seconds", type=float, default=None, help="C阶段提交候选的时间预算；默认不限制")
     return parser.parse_args()
 
 
@@ -61,36 +70,50 @@ def read_jsonl(path):
     return records
 
 
+def require_candidate_field(cand, path, index, field):
+    value = cand.get(field)
+    if value in (None, "", []):
+        raise ValueError(f"{path}: candidate #{index} missing required field {field}")
+    return value
+
+
+def require_candidate_key(cand, path, index, field):
+    if field not in cand:
+        raise ValueError(f"{path}: candidate #{index} missing required field {field}")
+    return cand.get(field)
+
+
+def validate_candidate(cand, path, index):
+    if not isinstance(cand, dict):
+        raise ValueError(f"{path}: candidate #{index} must be an object")
+    schema = require_candidate_field(cand, path, index, "schema_version")
+    if schema != C_READY_SCHEMA_VERSION:
+        raise ValueError(f"{path}: candidate #{index} unsupported schema_version {schema!r}")
+    for field in ("project_id", "sample_id", "llm_evidence", "stage_b"):
+        require_candidate_field(cand, path, index, field)
+    for field in ("route", "file", "evidence_slice"):
+        value = require_candidate_key(cand, path, index, field)
+        if not isinstance(value, str):
+            raise ValueError(f"{path}: candidate #{index} {field} must be a string")
+    if not isinstance(cand.get("line"), int):
+        raise ValueError(f"{path}: candidate #{index} line must be an integer")
+    llm = cand.get("llm_evidence")
+    if not isinstance(llm, dict):
+        raise ValueError(f"{path}: candidate #{index} llm_evidence must be an object")
+    if llm.get("sample_id") != cand.get("sample_id"):
+        raise ValueError(
+            f"{path}: candidate #{index} llm_evidence sample_id does not match candidate sample_id"
+        )
+    if not isinstance(cand.get("stage_b"), dict):
+        raise ValueError(f"{path}: candidate #{index} stage_b must be an object")
+
+
 def load_candidates(path):
-    """加载B阶段输出的候选样本（candidates.scored.jsonl），每行一个JSON对象"""
-    return read_jsonl(path)
-
-
-def load_llm_samples(path):
-    """加载A阶段导出的LLM证据（samples.llm.jsonl），建立sample_id到证据的映射"""
-    llm_map = {}
-    for obj in read_jsonl(path):
-        sample_id = obj.get("sample_id")
-        if not sample_id:
-            raise ValueError(f"{path}: LLM evidence record missing sample_id")
-        if sample_id in llm_map:
-            raise ValueError(f"{path}: duplicate LLM evidence sample_id={sample_id}")
-        llm_map[sample_id] = obj
-    return llm_map
-
-
-def validate_inputs(candidates, llm_map):
-    missing = sorted(
-        {
-            str(cand.get("sample_id"))
-            for cand in candidates
-            if not cand.get("sample_id") or cand.get("sample_id") not in llm_map
-        }
-    )
-    if missing:
-        preview = ", ".join(missing[:10])
-        suffix = "" if len(missing) <= 10 else f" ... (+{len(missing) - 10} more)"
-        raise ValueError(f"B candidates missing matching A LLM evidence sample_id(s): {preview}{suffix}")
+    """加载B阶段已合并LLM证据并排序的候选队列。"""
+    candidates = read_jsonl(path)
+    for index, cand in enumerate(candidates, 1):
+        validate_candidate(cand, path, index)
+    return candidates
 
 
 # ==================== verification_context 自动推断模块 ====================
@@ -157,20 +180,36 @@ def infer_verification_context(repo_path: str) -> dict:
 
 
 # ==================== 证据文本构建模块（精简版） ====================
-def compact_text(value, max_chars=600):
+def compact_text(value, max_chars=EVIDENCE_TEXT_MAX_CHARS):
     text = " ".join(str(value or "").split())
     if len(text) <= max_chars:
         return text
     return text[:max_chars] + "..."
 
 
-def build_evidence_brief(cand, llm_map):
+def bool_text(value):
+    return "true" if bool(value) else "false"
+
+
+def format_missing_feature(feature):
+    token = feature.get("token", "?")
+    support = feature.get("support", 0.0)
+    support_count = feature.get("support_count", 0)
+    group_size = feature.get("group_size", 0)
+    weight = feature.get("weight", 0.0)
+    refs = ", ".join(str(item) for item in feature.get("reference_sample_ids", [])[:3])
+    suffix = f" refs=[{refs}]" if refs else ""
+    return f"{token} support={support:.2f} count={support_count}/{group_size} weight={weight:.2f}{suffix}"
+
+
+def build_evidence_brief(cand):
     """
     为大模型构建精简但完整的审计证据。
-    输入来自A阶段samples.llm.jsonl和B阶段candidates.scored.jsonl。
+    输入来自B阶段以LLM证据为主体、按route聚合增强的candidates.for_c.jsonl。
     """
     sample_id = cand.get("sample_id")
-    llm = llm_map.get(sample_id, {})
+    llm = cand.get("llm_evidence", {})
+    stage_b = cand.get("stage_b", {})
 
     lines = []
     lines.append(f"项目:{cand.get('project_id','?')} 样本:{sample_id}")
@@ -191,9 +230,46 @@ def build_evidence_brief(cand, llm_map):
     focus_file = focus.get("file") or cand.get("file", "?")
     focus_line = focus.get("line") or cand.get("line", 0)
     lines.append(f"位置:{focus_file}:{focus_line}")
-    lines.append(f"B阶段证据:{cand.get('evidence_slice','')}")
-    if llm.get("evidence_slice"):
-        lines.append(f"A阶段证据:{compact_text(llm.get('evidence_slice'))}")
+    if cand.get("evidence_slice"):
+        lines.append(f"A阶段合并证据:{compact_text(cand.get('evidence_slice'))}")
+    lines.append(
+        "B阶段门禁:"
+        f" threshold_pass={bool_text(cand.get('threshold_pass'))}"
+        f" risk_threshold={float(cand.get('risk_threshold', 0.0)):.2f}"
+        f" risk_score={float(cand.get('risk_score', 0.0)):.2f}"
+        f" missing_feature_count={int(cand.get('missing_feature_count', 0) or 0)}"
+        f" route_candidate_count={int(stage_b.get('candidate_count', 0) or 0)}"
+    )
+    lines.append(
+        "B阶段排序:"
+        f" rank={cand.get('processing_rank','?')}"
+        f" basis={cand.get('priority_basis', {})}"
+    )
+    lines.append(
+        f"B阶段分数: rarity={cand.get('rarity_score',0.0):.2f}"
+        f" sink={cand.get('sink_score',0.0):.2f}"
+        f" deviation={cand.get('pattern_deviation_score',0.0):.2f}"
+    )
+    seed_tokens = stage_b.get("seed_tokens", [])
+    if seed_tokens:
+        lines.append(f"B阶段route内API种子:{', '.join(str(item) for item in seed_tokens[:MAX_CALL_CHAIN])}")
+    top_candidates = stage_b.get("top_candidates", [])
+    for item in top_candidates[:MAX_SINK_SOURCE]:
+        lines.append(
+            "B阶段候选:"
+            f" sample={item.get('sample_id','?')}"
+            f" seed={item.get('seed_token','?')}"
+            f" line={item.get('file','?')}:{item.get('line','?')}"
+            f" risk={float(item.get('risk_score', 0.0)):.2f}"
+        )
+    missing_features = stage_b.get("missing_features", [])
+    if missing_features:
+        lines.append("B阶段缺失高频feature:")
+        for feature in missing_features[:MAX_SINK_SOURCE]:
+            lines.append(f"- {format_missing_feature(feature)}")
+    refs = stage_b.get("reference_sample_ids", [])
+    if refs:
+        lines.append(f"B阶段参考样本:{', '.join(str(item) for item in refs[:5])}")
 
     # A阶段代表性source-sink流
     flows = llm.get("source_sink_flows", [])
@@ -222,7 +298,7 @@ def build_evidence_brief(cand, llm_map):
 
     # A阶段内部函数摘要
     summaries = llm.get("internal_function_summaries", [])
-    for item in summaries[:2]:
+    for item in summaries[:MAX_INTERNAL_SUMMARIES]:
         loc = f"{item.get('file','?')}:{item.get('line_start','?')}-{item.get('line_end','?')}"
         calls = " -> ".join(item.get("calls", [])[:MAX_CALL_CHAIN])
         lines.append(f"函数:{item.get('function','?')} {loc} 调用:{calls}")
@@ -230,9 +306,7 @@ def build_evidence_brief(cand, llm_map):
         if excerpt:
             lines.append(f"函数证据:{compact_text(excerpt)}")
 
-    # B阶段风险评分
-    lines.append(f"风险:稀有度{cand.get('rarity_score',0.5):.2f} sink{cand.get('sink_score',0.5):.2f} 偏离{cand.get('pattern_deviation_score',0.5):.2f} 综合{cand.get('risk_score',0.5):.2f}")
-    lines.append(f"标签:{', '.join(cand.get('reason_tags', []))}")
+    lines.append(f"标签:{', '.join(stage_b.get('reason_tags', cand.get('reason_tags', [])))}")
 
     return "\n".join(lines)
 
@@ -246,6 +320,8 @@ PROPOSER_PROMPT = """你是一位红队安全审计专家。基于以下代码�
 **任务**：
 - 如果存在安全漏洞（如缓冲区溢出、整数溢出、空指针解引用、权限缺失、SQL注入等），输出漏洞描述、CWE编号、**假设条件集合**、**触发路径**、攻击前提条件，以及对漏洞存在的置信度（0~1）。
 - 如果确定没有任何漏洞，输出 "NO_VULNERABILITY_FOUND"。
+- B阶段门禁和缺失feature是审计优先级/反幻觉约束，不是漏洞结论。必须用代码证据证明source、sink和可达路径；不得仅凭risk_score、threshold_pass或文件名推断漏洞。
+- 如果threshold_pass=false或缺失feature为空，仍可报告漏洞，但必须有更强的A阶段代码证据；否则倾向输出NO_VULNERABILITY_FOUND或低置信度假设。
 
 **输出格式（严格JSON）**：
 {{
@@ -275,6 +351,7 @@ RED_REVIEW_PROMPT = """你仍然是红队安全审计专家，不是蓝队。请
 - 如果第一轮已发现漏洞，检查 source/sink 或 API misuse 路径是否真实、是否引用了不存在的代码。
 - 如果第一轮判断为 NO_VULNERABILITY_FOUND，但证据中存在具体可验证漏洞路径，必须纠正为漏洞。
 - 只有发现硬矛盾（路径不可达、sink不存在、source和sink不连通、把good路径当bad路径等）时，才列入 hard_contradictions。
+- 使用B阶段门禁、缺失feature和参考样本约束第一轮判断：这些信号只能说明优先级或异常模式，不能替代真实代码路径。
 
 **输出格式（严格JSON）**：
 {{
@@ -306,6 +383,7 @@ RED_FINAL_PROMPT = """你是红队最终整理者。请汇总前两轮结果，�
 - 如果无漏洞，输出 NO_VULNERABILITY_FOUND。
 - 如果发现硬矛盾，写入 hard_contradictions。
 - 不要输出 HTTP/base_url/token/*.http 等Web验证内容；这里的API指C/C++函数调用接口或调用序列。
+- 最终结论必须说明得通A阶段代码证据和B阶段结构信号；当代码证据不闭合但仍有漏洞可能时，保留漏洞假设并标记 evidence_complete=false，不要把不确定性伪装成已确认无漏洞。
 
 **输出格式（严格JSON）**：
 {{
@@ -324,20 +402,78 @@ RED_FINAL_PROMPT = """你是红队最终整理者。请汇总前两轮结果，�
 
 
 # ==================== LLM调用与假设构建模块 ====================
-def call_llm(prompt):
-    """调用大模型API，返回解析后的JSON字典。设置max_tokens=2000确保输出完整。"""
-    try:
-        r = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            max_tokens=2000,      # 保持足够大，避免截断
-            temperature=0.0
-        )
-        return json.loads(r.choices[0].message.content)
-    except Exception as e:
-        print(f"LLM调用失败: {e}")
+def remaining_seconds(deadline):
+    if deadline is None:
         return None
+    return deadline - time.monotonic()
+
+
+def has_time_remaining(deadline, min_seconds=1.0):
+    remaining = remaining_seconds(deadline)
+    return remaining is None or remaining > min_seconds
+
+
+def llm_failure(error_type, detail):
+    return {
+        "claim": "NO_VULNERABILITY_FOUND",
+        "confidence": 0.0,
+        "llm_error": error_type,
+        "llm_error_detail": detail,
+    }
+
+
+def response_preview(content, limit=500):
+    return " ".join(str(content or "").split())[:limit]
+
+
+def parse_llm_json(content):
+    if content is None:
+        raise ValueError("empty_response")
+    if not str(content).strip():
+        raise ValueError("empty_response")
+    return json.loads(content)
+
+
+def call_llm(prompt, deadline=None):
+    """调用大模型API，返回解析后的JSON字典。max_tokens限制输出长度，不控制输入长度。"""
+    timeout = LLM_REQUEST_TIMEOUT_SECONDS
+    remaining = remaining_seconds(deadline)
+    if remaining is not None:
+        if remaining <= 1.0:
+            print("LLM调用跳过: time budget exhausted")
+            return llm_failure("time_budget_exhausted_before_call", "remaining<=1s")
+        timeout = max(1.0, min(timeout, remaining))
+
+    last_failure = None
+    for attempt in range(LLM_JSON_RETRY_ATTEMPTS + 1):
+        if not has_time_remaining(deadline):
+            return llm_failure("time_budget_exhausted_before_retry", f"attempt={attempt}")
+        try:
+            request_client = client.with_options(timeout=timeout)
+            r = request_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                max_tokens=LLM_MAX_OUTPUT_TOKENS,
+                temperature=0.0
+            )
+            content = r.choices[0].message.content
+            try:
+                return parse_llm_json(content)
+            except JSONDecodeError as exc:
+                last_failure = llm_failure(
+                    "invalid_json_response",
+                    f"{exc}; preview={response_preview(content)}",
+                )
+                print(f"LLM JSON解析失败 attempt={attempt}: {exc}")
+            except ValueError as exc:
+                last_failure = llm_failure(str(exc), f"attempt={attempt}")
+                print(f"LLM返回为空 attempt={attempt}: {exc}")
+        except Exception as exc:
+            last_failure = llm_failure("api_error", str(exc))
+            print(f"LLM调用失败 attempt={attempt}: {exc}")
+            break
+    return last_failure
 
 
 def response_claim(resp):
@@ -466,16 +602,11 @@ def route_record(cand, responses):
     if not any_vuln:
         return selected, "P3", "audit_only", "red_team_no_vulnerability", contradictions
 
-    if contradictions and not is_vulnerability_response(responses[-1]):
-        return selected, "P3", "audit_only", "hard_contradiction", contradictions
-
-    if not evidence_complete(selected, cand):
-        return selected, "P3", "audit_only", "evidence_incomplete", contradictions
-
     confidence = response_confidence(selected)
     all_vuln = vuln_count == len(responses)
     has_cwe = bool(response_cwes(selected))
-    if all_vuln and confidence >= STATIC_CONFIDENCE_THRESHOLD and has_cwe:
+    selected_evidence_complete = evidence_complete(selected, cand)
+    if all_vuln and selected_evidence_complete and confidence >= STATIC_CONFIDENCE_THRESHOLD and has_cwe:
         return selected, "P0", "static_confirmed", "red_team_static_strong", contradictions
 
     if not first_is_vuln and any_vuln:
@@ -541,7 +672,33 @@ def audit_error_record(cand, exc):
     }
 
 
-def audit_one(cand, llm_map):
+def audit_timeout_record(cand, completed_rounds):
+    return {
+        "project_id": cand.get("project_id"),
+        "sample_id": cand.get("sample_id"),
+        "hypothesis_id": f"hyp_{cand.get('sample_id', 'unknown')}",
+        "claim": "NO_VULNERABILITY_FOUND",
+        "CWE_candidates": [],
+        "preconditions": [],
+        "attack_path": [cand.get("route", "")] if cand.get("route") else [],
+        "confidence": 0.0,
+        "priority": "P3",
+        "agent_verdict": "audit_only",
+        "routing_decision": "audit_only",
+        "suspicion_reason": "stage_c_time_budget_exhausted",
+        "hard_contradictions": [],
+        "red_team_rounds": completed_rounds,
+        "route": cand.get("route", ""),
+        "file": cand.get("file", ""),
+        "line": cand.get("line", 0),
+        "evidence_slice": cand.get("evidence_slice", ""),
+        "timestamps": {"routed_at": utc_now()},
+        "status": "audit_only",
+        "d_verification": "not_applicable",
+    }
+
+
+def audit_one(cand, deadline=None):
     """
     单个样本的三轮红队审计流程：
     1. 红队提出高召回漏洞假设。
@@ -549,38 +706,45 @@ def audit_one(cand, llm_map):
     3. 红队最终整理，按P0/P1/P2/P3分流。
     """
     sample_id = cand["sample_id"]
-    brief = build_evidence_brief(cand, llm_map)
-    repo_path = llm_map.get(sample_id, {}).get("repo_path", "")
+    brief = build_evidence_brief(cand)
+    repo_path = cand.get("llm_evidence", {}).get("repo_path", "")
+    red_team_rounds = []
+
+    if not has_time_remaining(deadline):
+        return audit_timeout_record(cand, red_team_rounds)
 
     print(f"[C] red round 1 proposer {sample_id}")
-    prop_resp = call_llm(PROPOSER_PROMPT.format(evidence_brief=brief))
+    prop_resp = call_llm(PROPOSER_PROMPT.format(evidence_brief=brief), deadline)
     if not prop_resp:
         prop_resp = {"claim": "NO_VULNERABILITY_FOUND", "confidence": 0.0, "llm_error": "round_1_failed"}
+    red_team_rounds.append({"round": 1, "role": "red_proposer", "response": prop_resp})
+
+    if not has_time_remaining(deadline):
+        return audit_timeout_record(cand, red_team_rounds)
 
     print(f"[C] red round 2 review {sample_id}")
     review_resp = call_llm(RED_REVIEW_PROMPT.format(
         evidence_brief=brief,
         proposer_json=json.dumps(prop_resp, ensure_ascii=False),
-    ))
+    ), deadline)
     if not review_resp:
         review_resp = dict(prop_resp)
         review_resp["llm_error"] = "round_2_failed_reused_round_1"
+    red_team_rounds.append({"round": 2, "role": "red_self_review", "response": review_resp})
+
+    if not has_time_remaining(deadline):
+        return audit_timeout_record(cand, red_team_rounds)
 
     print(f"[C] red round 3 final {sample_id}")
     final_resp = call_llm(RED_FINAL_PROMPT.format(
         evidence_brief=brief,
         proposer_json=json.dumps(prop_resp, ensure_ascii=False),
         review_json=json.dumps(review_resp, ensure_ascii=False),
-    ))
+    ), deadline)
     if not final_resp:
         final_resp = dict(review_resp)
         final_resp["llm_error"] = "round_3_failed_reused_round_2"
-
-    red_team_rounds = [
-        {"round": 1, "role": "red_proposer", "response": prop_resp},
-        {"round": 2, "role": "red_self_review", "response": review_resp},
-        {"round": 3, "role": "red_final", "response": final_resp},
-    ]
+    red_team_rounds.append({"round": 3, "role": "red_final", "response": final_resp})
     responses = [prop_resp, review_resp, final_resp]
     selected, priority, decision, reason, contradictions = route_record(cand, responses)
     return build_hypothesis(cand, selected, priority, decision, reason, contradictions, red_team_rounds, repo_path)
@@ -598,11 +762,167 @@ def append_jsonl(file_obj, row):
     file_obj.flush()
 
 
+class CompletedFuture:
+    def __init__(self, result):
+        self._result = result
+
+    def result(self):
+        return self._result
+
+
+def audit_worker(cand, deadline, result_queue):
+    try:
+        hyp = audit_one(cand, deadline)
+    except Exception as exc:
+        hyp = audit_error_record(cand, exc)
+    result_queue.put({"pid": os.getpid(), "hyp": hyp})
+
+
+def process_completed_future(future, cand, d_file, static_file, audit_file):
+    try:
+        hyp = future.result()
+    except Exception as e:
+        hyp = audit_error_record(cand, e)
+
+    if hyp.get("priority") == "P0":
+        append_jsonl(static_file, hyp)
+        bucket = "static"
+    elif hyp.get("priority") in {"P1", "P2"}:
+        append_jsonl(d_file, hyp)
+        bucket = "d"
+    else:
+        append_jsonl(audit_file, hyp)
+        bucket = "audit"
+    print(
+        f"[C] {cand['sample_id']} rank={cand.get('processing_rank')} "
+        f"priority={hyp.get('priority')} decision={hyp.get('routing_decision')} "
+        f"reason={hyp.get('suspicion_reason')}"
+    )
+    return bucket
+
+
+def process_hypothesis_record(hyp, cand, d_file, static_file, audit_file):
+    return process_completed_future(CompletedFuture(hyp), cand, d_file, static_file, audit_file)
+
+
+def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_file):
+    if time_limit_seconds is not None and time_limit_seconds <= 0:
+        raise ValueError("--time-limit-seconds must be greater than 0")
+
+    deadline = None if time_limit_seconds is None else time.monotonic() + time_limit_seconds
+    grace_deadline = None if deadline is None else deadline + POST_DEADLINE_GRACE_SECONDS
+    next_index = 0
+    submitted_count = 0
+    exhausted_reported = False
+    counts = {"d": 0, "static": 0, "audit": 0}
+
+    def within_budget():
+        return deadline is None or time.monotonic() < deadline
+
+    def report_exhausted(pending_count):
+        nonlocal exhausted_reported
+        if deadline is None or exhausted_reported or next_index >= len(candidates):
+            return
+        exhausted_reported = True
+        print(
+            f"[C] time budget exhausted after submitting {submitted_count}/{len(candidates)} "
+            f"candidates; waiting for {pending_count} in-flight task(s)"
+        )
+
+    start_method = "fork" if "fork" in mp.get_all_start_methods() else None
+    ctx = mp.get_context(start_method) if start_method else mp.get_context()
+    result_queue = ctx.Queue()
+    running = {}
+
+    def submit_available():
+        nonlocal next_index, submitted_count
+        while len(running) < MAX_WORKERS and next_index < len(candidates) and within_budget():
+            cand = candidates[next_index]
+            process = ctx.Process(target=audit_worker, args=(cand, deadline, result_queue))
+            process.start()
+            running[process.pid] = (process, cand)
+            next_index += 1
+            submitted_count += 1
+
+    def handle_result(message):
+        pid = message.get("pid")
+        process, cand = running.pop(pid, (None, None))
+        if process is not None:
+            process.join(timeout=0)
+        if cand is None:
+            return
+        bucket = process_hypothesis_record(message.get("hyp"), cand, d_file, static_file, audit_file)
+        counts[bucket] += 1
+
+    def drain_results():
+        drained = False
+        while True:
+            try:
+                handle_result(result_queue.get_nowait())
+                drained = True
+            except queue.Empty:
+                return drained
+
+    def terminate_running():
+        drain_results()
+        for pid, (process, cand) in list(running.items()):
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=1)
+            if process.is_alive():
+                process.kill()
+                process.join(timeout=1)
+            bucket = process_hypothesis_record(audit_timeout_record(cand, []), cand, d_file, static_file, audit_file)
+            counts[bucket] += 1
+            running.pop(pid, None)
+
+    submit_available()
+    if not running and next_index < len(candidates):
+        report_exhausted(0)
+
+    while running:
+        if drain_results():
+            submit_available()
+            continue
+
+        if deadline is not None and not within_budget():
+            report_exhausted(len(running))
+            if time.monotonic() >= grace_deadline:
+                terminate_running()
+                break
+            poll_timeout = max(0.0, min(0.5, grace_deadline - time.monotonic()))
+        elif deadline is None:
+            poll_timeout = 0.5
+        else:
+            poll_timeout = max(0.0, min(0.5, deadline - time.monotonic()))
+
+        try:
+            handle_result(result_queue.get(timeout=poll_timeout))
+            submit_available()
+        except queue.Empty:
+            for pid, (process, cand) in list(running.items()):
+                if process.is_alive():
+                    continue
+                process.join(timeout=0)
+                bucket = process_hypothesis_record(
+                    audit_error_record(cand, RuntimeError(f"worker exited without result: exitcode={process.exitcode}")),
+                    cand,
+                    d_file,
+                    static_file,
+                    audit_file,
+                )
+                counts[bucket] += 1
+                running.pop(pid, None)
+            submit_available()
+
+    skipped = len(candidates) - submitted_count
+    return counts, submitted_count, skipped
+
+
 def main():
     """主流程：加载数据，并发处理每个候选样本，并按P0/P1/P2/P3即时分流写入。"""
     args = parse_args()
-    candidates_path = Path(args.b_candidates)
-    llm_samples_path = Path(args.llm_input)
+    candidates_path = Path(args.candidates)
     output_path = Path(args.output)
     static_output_path = Path(args.static_output) if args.static_output else default_side_output(
         output_path, "final", "static_confirmed.jsonl"
@@ -612,53 +932,31 @@ def main():
     )
 
     candidates = load_candidates(candidates_path)
-    llm_map = load_llm_samples(llm_samples_path)
-    validate_inputs(candidates, llm_map)
-
-    # 测试限制（可注释掉或调整数量）
-    if args.max_samples is not None:
-        candidates = candidates[:args.max_samples]
 
     truncate_jsonl(output_path)
     truncate_jsonl(static_output_path)
     truncate_jsonl(audit_output_path)
-
-    d_count = 0
-    static_count = 0
-    audit_count = 0
 
     # 使用线程池并发处理，提高整体吞吐量
     with (
         open(output_path, "a", encoding="utf-8", buffering=1) as d_file,
         open(static_output_path, "a", encoding="utf-8", buffering=1) as static_file,
         open(audit_output_path, "a", encoding="utf-8", buffering=1) as audit_file,
-        ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor,
     ):
-        future_to_cand = {executor.submit(audit_one, cand, llm_map): cand for cand in candidates}
-        for future in as_completed(future_to_cand):
-            cand = future_to_cand[future]
-            try:
-                hyp = future.result()
-            except Exception as e:
-                hyp = audit_error_record(cand, e)
+        counts, submitted_count, skipped_count = run_audit_queue(
+            candidates,
+            args.time_limit_seconds,
+            d_file,
+            static_file,
+            audit_file,
+        )
 
-            if hyp.get("priority") == "P0":
-                append_jsonl(static_file, hyp)
-                static_count += 1
-            elif hyp.get("priority") in {"P1", "P2"}:
-                append_jsonl(d_file, hyp)
-                d_count += 1
-            else:
-                append_jsonl(audit_file, hyp)
-                audit_count += 1
-            print(
-                f"[C] {cand['sample_id']} priority={hyp.get('priority')} "
-                f"decision={hyp.get('routing_decision')} reason={hyp.get('suspicion_reason')}"
-            )
-
-    print(f"[C] D candidates: {d_count} -> {output_path}")
-    print(f"[C] P0 static confirmed: {static_count} -> {static_output_path}")
-    print(f"[C] audit only: {audit_count} -> {audit_output_path}")
+    print(f"[C] submitted candidates: {submitted_count}/{len(candidates)}")
+    if skipped_count:
+        print(f"[C] skipped by time budget: {skipped_count}")
+    print(f"[C] D candidates: {counts['d']} -> {output_path}")
+    print(f"[C] P0 static confirmed: {counts['static']} -> {static_output_path}")
+    print(f"[C] audit only: {counts['audit']} -> {audit_output_path}")
 
 
 if __name__ == "__main__":

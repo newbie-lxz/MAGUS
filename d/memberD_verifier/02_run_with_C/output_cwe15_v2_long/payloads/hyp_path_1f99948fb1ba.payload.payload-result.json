@@ -1,0 +1,23 @@
+{
+  "status": "failed",
+  "reason": "NOT_EXPLOITABLE",
+  "failure_code": "NOT_EXPLOITABLE",
+  "failure_note": "payload did not satisfy oracle",
+  "observations": [
+    "exit=1 for /home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d_badSink"
+  ],
+  "runtime_trace": [
+    {
+      "cmd": "/home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d_badSink",
+      "cwd": "/home/sq_hu/MAGUS",
+      "exit_code": 1,
+      "elapsed_ms": 232,
+      "stdout_tail": "MAGUS_CWE15_BUILD_FAILED\n",
+      "stderr_tail": "/usr/bin/ld: /lib/x86_64-linux-gnu/Scrt1.o: in function `_start':\n(.text+0x1b): undefined reference to `main'\nclang-20: error: linker command failed with exit code 1 (use -v to see invocation)\n",
+      "timed_out": false
+    }
+  ],
+  "timestamps": {
+    "finished_at": "2026-05-20T15:51:48Z"
+  }
+}

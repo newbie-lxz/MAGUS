@@ -5,141 +5,6 @@
       "target_type": "source_api",
       "env_profile": "source_repository",
       "cases": {
-        "hyp_path_657af4f5f3ba": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "cpp",
-          "source_file": "/usr/include/c++/11/bits/alloc_traits.h",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_74L7goodG2BEv",
-          "api_sequence": [
-            "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_74L7goodG2BEv"
-          ],
-          "poc_plan": [
-            "Build or load project containing /usr/include/c++/11/bits/alloc_traits.h",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_74L7goodG2BEv",
-            "Drive the API sequence with misuse-oriented inputs for generic",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_657af4f5f3ba",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_74L7goodG2BEv",
-            "input_source": "unknown",
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "accepted_evidence": [
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision"
-            ],
-            "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
-            ],
-            "expect_nonzero_exit": true
-          }
-        },
-        "hyp_path_646f5b0acc7b": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "cpp",
-          "source_file": "/usr/include/c++/11/ext/new_allocator.h",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv",
-          "api_sequence": [
-            "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_72a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv"
-          ],
-          "poc_plan": [
-            "Build or load project containing /usr/include/c++/11/ext/new_allocator.h",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv",
-            "Drive the API sequence with misuse-oriented inputs for generic",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_646f5b0acc7b",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv",
-            "input_source": "unknown",
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "accepted_evidence": [
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision"
-            ],
-            "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
-            ],
-            "expect_nonzero_exit": true
-          }
-        },
-        "hyp_path_6704906c7588": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "cpp",
-          "source_file": "/usr/include/c++/11/bits/stl_list.h",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
-          "api_sequence": [
-            "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv"
-          ],
-          "poc_plan": [
-            "Build or load project containing /usr/include/c++/11/bits/stl_list.h",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
-            "Drive the API sequence with misuse-oriented inputs for generic",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_6704906c7588",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
-            "input_source": "unknown",
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "accepted_evidence": [
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision"
-            ],
-            "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
-            ],
-            "expect_nonzero_exit": true
-          }
-        },
         "hyp_path_f81bed3d35cf": {
           "name": "auto_generic",
           "target_type": "source_api",
@@ -151,7 +16,8 @@
           "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_743badEv",
           "api_sequence": [
             "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:90",
-            "dataMap[0] = data; // data被存储，可能后续用于系统调用 @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:96"
+            "dataMap[0] = data; @ 同上文件:97-98",
+            "closesocket(acceptSocket); @ 同上文件:102"
           ],
           "poc_plan": [
             "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp",
@@ -186,121 +52,28 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_e5b9f8c11eba": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "cpp",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv",
-          "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp:88-92",
-            "dataList.push_back(data); @ 同上文件，后续行",
-            "配置设置函数(data) // 假设, 未在片段中显示 @ 假设后续使用处"
-          ],
-          "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_e5b9f8c11eba",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv",
-            "input_source": "unknown",
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "accepted_evidence": [
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision"
-            ],
-            "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
-            ],
-            "expect_nonzero_exit": true
-          }
-        },
-        "hyp_path_6902ad55fb81": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "cpp",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
-          "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp:90-94",
-            "badSource(data); /* POTENTIAL FLAW: set the hostname to data obtained from a potentially external source */ if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\");} @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp:110-114"
-          ],
-          "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_6902ad55fb81",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
-            "input_source": "unknown",
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "accepted_evidence": [
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision"
-            ],
-            "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
-            ],
-            "expect_nonzero_exit": true
-          }
-        },
-        "hyp_path_65ab71da3e37": {
+        "hyp_path_87522265d475": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c",
+          "entry_symbol": "goodG2B2",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ 行82-86",
-            "strcpy(data, \"hostname\"); // 实际在修复中，但在bad路径中应是从recv获取data后直接用于设置配置 @ 行84（B阶段证据）"
+            "data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_goodG2B2Source(data); @ L72（入口）",
+            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); } @ L80"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c",
+            "Construct or locate a harness that reaches goodG2B2",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_65ab71da3e37",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_bad",
+            "marker": "memberD_source_api_probe_hyp_path_87522265d475",
+            "entry_symbol": "goodG2B2",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -325,28 +98,71 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_dbfae15f7a0a": {
+        "hyp_path_d8b272199e42": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "cpp",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_72a.cpp",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_723badEv",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp",
+          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_823badEv",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_72a.cpp:90",
-            "dataVector.insert(dataVector.end(), 1, data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_72a.cpp:98-102",
-            "潜在使用dataVector中的元素作为系统配置调用（如SetComputerName等） @ 假设后续代码"
+            "CWE15_External_Control_of_System_or_Configuration_Setting__w32_82_base* baseObject = new CWE15_External_Control_of_System_or_Configuration_Setting__w32_82_bad; baseObject->action(data); delete baseObject; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp:103-107"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_72a.cpp",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp",
+            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_823badEv",
+            "Drive the API sequence with misuse-oriented inputs for CWE-15",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_path_d8b272199e42",
+            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_823badEv",
+            "input_source": "unknown",
+            "seed_inputs": [
+              "boundary-sized input",
+              "null/zero/negative argument where type permits",
+              "malformed serialized bytes",
+              "state-transition sequence that violates inferred API pattern"
+            ]
+          },
+          "oracle": {
+            "accepted_evidence": [
+              "ASan/UBSan crash",
+              "non-zero test exit caused by crafted source/API input",
+              "unexpected success on invalid API state",
+              "differential behavior between vulnerable and fixed revision"
+            ],
+            "failure_patterns": [
+              "Segmentation fault",
+              "AddressSanitizer",
+              "null pointer",
+              "core dumped"
+            ],
+            "expect_nonzero_exit": true
+          }
+        },
+        "hyp_path_8064a9cf7e2b": {
+          "name": "auto_generic",
+          "target_type": "source_api",
+          "attack_type": "generic",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "cpp",
+          "source_file": "/usr/include/c++/11/ext/alloc_traits.h",
+          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_723badEv",
+          "api_sequence": [
+            "dataVector.insert(dataVector.end(), 1, data); badSink(dataVector); @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_72a.cpp:114-118"
+          ],
+          "poc_plan": [
+            "Build or load project containing /usr/include/c++/11/ext/alloc_traits.h",
             "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_723badEv",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_dbfae15f7a0a",
+            "marker": "memberD_source_api_probe_hyp_path_8064a9cf7e2b",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_723badEv",
             "input_source": "unknown",
             "seed_inputs": [
@@ -372,28 +188,28 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_a4396ae566b1": {
+        "hyp_path_c238622ed4ff": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+          "poc_language": "cpp",
+          "source_file": "/usr/include/c++/11/ext/alloc_traits.h",
+          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_743badEv",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ L29-101 (badSource函数)",
-            "data = badSource(data); if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\");} @ L108-112"
+            "dataMap[2] = data; badSink(dataMap); @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:114-118",
+            "void badSink(map<int, char*> dataMap) { ... } @ badSink函数实现（未在提供代码中显示，但根据测试用例命名，应包含system或配置API调用）"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+            "Build or load project containing /usr/include/c++/11/ext/alloc_traits.h",
+            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_743badEv",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_a4396ae566b1",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+            "marker": "memberD_source_api_probe_hyp_path_c238622ed4ff",
+            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_743badEv",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -418,28 +234,28 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_a0780d094b3f": {
+        "hyp_path_4d6d36332485": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_02.c",
+          "entry_symbol": "goodG2B2",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100-1, 0); @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c:83-87",
-            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c:106-110"
+            "goodG2B2函数入口行143",
+            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); } @ L152-156"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_02.c",
+            "Construct or locate a harness that reaches goodG2B2",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_a0780d094b3f",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_bad",
+            "marker": "memberD_source_api_probe_hyp_path_4d6d36332485",
+            "entry_symbol": "goodG2B2",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -464,28 +280,27 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_f479965c2ca3": {
+        "hyp_path_ccb8ae575e36": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_21_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_14.c",
+          "entry_symbol": "goodG2B1",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c:82-86",
-            "data = badSource(data); /* POTENTIAL FLAW: set the hostname to data obtained from a potentially external source */ if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c:115-119"
+            "if (!SetComputerNameA(data)) @ L135"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_21_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_14.c",
+            "Construct or locate a harness that reaches goodG2B1",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_f479965c2ca3",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_21_bad",
+            "marker": "memberD_source_api_probe_hyp_path_ccb8ae575e36",
+            "entry_symbol": "goodG2B1",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -510,28 +325,28 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_3c989a45e355": {
+        "hyp_path_e8abed295e20": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_13.c",
+          "entry_symbol": "goodG2B1",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c:90-94",
-            "if (!SetComputerNameA(data)) {...} @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c:29-37"
+            "goodG2B1函数入口 @ L119",
+            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); } @ L135"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_13.c",
+            "Construct or locate a harness that reaches goodG2B1",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_3c989a45e355",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_bad",
+            "marker": "memberD_source_api_probe_hyp_path_e8abed295e20",
+            "entry_symbol": "goodG2B1",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -556,27 +371,28 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_012deba47e03": {
+        "hyp_path_eb4b62790fe1": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54a.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_54_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_08.c",
+          "entry_symbol": "goodG2B2",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54a.c:85"
+            "入口函数goodG2B2 @ L157",
+            "if (!SetComputerNameA(data)) @ L168"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54a.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_54_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_08.c",
+            "Construct or locate a harness that reaches goodG2B2",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_012deba47e03",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_54_bad",
+            "marker": "memberD_source_api_probe_hyp_path_eb4b62790fe1",
+            "entry_symbol": "goodG2B2",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -601,7 +417,53 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_27da96012b18": {
+        "hyp_path_f538905c837c": {
+          "name": "auto_generic",
+          "target_type": "source_api",
+          "attack_type": "generic",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "unknown",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_07.c",
+          "entry_symbol": "goodG2B1",
+          "api_sequence": [
+            "goodG2B1函数入口 @ 125",
+            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); @ 141"
+          ],
+          "poc_plan": [
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_07.c",
+            "Construct or locate a harness that reaches goodG2B1",
+            "Drive the API sequence with misuse-oriented inputs for CWE-15",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_path_f538905c837c",
+            "entry_symbol": "goodG2B1",
+            "input_source": "unknown",
+            "seed_inputs": [
+              "boundary-sized input",
+              "null/zero/negative argument where type permits",
+              "malformed serialized bytes",
+              "state-transition sequence that violates inferred API pattern"
+            ]
+          },
+          "oracle": {
+            "accepted_evidence": [
+              "ASan/UBSan crash",
+              "non-zero test exit caused by crafted source/API input",
+              "unexpected success on invalid API state",
+              "differential behavior between vulnerable and fixed revision"
+            ],
+            "failure_patterns": [
+              "Segmentation fault",
+              "AddressSanitizer",
+              "null pointer",
+              "core dumped"
+            ],
+            "expect_nonzero_exit": true
+          }
+        },
+        "hyp_path_1076ed6e41e1": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
@@ -611,8 +473,9 @@
           "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c",
           "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_64_bad",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:85",
-            "data被传递给系统配置函数（如SetComputerName、RegSetValue等） @ 未知（后续使用）"
+            "acceptSocket = accept(listenSocket, NULL, NULL); if (acceptSocket == INVALID_SOCKET) { break; } @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:66-70",
+            "recvResult = recv(acceptSocket, data, 100 - 1, 0); if (recvResult == SOCKET_ERROR || recvResult == 0) { ... } @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:83-87",
+            "将 data 传递给系统配置 API，如 System function 或 ChangeServiceConfig。 @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:后续代码（约90-110行）"
           ],
           "poc_plan": [
             "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c",
@@ -621,7 +484,7 @@
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_27da96012b18",
+            "marker": "memberD_source_api_probe_hyp_path_1076ed6e41e1",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_64_bad",
             "input_source": "unknown",
             "seed_inputs": [
@@ -647,28 +510,29 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_7fe61828cb90": {
+        "hyp_path_3ed0ffa9ac40": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+          "entry_symbol": "badSource",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:83-87",
-            "if (acceptSocket != INVALID_SOCKET) { closesocket(acceptSocket); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:93-97"
+            "acceptSocket = accept(listenSocket, NULL, NULL); @ 第60-64行",
+            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ 第77-81行",
+            "SetComputerNameA(data); @ 第83行附近（推断）"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+            "Construct or locate a harness that reaches badSource",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_7fe61828cb90",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_bad",
+            "marker": "memberD_source_api_probe_hyp_path_3ed0ffa9ac40",
+            "entry_symbol": "badSource",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -693,28 +557,29 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_5bb3b64a9c37": {
+        "hyp_path_4607385c581d": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53a.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_53_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_66a.c",
+          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_66_bad",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53a.c:85",
-            "data被用于系统配置设置（如调用系统函数设置主机名） @ 后续未展示的代码"
+            "acceptSocket = accept(listenSocket, NULL, NULL); @ L61",
+            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ L84-88",
+            "假设数据被用于系统配置函数 @ 后续调用（如SetComputerName等）"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53a.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_53_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_66a.c",
+            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_66_bad",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_5bb3b64a9c37",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_53_bad",
+            "marker": "memberD_source_api_probe_hyp_path_4607385c581d",
+            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_66_bad",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -739,28 +604,28 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_b17dc291ac62": {
+        "hyp_path_8f7c1ae3dd8f": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_63a.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_63_bad",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_81a.cpp",
+          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_813badEv",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ 85行",
-            "假设数据被未经验证地用于系统配置API。 @ 之后（未显示）"
+            "acceptSocket = accept(listenSocket, NULL, NULL); @ 65-69",
+            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ 82-86"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_63a.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_63_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_81a.cpp",
+            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_813badEv",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_b17dc291ac62",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_63_bad",
+            "marker": "memberD_source_api_probe_hyp_path_8f7c1ae3dd8f",
+            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_813badEv",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -785,29 +650,28 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_bf54b497543b": {
+        "hyp_path_a76157ffb5fe": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_65a.c",
+          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_65_bad",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c:83",
-            "if (recvResult == SOCKET_ERROR || recvResult == 0) { break; } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c:85",
-            "if (acceptSocket != INVALID_SOCKET) { closesocket(acceptSocket); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c:93-97"
+            "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_65a.c:68-72",
+            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_65a.c:85-89"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_65a.c",
+            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_65_bad",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_bf54b497543b",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_bad",
+            "marker": "memberD_source_api_probe_hyp_path_a76157ffb5fe",
+            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_65_bad",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -832,28 +696,29 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_1a2b9b32264e": {
+        "hyp_path_d89f47f8b6c9": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_09.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_09_bad",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22b.c",
+          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_badSource",
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_09.c:84",
-            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_09.c:106-107"
+            "acceptSocket = accept(listenSocket, NULL, NULL); @ L63-67",
+            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ L80-84",
+            "/* FLAW: read the new hostname from a network socket */ @ L94-98及后续"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_09.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_09_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22b.c",
+            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_badSource",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_1a2b9b32264e",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_09_bad",
+            "marker": "memberD_source_api_probe_hyp_path_d89f47f8b6c9",
+            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_badSource",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",
@@ -878,28 +743,29 @@
             "expect_nonzero_exit": true
           }
         },
-        "hyp_path_37d605387e5a": {
+        "hyp_path_f56e3959832d": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_03.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_03_bad",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp",
+          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv",
           "api_sequence": [
-            "recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_03.c:84",
-            "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_03.c:105"
+            "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp:71",
+            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp:88",
+            "/* FLAW: read the new hostname from a network socket */ @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp:92"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_03.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_03_bad",
+            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp",
+            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv",
             "Drive the API sequence with misuse-oriented inputs for CWE-15",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_37d605387e5a",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_03_bad",
+            "marker": "memberD_source_api_probe_hyp_path_f56e3959832d",
+            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv",
             "input_source": "unknown",
             "seed_inputs": [
               "boundary-sized input",

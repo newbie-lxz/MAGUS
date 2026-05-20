@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_f81bed3d35cf",
   "hypothesis_id": "hyp_path_f81bed3d35cf",
-  "claim": "NO_VULNERABILITY_FOUND",
+  "claim": "从网络套接字接收的数据未经适当验证直接用于系统配置，可能允许攻击者控制系统设置。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -11,7 +11,8 @@
   "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_743badEv",
   "api_sequence": [
     "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:90",
-    "dataMap[0] = data; // data被存储，可能后续用于系统调用 @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:96"
+    "dataMap[0] = data; @ 同上文件:97-98",
+    "closesocket(acceptSocket); @ 同上文件:102"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_f81bed3d35cf",
@@ -57,6 +58,6 @@
     "evidence_slice": "network:recv"
   },
   "timestamps": {
-    "generated_at": "2026-05-20T12:01:17Z"
+    "generated_at": "2026-05-20T15:04:22Z"
   }
 }

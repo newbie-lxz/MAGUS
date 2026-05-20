@@ -22,11 +22,11 @@ GEN_BC_DIR ?= bc
 GEN_SOURCE_GLOB ?=
 GEN_FORCE ?=
 B_INPUT ?= $(shell python3 pipeline.py stats-path --raw-output $(A_OUTPUT))
+B_LLM_INPUT ?= $(shell python3 pipeline.py llm-path --raw-output $(A_OUTPUT))
 B_OUTPUT_DIR ?= b/b_output
-B_CANDIDATES ?= $(B_OUTPUT_DIR)/candidates.scored.jsonl
-C_LLM_INPUT ?= $(shell python3 pipeline.py llm-path --raw-output $(A_OUTPUT))
+C_CANDIDATES ?= $(B_OUTPUT_DIR)/candidates.for_c.jsonl
 C_OUTPUT ?= c/out/hypotheses.jsonl
-C_MAX_SAMPLES ?=
+C_TIME_LIMIT_SECONDS ?=
 MIN_SUPPORT ?= 3
 
 build-analyzer:
@@ -42,13 +42,13 @@ run-a:
 	python3 pipeline.py a --input $(A_INPUT) --output $(A_OUTPUT)
 
 run-b:
-	python3 pipeline.py b --input $(B_INPUT) --output-dir $(B_OUTPUT_DIR) --min-support $(MIN_SUPPORT)
+	python3 pipeline.py b --input $(B_INPUT) --llm-input $(B_LLM_INPUT) --output-dir $(B_OUTPUT_DIR) --min-support $(MIN_SUPPORT)
 
 run-c:
-	python3 pipeline.py c --llm-input $(C_LLM_INPUT) --b-candidates $(B_CANDIDATES) --output $(C_OUTPUT) $(if $(C_MAX_SAMPLES),--max-samples $(C_MAX_SAMPLES),)
+	python3 pipeline.py c --candidates $(C_CANDIDATES) --output $(C_OUTPUT) $(if $(C_TIME_LIMIT_SECONDS),--time-limit-seconds $(C_TIME_LIMIT_SECONDS),)
 
 run-d:
 	python3 pipeline.py d
 
 run-abcd:
-	python3 pipeline.py abcd --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) $(if $(C_MAX_SAMPLES),--c-max-samples $(C_MAX_SAMPLES),)
+	python3 pipeline.py abcd --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) $(if $(C_TIME_LIMIT_SECONDS),--c-time-limit-seconds $(C_TIME_LIMIT_SECONDS),)

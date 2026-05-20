@@ -1,0 +1,63 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "cwe15",
+  "sample_id": "path_26d4b817933e",
+  "hypothesis_id": "hyp_path_26d4b817933e",
+  "claim": "数据从外部源获取后直接用于设置计算机名，可能导致系统配置被外部控制。",
+  "cwe_candidates": [
+    "CWE-15"
+  ],
+  "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c",
+  "entry_symbol": "goodG2B1",
+  "api_sequence": [
+    "data = dataBuffer; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c:58",
+    "data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_goodG2B1Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c:60",
+    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c:62"
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_26d4b817933e",
+    "entry_symbol": "goodG2B1",
+    "input_source": "Juliet CWE15 WinSock recv stub payload",
+    "seed_inputs": [
+      "magus-cwe15-controlled-host"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c",
+    "Construct or locate a harness that reaches goodG2B1",
+    "Drive the API sequence with misuse-oriented inputs for CWE-15",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "ASan/UBSan crash",
+      "non-zero test exit caused by crafted source/API input",
+      "unexpected success on invalid API state",
+      "differential behavior between vulnerable and fixed revision"
+    ],
+    "failure_patterns": [
+      "MAGUS_CWE15_CONFIRMED"
+    ],
+    "expect_nonzero_exit": false
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": "/home/sq_hu/MAGUS",
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c --entry-symbol goodG2B1",
+    "poc_cmd": null,
+    "test_cmd": null,
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c::goodG2B1",
+    "file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c",
+    "line": 62,
+    "evidence_slice": "data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_goodG2B1Source(data);\n    /* POTENTIAL FLAW: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\ndata = dataBuffer;\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_goodG2B1Global = 0; /* false */\n    data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_goodG2B1Source(data);\n    /* POTENTIAL FLAW: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-20T15:51:44Z"
+  }
+}

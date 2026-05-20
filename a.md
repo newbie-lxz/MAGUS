@@ -8,7 +8,7 @@
 - `a/cmd/gen_input.py`：Stage A 输入生成器，从 `compile_commands.json` 改写出能生成 LLVM bitcode 的 `projects.in.jsonl`。
 - `a/analyzer/llvm_api_analyzer.cpp`：LLVM IR analyzer，负责真正的数据流/控制流分析，产出低层 DFA JSON 记录。
 - `a/config/call_taxonomy.json`：call taxonomy 规则，供 C++ analyzer 给调用打 `sink_kind`。
-- `a/cmd/llm_export.py`：Stage A LLM 证据导出器，从 `samples.raw.jsonl` 和项目源码恢复 Stage C 使用的 `samples.llm.jsonl` 证据。
+- `a/cmd/llm_export.py`：Stage A LLM 证据导出器，从 `samples.raw.jsonl` 和项目源码恢复 Stage B 合并进 C-ready 队列的 `samples.llm.jsonl` 证据。
 - `pipeline.py`、`Makefile`、`a/Makefile`：根管线和 Stage A 便捷命令。
 
 ## 1. Stage A 产物
@@ -1104,8 +1104,8 @@ make run-abcd
 python3 pipeline.py build-analyzer
 python3 pipeline.py gen-input --repo-path ./srcs --compile-commands ./srcs/compile_commands.json --output ./a/input/srcs.in.jsonl
 python3 pipeline.py a --input a/input/xxx.in.jsonl --output a/out/samples.raw.jsonl
-python3 pipeline.py b --input a/out/samples.stats.jsonl --output-dir b/b_output
-python3 pipeline.py c --llm-input a/out/samples.llm.jsonl --b-candidates b/b_output/candidates.scored.jsonl --output c/out/hypotheses.jsonl
+python3 pipeline.py b --input a/out/samples.stats.jsonl --llm-input a/out/samples.llm.jsonl --output-dir b/b_output
+python3 pipeline.py c --candidates b/b_output/candidates.for_c.jsonl --output c/out/hypotheses.jsonl
 python3 pipeline.py d
 python3 pipeline.py abcd --a-input a/input/xxx.in.jsonl --a-output a/out/samples.raw.jsonl
 python3 pipeline.py stats-path --raw-output a/out/samples.raw.jsonl
