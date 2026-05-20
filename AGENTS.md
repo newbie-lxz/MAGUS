@@ -21,6 +21,7 @@
 - `d/`: standalone Stage `D` source/API verifier and usage notes
 - `d/使用说明.md`: Stage `D` high-level handoff and run contract
 - `d/memberD_verifier/02_run_with_C/01_auto_attack_from_C_linux.sh`: Stage `D` automatic verifier entrypoint for all `c/out/*.jsonl`
+- `d/memberD_verifier/02_run_with_C/stream_from_C.py`: Stage `D` streaming verifier entrypoint used by root `abcd`
 - `README.md`: root overview for the combined pipeline
 
 ## Engineering Rules
@@ -37,7 +38,7 @@
 - `pipeline.py b` runs Stage `B` only.
 - `pipeline.py c` runs Stage `C` over Stage `A` LLM evidence and Stage `B` candidates, routing `P0` static confirmations, `P1`/`P2` D candidates, and `P3` audit-only records.
 - `pipeline.py d` runs Stage `D` over Stage `C` `c/out/*.jsonl` by calling `d/memberD_verifier/02_run_with_C/01_auto_attack_from_C_linux.sh`.
-- `pipeline.py abcd` chains Stage `A`, Stage `B`, Stage `C`, and Stage `D`.
+- `pipeline.py abcd` chains Stage `A` and Stage `B`, then streams Stage `C` dynamic candidates into Stage `D` while Stage `C` is still running.
 - `make gen-input`, `make run-a`, `make run-b`, `make run-c`, `make run-d`, and `make run-abcd` are thin wrappers over `pipeline.py`.
 - `make gen-srcs-compile-commands` is an explicit helper for the checked-in `srcs` Juliet sample tree; it only writes `srcs/compile_commands.json` and does not run Stage `A`.
 - Stage `A` default root runs emit `samples.raw.jsonl`, `samples.stats.jsonl`, and `samples.llm.jsonl`.
@@ -47,7 +48,9 @@
 - Stage `C` expects Stage `A` `samples.llm.jsonl` plus Stage `B` `candidates.scored.jsonl`; it must not read `samples.raw.jsonl` as its evidence input.
 - Stage `C` writes `P1`/`P2` dynamic-verification candidates to `c/out/*.jsonl`, `P0` static confirmations to `c/final/static_confirmed.jsonl`, and `P3` audit-only records to `c/audit/audit.jsonl`.
 - Stage `C` uses the DeepSeek-compatible OpenAI Python SDK client configured in `c/agent1.py`; `make run-abcd` reaches this networked LLM call.
-- Stage `D` expects Stage `C` dynamic-verification candidates under `c/out/*.jsonl`; it reads those files in filename order, trusts Stage `C` routing instead of re-checking `P1`/`P2` or `agent_verdict`, rejects duplicate `project_id + hypothesis_id` records, and must not read Stage `A` or Stage `B` outputs directly.
+- Stage `D` batch mode expects Stage `C` dynamic-verification candidates under `c/out/*.jsonl`; it reads those files in filename order, trusts Stage `C` routing instead of re-checking `P1`/`P2` or `agent_verdict`, rejects duplicate `project_id + hypothesis_id` records, and must not read Stage `A` or Stage `B` outputs directly.
+- Stage `D` streaming mode is used by root `abcd`; it follows the current Stage `C --output` JSONL file, processes only complete newline-terminated records, rejects duplicate `project_id + hypothesis_id` records, and exits after the root pipeline marks Stage `C` done.
+- Stage `D` batch and streaming modes share an output lock under `d/memberD_verifier/02_run_with_C/.stage_d_output.lock`; do not run another D writer against the same output directory while one mode is active.
 - Stage `D` verifies C/C++ source/API misuse hypotheses and does not generate HTTP requests, `base_url` payloads, or `*.http` files.
 - The root pipeline does not currently expose a Stage `B` worker-count flag.
 

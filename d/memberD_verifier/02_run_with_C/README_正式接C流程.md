@@ -13,6 +13,8 @@ c/out/
 
 D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按文件名排序合并。D 不直接接 A 的输出；A 的输出已经被 B/C 加工，D 只收 C 放入 `c/out/*.jsonl` 的动态验证候选。
 
+根目录 `make run-abcd` 使用流式接入：`pipeline.py` 先启动本目录的 `stream_from_C.py`，让它监听当前 `C_OUTPUT` 文件；随后启动 C。C 每写入一条完整 JSONL 记录，D 就生成 target、绑定可选 sidecar、执行 verifier，并追加 confirmed/failed 输出。C 结束后 pipeline 写 done 文件，D 读完剩余完整行再退出。这个模式只消费本次 `C_OUTPUT` 文件；本目录的 `01_auto_attack_from_C_linux.sh` 仍是独立批处理入口，读取所有 `c/out/*.jsonl`。
+
 C 的分流约定是：
 
 ```text
@@ -92,6 +94,16 @@ make run-d
 ```text
 make run-abcd
 ```
+
+`make run-abcd` 现在是 A、B 顺序执行，C 和 D 并行流式执行。D 只读 C 当前输出，不写回 `c/out`，并且只处理换行结束的完整 JSONL 记录。
+
+D 的批处理和流式模式共用输出锁：
+
+```text
+.stage_d_output.lock
+```
+
+锁存在时，另一个写同一 `output` 目录的 D 进程会直接失败，避免 `verification*.jsonl` 和 `payloads/` 被并发写入。
 
 D 当前只使用 Python 标准库；`../01_demo_test/01_setup_linux.sh` 在没有真实 requirements 依赖时会创建不带 pip 的 `.venv`。
 

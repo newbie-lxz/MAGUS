@@ -6,7 +6,7 @@ MAGUS is a multi-stage mining pipeline plus a small root-level orchestrator:
 - `b/`: Stage `B` miner that consumes Stage `A` `samples.stats.jsonl` records, mines high-support feature patterns, and scores candidates.
 - `c/`: Stage `C` red-team audit that consumes Stage `A` `samples.llm.jsonl` evidence and Stage `B` `candidates.scored.jsonl`, then routes findings into static confirmations, D candidates, or audit-only records.
 - `d/`: Stage `D` source/API verifier that consumes the Stage `C` dynamic-verification queue in `c/out/*.jsonl` and produces confirmed or failed dynamic-verification records.
-- `pipeline.py`: root entrypoint for generating Stage `A` input, running Stage `A`, Stage `B`, Stage `C`, Stage `D`, or the full `A -> B -> C -> D` flow from one place.
+- `pipeline.py`: root entrypoint for generating Stage `A` input, running Stage `A`, Stage `B`, Stage `C`, Stage `D`, or the full `A -> B -> streamed C/D` flow from one place.
 - `tools/gen_srcs_compile_commands.py`: explicit helper for generating `srcs/compile_commands.json` for the checked-in Juliet sample tree.
 
 
@@ -94,15 +94,15 @@ make run-c
 make run-d
 ```
 
-- Run the full `A -> B -> C -> D` pipeline:
+- Run the full `A -> B -> streamed C/D` pipeline:
 
 ```bash
 make run-abcd
 ```
 
-This command reaches Stage `C` and will call the DeepSeek API through the OpenAI-compatible Python SDK before entering Stage `D`.
+This command runs Stage `A` and Stage `B`, then starts Stage `D` as a stream consumer for the current Stage `C` output file before launching Stage `C`. As Stage `C` flushes `P1`/`P2` JSONL records, Stage `D` verifies those records without waiting for all Stage `C` candidates to finish. This command reaches Stage `C` and calls the DeepSeek API through the OpenAI-compatible Python SDK.
 
-Stage `D` still uses the formal script under `d/memberD_verifier/02_run_with_C`. The root `d` and `abcd` commands call that script, which reads every `c/out/*.jsonl` file in filename order, trusts that Stage `C` has already selected the records that need dynamic verification, rejects duplicate `project_id + hypothesis_id` records, generates source/API targets, optionally binds `verification_contexts.jsonl`, runs the verifier, and validates the output files. Prepare the local D Python environment once before running D:
+Stage `D` has two root modes. `make run-d` uses the formal batch script under `d/memberD_verifier/02_run_with_C`; it reads every `c/out/*.jsonl` file in filename order, trusts that Stage `C` has already selected the records that need dynamic verification, rejects duplicate `project_id + hypothesis_id` records, generates source/API targets, optionally binds `verification_contexts.jsonl`, runs the verifier, and validates the output files. `make run-abcd` uses `d/memberD_verifier/02_run_with_C/stream_from_C.py` to follow only the current `--c-output` file while Stage `C` is still running. Both D modes use the same output lock so two D processes cannot write the same output directory concurrently. Prepare the local D Python environment once before running D:
 
 ```bash
 (cd d/memberD_verifier/01_demo_test && ./01_setup_linux.sh)
@@ -131,7 +131,7 @@ The root orchestrator intentionally preserves separate validation:
 - Stage `A` input can be generated independently with `make gen-input` from an existing `compile_commands.json`
 - Stage `B` can still be validated independently by pointing it at any existing `samples.stats.jsonl`
 - Stage `C` can still be validated independently by pointing it at an existing `samples.llm.jsonl` and `candidates.scored.jsonl`
-- `make run-abcd` chains Stage `A`, Stage `B`, Stage `C`, and Stage `D`
+- `make run-abcd` chains Stage `A` and Stage `B`, then streams Stage `C` dynamic candidates into Stage `D`
 - Stage `D` can still be validated independently from `d/memberD_verifier` or through `make run-d`
 
 Important contract boundary:
@@ -140,7 +140,7 @@ Important contract boundary:
 - Stage `B` validates the required stats fields before mining and rejects unsupported schemas
 - Stage `C` consumes Stage `A` `samples.llm.jsonl` and Stage `B` `candidates.scored.jsonl`; it does not read `samples.raw.jsonl`
 - Stage `C` routes records by priority: `P0` static confirmations go to `c/final/static_confirmed.jsonl`, `P1`/`P2` dynamic-verification candidates go to `c/out/*.jsonl`, and `P3` audit-only records go to `c/audit/audit.jsonl`
-- Stage `D` consumes every record Stage `C` places under `c/out/*.jsonl`; it does not re-check `P1`/`P2` or `agent_verdict`, does not read Stage `A` or Stage `B` outputs directly, and verifies C/C++ source/API misuse cases rather than HTTP endpoints
+- Stage `D` batch mode consumes every record Stage `C` places under `c/out/*.jsonl`; root full-chain streaming mode consumes the current Stage `C --output` file as JSONL lines become complete. In both modes D does not re-check `P1`/`P2` or `agent_verdict`, does not read Stage `A` or Stage `B` outputs directly, and verifies C/C++ source/API misuse cases rather than HTTP endpoints
 
 ## Outputs
 
@@ -151,7 +151,7 @@ Default outputs:
 - Stage `A` LLM evidence output: `a/out/samples.llm.jsonl`
 - Generated Stage `A` project input: `a/input/srcs.in.jsonl`
 - Stage `B` outputs: `b/b_output/patterns.json`, `b/b_output/candidates.scored.jsonl`, `b/b_output/b_miner_stats.json`
-- Stage `C` D-candidate output: `c/out/hypotheses.jsonl`; Stage `C` static-confirmed output: `c/final/static_confirmed.jsonl`; Stage `C` audit-only output: `c/audit/audit.jsonl`; Stage `D` batch input: all `c/out/*.jsonl`
+- Stage `C` D-candidate output: `c/out/hypotheses.jsonl`; Stage `C` static-confirmed output: `c/final/static_confirmed.jsonl`; Stage `C` audit-only output: `c/audit/audit.jsonl`; Stage `D` batch input: all `c/out/*.jsonl`; Stage `D` streaming input in `run-abcd`: the current `C_OUTPUT` file
 - Stage `D` outputs: `d/memberD_verifier/02_run_with_C/output/verification.jsonl`, `verification.failed.jsonl`, `verification.summary.md`, and `payloads/*.api-plan.json` / `payloads/*.payload.py`
 
 If you override `A_OUTPUT`, `pipeline.py` derives the matching stats path automatically during full runs; `make run-a`, `make run-c`, and `make run-abcd` derive the matching `samples.llm.jsonl` path for `C_LLM_INPUT`.

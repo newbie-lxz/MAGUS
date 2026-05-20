@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
+import os
 import shlex
 import subprocess
 import sys
+import tempfile
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
 STAGE_A_DIR = REPO_ROOT / "a"
 STAGE_B_DIR = REPO_ROOT / "b"
 STAGE_C_DIR = REPO_ROOT / "c"
+STAGE_D_DIR = REPO_ROOT / "d/memberD_verifier"
 STAGE_D_RUN_DIR = REPO_ROOT / "d/memberD_verifier/02_run_with_C"
+STAGE_D_PYTHON = STAGE_D_DIR / ".venv/bin/python"
 DEFAULT_STAGE_A_INPUT = STAGE_A_DIR / "input/zlib.in.jsonl"
 DEFAULT_STAGE_A_OUTPUT = STAGE_A_DIR / "out/samples.raw.jsonl"
 DEFAULT_STAGE_A_GENERATED_INPUT = STAGE_A_DIR / "input/srcs.in.jsonl"
@@ -145,7 +151,12 @@ def run_stage_b(input_path: Path, output_dir: Path, min_support: int) -> None:
     )
 
 
-def run_stage_c(llm_input_path: Path, b_candidates_path: Path, output_path: Path, max_samples: int | None) -> None:
+def stage_c_command(
+    llm_input_path: Path,
+    b_candidates_path: Path,
+    output_path: Path,
+    max_samples: int | None,
+) -> list[str]:
     command = [
         sys.executable,
         "agent1.py",
@@ -158,11 +169,102 @@ def run_stage_c(llm_input_path: Path, b_candidates_path: Path, output_path: Path
     ]
     if max_samples is not None:
         command.extend(["--max-samples", str(max_samples)])
-    run_command(command, STAGE_C_DIR)
+    return command
+
+
+def run_stage_c(llm_input_path: Path, b_candidates_path: Path, output_path: Path, max_samples: int | None) -> None:
+    run_command(stage_c_command(llm_input_path, b_candidates_path, output_path, max_samples), STAGE_C_DIR)
 
 
 def run_stage_d() -> None:
     run_command(["./01_auto_attack_from_C_linux.sh"], STAGE_D_RUN_DIR)
+
+
+def ensure_stage_d_python() -> None:
+    if not STAGE_D_PYTHON.exists() or not os.access(STAGE_D_PYTHON, os.X_OK):
+        raise SystemExit(
+            f"error: Cannot find Stage D Python env: {STAGE_D_PYTHON}\n"
+            "Run d/memberD_verifier/01_demo_test/01_setup_linux.sh first."
+        )
+
+
+def terminate_process(process: subprocess.Popen, label: str) -> None:
+    if process.poll() is not None:
+        return
+    print(f"[pipeline] terminating {label}", flush=True)
+    process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        print(f"[pipeline] killing {label}", flush=True)
+        process.kill()
+        process.wait()
+
+
+def run_stage_c_with_streaming_d(
+    llm_input_path: Path,
+    b_candidates_path: Path,
+    output_path: Path,
+    max_samples: int | None,
+) -> None:
+    ensure_stage_d_python()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("", encoding="utf-8")
+    with tempfile.TemporaryDirectory(prefix="magus-stage-c-") as temp_dir:
+        done_file = Path(temp_dir) / "stage_c.done"
+        c_command = stage_c_command(llm_input_path, b_candidates_path, output_path, max_samples)
+        d_command = [
+            str(STAGE_D_PYTHON),
+            "stream_from_C.py",
+            "--hypotheses",
+            str(output_path),
+            "--done-file",
+            str(done_file),
+            "--out-dir",
+            "output",
+        ]
+
+        print("[pipeline] streaming Stage C output into Stage D", flush=True)
+        print(f"[pipeline] cwd={STAGE_D_RUN_DIR}", flush=True)
+        print(f"[pipeline] cmd={shlex.join(d_command)}", flush=True)
+        d_process = subprocess.Popen(d_command, cwd=STAGE_D_RUN_DIR)
+        time.sleep(0.2)
+        if d_process.poll() is not None:
+            raise SystemExit(d_process.returncode)
+
+        print(f"[pipeline] cwd={STAGE_C_DIR}", flush=True)
+        print(f"[pipeline] cmd={shlex.join(c_command)}", flush=True)
+        c_process: subprocess.Popen | None = None
+        c_returncode: int | None = None
+        try:
+            c_process = subprocess.Popen(c_command, cwd=STAGE_C_DIR)
+            while True:
+                c_returncode = c_process.poll()
+                d_returncode = d_process.poll()
+                if d_returncode is not None and c_returncode is None:
+                    terminate_process(c_process, "Stage C")
+                    raise SystemExit(d_returncode)
+                if c_returncode is not None:
+                    break
+                time.sleep(0.5)
+        except BaseException:
+            if c_process is not None:
+                terminate_process(c_process, "Stage C")
+            terminate_process(d_process, "Stage D stream")
+            raise
+        finally:
+            if c_returncode is None and c_process is not None:
+                c_returncode = c_process.poll()
+            done_file.write_text(
+                json.dumps({"stage_c_returncode": c_returncode}, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+
+        d_returncode = d_process.wait()
+        if c_returncode != 0:
+            raise SystemExit(c_returncode)
+        if d_returncode != 0:
+            raise SystemExit(d_returncode)
 
 
 def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_flag: str) -> None:
@@ -172,7 +274,7 @@ def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_fl
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="MAGUS pipeline runner. Supports separate Stage A, B, C, D, or chained A->B->C->D execution."
+        description="MAGUS pipeline runner. Supports separate Stage A, B, C, D, or chained A->B->streamed C/D execution."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -255,7 +357,7 @@ def main() -> None:
     )
     subparsers.add_parser("d", help="只运行 Stage D")
 
-    parser_abcd = subparsers.add_parser("abcd", help="串联运行 Stage A、Stage B、Stage C 和 Stage D")
+    parser_abcd = subparsers.add_parser("abcd", help="串联运行 Stage A、Stage B，并流式运行 Stage C -> Stage D")
     add_stage_a_args(parser_abcd, "--a-input", "--a-output")
     parser_abcd.add_argument(
         "--b-output-dir",
@@ -351,9 +453,7 @@ def main() -> None:
 
         candidates_path = b_candidates_path(b_output_dir)
         print(f"[pipeline] derived Stage C candidates input={candidates_path}", flush=True)
-        run_stage_c(llm_output, candidates_path, c_output, args.c_max_samples)
-
-        run_stage_d()
+        run_stage_c_with_streaming_d(llm_output, candidates_path, c_output, args.c_max_samples)
         return
 
 
