@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 STAGE_A_DIR = REPO_ROOT / "a"
 STAGE_B_DIR = REPO_ROOT / "b"
 STAGE_C_DIR = REPO_ROOT / "c"
+STAGE_D_RUN_DIR = REPO_ROOT / "d/memberD_verifier/02_run_with_C"
 DEFAULT_STAGE_A_INPUT = STAGE_A_DIR / "input/zlib.in.jsonl"
 DEFAULT_STAGE_A_OUTPUT = STAGE_A_DIR / "out/samples.raw.jsonl"
 DEFAULT_STAGE_A_GENERATED_INPUT = STAGE_A_DIR / "input/srcs.in.jsonl"
@@ -106,6 +107,9 @@ def run_stage_a(input_path: Path, output_path: Path) -> None:
         ],
         STAGE_A_DIR,
     )
+    llm_output = derived_llm_path(output_path)
+    print(f"[pipeline] derived Stage A LLM output={llm_output}", flush=True)
+    run_stage_a_llm(output_path, input_path, llm_output)
 
 
 def run_stage_a_llm(raw_input_path: Path, projects_path: Path, output_path: Path) -> None:
@@ -157,6 +161,10 @@ def run_stage_c(llm_input_path: Path, b_candidates_path: Path, output_path: Path
     run_command(command, STAGE_C_DIR)
 
 
+def run_stage_d() -> None:
+    run_command(["./01_auto_attack_from_C_linux.sh"], STAGE_D_RUN_DIR)
+
+
 def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_flag: str) -> None:
     parser.add_argument(input_flag, default=str(DEFAULT_STAGE_A_INPUT), help="Stage A 输入 projects.in.jsonl")
     parser.add_argument(output_flag, default=str(DEFAULT_STAGE_A_OUTPUT), help="Stage A 输出 samples.raw.jsonl")
@@ -164,7 +172,7 @@ def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_fl
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="MAGUS pipeline runner. Supports separate Stage A, B, C, or chained A->B execution."
+        description="MAGUS pipeline runner. Supports separate Stage A, B, C, D, or chained A->B->C->D execution."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -203,12 +211,7 @@ def main() -> None:
     parser_llm = subparsers.add_parser("llm-path", help="根据 Stage A raw 输出推导 samples.llm.jsonl 路径")
     parser_llm.add_argument("--raw-output", default=str(DEFAULT_STAGE_A_OUTPUT), help="Stage A raw 输出路径")
 
-    parser_llm_export = subparsers.add_parser("llm", help="从 Stage A raw 输出导出 samples.llm.jsonl")
-    parser_llm_export.add_argument("--input", default=str(DEFAULT_STAGE_A_OUTPUT), help="Stage A samples.raw.jsonl 路径")
-    parser_llm_export.add_argument("--projects", default=str(DEFAULT_STAGE_A_INPUT), help="Stage A projects.in.jsonl 路径")
-    parser_llm_export.add_argument("--output", default="", help="Stage A samples.llm.jsonl 输出路径")
-
-    parser_a = subparsers.add_parser("a", help="只运行 Stage A")
+    parser_a = subparsers.add_parser("a", help="只运行 Stage A（含 samples.llm.jsonl 导出）")
     add_stage_a_args(parser_a, "--input", "--output")
 
     parser_b = subparsers.add_parser("b", help="只运行 Stage B")
@@ -250,38 +253,27 @@ def main() -> None:
         default=None,
         help="Stage C 可选候选数量上限",
     )
-    parser_ab = subparsers.add_parser("ab", help="串联运行 Stage A 和 Stage B")
-    add_stage_a_args(parser_ab, "--a-input", "--a-output")
-    parser_ab.add_argument(
+    subparsers.add_parser("d", help="只运行 Stage D")
+
+    parser_abcd = subparsers.add_parser("abcd", help="串联运行 Stage A、Stage B、Stage C 和 Stage D")
+    add_stage_a_args(parser_abcd, "--a-input", "--a-output")
+    parser_abcd.add_argument(
         "--b-output-dir",
         default=str(DEFAULT_STAGE_B_OUTPUT_DIR),
         help="Stage B 输出目录",
     )
-    parser_ab.add_argument(
-        "--min-support",
-        type=int,
-        default=3,
-        help="Stage B 频繁模式最低支持度",
-    )
-    parser_abc = subparsers.add_parser("abc", help="串联运行 Stage A、Stage B 和 Stage C")
-    add_stage_a_args(parser_abc, "--a-input", "--a-output")
-    parser_abc.add_argument(
-        "--b-output-dir",
-        default=str(DEFAULT_STAGE_B_OUTPUT_DIR),
-        help="Stage B 输出目录",
-    )
-    parser_abc.add_argument(
+    parser_abcd.add_argument(
         "--c-output",
         default=str(DEFAULT_STAGE_C_OUTPUT),
         help="Stage C 输出 hypotheses.jsonl",
     )
-    parser_abc.add_argument(
+    parser_abcd.add_argument(
         "--min-support",
         type=int,
         default=3,
         help="Stage B 频繁模式最低支持度",
     )
-    parser_abc.add_argument(
+    parser_abcd.add_argument(
         "--c-max-samples",
         type=int,
         default=None,
@@ -320,12 +312,6 @@ def main() -> None:
         print(derived_llm_path(resolve_path(args.raw_output)))
         return
 
-    if args.command == "llm":
-        raw_input = resolve_path(args.input)
-        output = resolve_path(args.output) if args.output else derived_llm_path(raw_input)
-        run_stage_a_llm(raw_input, resolve_path(args.projects), output)
-        return
-
     if args.command == "a":
         run_stage_a(resolve_path(args.input), resolve_path(args.output))
         return
@@ -344,17 +330,11 @@ def main() -> None:
         )
         return
 
-    if args.command == "ab":
-        a_input = resolve_path(args.a_input)
-        a_output = resolve_path(args.a_output)
-        run_stage_a(a_input, a_output)
-
-        b_input = derived_stats_path(a_output)
-        print(f"[pipeline] derived Stage B input={b_input}", flush=True)
-        run_stage_b(b_input, resolve_path(args.b_output_dir), args.min_support)
+    if args.command == "d":
+        run_stage_d()
         return
 
-    if args.command == "abc":
+    if args.command == "abcd":
         a_input = resolve_path(args.a_input)
         a_output = resolve_path(args.a_output)
         b_output_dir = resolve_path(args.b_output_dir)
@@ -364,7 +344,6 @@ def main() -> None:
 
         llm_output = derived_llm_path(a_output)
         print(f"[pipeline] derived Stage C LLM input={llm_output}", flush=True)
-        run_stage_a_llm(a_output, a_input, llm_output)
 
         b_input = derived_stats_path(a_output)
         print(f"[pipeline] derived Stage B input={b_input}", flush=True)
@@ -373,6 +352,8 @@ def main() -> None:
         candidates_path = b_candidates_path(b_output_dir)
         print(f"[pipeline] derived Stage C candidates input={candidates_path}", flush=True)
         run_stage_c(llm_output, candidates_path, c_output, args.c_max_samples)
+
+        run_stage_d()
         return
 
 

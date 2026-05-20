@@ -13,7 +13,7 @@ from openai import OpenAI
 
 # ==================== 配置（可根据实际情况调整）====================
 MODEL_NAME = "deepseek-v4-flash"          # 使用Flash模型，速度更快
-API_KEY = ""
+API_KEY = "sk-accf76251b06423b8c02257bb8da0758"
 BASE_URL = "https://api.deepseek.com/v1"
 CONFIDENCE_THRESHOLD = 0.60               # 放宽到0.60，让更多假设进入D阶段（原0.65）
 MAX_WORKERS = 5                           # 并发线程数，平衡速度与稳定性

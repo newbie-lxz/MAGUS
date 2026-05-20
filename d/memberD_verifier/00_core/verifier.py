@@ -233,7 +233,9 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
     try:
         data = json.loads(text)
         if isinstance(data, list):
-            return data
+            if all(isinstance(item, dict) for item in data):
+                return data
+            raise ValueError(f"{path}: expected JSON objects in array")
         if isinstance(data, dict):
             return [data]
     except json.JSONDecodeError:
@@ -245,9 +247,46 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
         if not line:
             continue
         try:
-            rows.append(json.loads(line))
+            row = json.loads(line)
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid JSON on {path}:{n}: {exc}") from exc
+        if not isinstance(row, dict):
+            raise ValueError(f"{path}:{n}: expected JSON object")
+        rows.append(row)
+    return rows
+
+
+def hypothesis_files(path: Path) -> List[Path]:
+    if path.is_dir():
+        files = sorted(item for item in path.glob("*.jsonl") if item.is_file())
+        if not files:
+            raise ValueError(f"{path}: no Stage C *.jsonl files found")
+        return files
+    if path.is_file():
+        return [path]
+    raise ValueError(f"{path}: expected Stage C output directory or hypotheses JSONL file")
+
+
+def read_hypotheses(path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    seen: Dict[Tuple[str, str], str] = {}
+    for file_path in hypothesis_files(path):
+        for row_no, row in enumerate(read_jsonl(file_path), 1):
+            project_id = str(row.get("project_id", "")).strip()
+            hypothesis_id = str(row.get("hypothesis_id", "")).strip()
+            if project_id and hypothesis_id:
+                key = (project_id, hypothesis_id)
+                label = f"{file_path}:{row_no}"
+                previous = seen.get(key)
+                if previous:
+                    raise ValueError(
+                        f"duplicate hypothesis project_id={project_id!r} hypothesis_id={hypothesis_id!r}: "
+                        f"{previous} and {label}"
+                    )
+                seen[key] = label
+            rows.append(row)
+    if not rows:
+        raise ValueError(f"{path}: no Stage C hypothesis records found")
     return rows
 
 
@@ -466,7 +505,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, timeout:
             hyp,
             "HYPOTHESIS_WRONG",
             f"no source/API case for hypothesis_id={hyp.get('hypothesis_id')}",
-            "regenerate targets.json from the same hypotheses.jsonl",
+            "regenerate targets.json from the same Stage C hypotheses input",
         )
     if not is_source_api_case(target, case):
         return None, failed_record(
@@ -613,7 +652,7 @@ def write_summary(out_dir: Path, success_rows: List[Dict[str, Any]], failed_rows
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Source/API hypothesis verifier")
-    parser.add_argument("--hypotheses", required=True, type=Path, help="Path to C hypotheses.jsonl")
+    parser.add_argument("--hypotheses", required=True, type=Path, help="Path to C output directory or hypotheses JSONL file")
     parser.add_argument("--targets", required=True, type=Path, help="Path to source/API targets.json")
     parser.add_argument("--out-dir", required=True, type=Path, help="Output directory")
     parser.add_argument("--timeout", default=10.0, type=float, help="Payload runner timeout seconds")
@@ -622,7 +661,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     targets = load_targets(args.targets)
-    hypotheses = read_jsonl(args.hypotheses)
+    hypotheses = read_hypotheses(args.hypotheses)
 
     success_rows: List[Dict[str, Any]] = []
     failed_rows: List[Dict[str, Any]] = []
@@ -635,7 +674,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     hyp,
                     "ENV_MISSING",
                     f"no source/API target for project_id={hyp.get('project_id')}",
-                    "regenerate targets.json from the same hypotheses.jsonl",
+                    "regenerate targets.json from the same Stage C hypotheses input",
                 )
             )
             continue

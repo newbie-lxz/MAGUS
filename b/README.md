@@ -36,6 +36,8 @@ From the repository root:
 make run-b
 ```
 
+The root Stage `A` command emits both `samples.stats.jsonl` and `samples.llm.jsonl`; Stage `B` still consumes only the stats file. Use `make run-abcd` for the full `A -> B -> C -> D` chain.
+
 Or directly from `b/`:
 
 ```bash

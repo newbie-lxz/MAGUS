@@ -8,7 +8,7 @@
 - `a/cmd/gen_input.py`：Stage A 输入生成器，从 `compile_commands.json` 改写出能生成 LLVM bitcode 的 `projects.in.jsonl`。
 - `a/analyzer/llvm_api_analyzer.cpp`：LLVM IR analyzer，负责真正的数据流/控制流分析，产出低层 DFA JSON 记录。
 - `a/config/call_taxonomy.json`：call taxonomy 规则，供 C++ analyzer 给调用打 `sink_kind`。
-- `a/cmd/llm_export.py`：可选导出器，从 `samples.raw.jsonl` 和项目源码恢复 Stage C 使用的 `samples.llm.jsonl` 证据。
+- `a/cmd/llm_export.py`：Stage A LLM 证据导出器，从 `samples.raw.jsonl` 和项目源码恢复 Stage C 使用的 `samples.llm.jsonl` 证据。
 - `pipeline.py`、`Makefile`、`a/Makefile`：根管线和 Stage A 便捷命令。
 
 ## 1. Stage A 产物
@@ -55,7 +55,7 @@ Stage B 不直接消费 raw，而是消费这个 stats 视图。
 
 ### 1.3 `samples.llm.jsonl`
 
-这是可选证据视图，由 `a/cmd/llm_export.py` 从已有 raw 输出导出。默认 `make run-a` 不产生它；`make run-llm` 和 `make run-abc` 会产生它。
+这是 Stage A 的 LLM 证据视图，由 `a/cmd/llm_export.py` 从 raw 输出导出。根目录 `make run-a` 和 `make run-abcd` 都会产生它。
 
 它用于 Stage C，重点保留 LLM 审计需要的信息：
 
@@ -1092,9 +1092,10 @@ project_id -> repo_path
 make build-analyzer
 make gen-input
 make run-a
-make run-llm
-make run-ab
-make run-abc
+make run-b
+make run-c
+make run-d
+make run-abcd
 ```
 
 等价的 pipeline 命令：
@@ -1103,7 +1104,10 @@ make run-abc
 python3 pipeline.py build-analyzer
 python3 pipeline.py gen-input --repo-path ./srcs --compile-commands ./srcs/compile_commands.json --output ./a/input/srcs.in.jsonl
 python3 pipeline.py a --input a/input/xxx.in.jsonl --output a/out/samples.raw.jsonl
-python3 pipeline.py llm --input a/out/samples.raw.jsonl --projects a/input/xxx.in.jsonl
+python3 pipeline.py b --input a/out/samples.stats.jsonl --output-dir b/b_output
+python3 pipeline.py c --llm-input a/out/samples.llm.jsonl --b-candidates b/b_output/candidates.scored.jsonl --output c/out/hypotheses.jsonl
+python3 pipeline.py d
+python3 pipeline.py abcd --a-input a/input/xxx.in.jsonl --a-output a/out/samples.raw.jsonl
 python3 pipeline.py stats-path --raw-output a/out/samples.raw.jsonl
 python3 pipeline.py llm-path --raw-output a/out/samples.raw.jsonl
 ```

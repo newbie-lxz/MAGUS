@@ -14,7 +14,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
 
 
 DEFAULT_FAILURE_PATTERNS = [
@@ -40,7 +40,9 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
     try:
         data = json.loads(text)
         if isinstance(data, list):
-            return data
+            if all(isinstance(item, dict) for item in data):
+                return data
+            raise ValueError(f"{path}: expected JSON objects in array")
         if isinstance(data, dict):
             return [data]
     except json.JSONDecodeError:
@@ -52,9 +54,46 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
         if not line:
             continue
         try:
-            rows.append(json.loads(line))
+            row = json.loads(line)
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid JSON at {path}:{n}: {exc}") from exc
+        if not isinstance(row, dict):
+            raise ValueError(f"{path}:{n}: expected JSON object")
+        rows.append(row)
+    return rows
+
+
+def hypothesis_files(path: Path) -> List[Path]:
+    if path.is_dir():
+        files = sorted(item for item in path.glob("*.jsonl") if item.is_file())
+        if not files:
+            raise ValueError(f"{path}: no Stage C *.jsonl files found")
+        return files
+    if path.is_file():
+        return [path]
+    raise ValueError(f"{path}: expected Stage C output directory or hypotheses JSONL file")
+
+
+def read_hypotheses(path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    seen: Dict[Tuple[str, str], str] = {}
+    for file_path in hypothesis_files(path):
+        for row_no, row in enumerate(read_jsonl(file_path), 1):
+            project_id = str(row.get("project_id", "")).strip()
+            hypothesis_id = str(row.get("hypothesis_id", "")).strip()
+            if project_id and hypothesis_id:
+                key = (project_id, hypothesis_id)
+                label = f"{file_path}:{row_no}"
+                previous = seen.get(key)
+                if previous:
+                    raise ValueError(
+                        f"duplicate hypothesis project_id={project_id!r} hypothesis_id={hypothesis_id!r}: "
+                        f"{previous} and {label}"
+                    )
+                seen[key] = label
+            rows.append(row)
+    if not rows:
+        raise ValueError(f"{path}: no Stage C hypothesis records found")
     return rows
 
 
@@ -355,13 +394,13 @@ def build_targets(hypotheses: Iterable[Dict[str, Any]], auto_fill: bool = False)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate source/API targets.json from hypotheses.jsonl")
-    parser.add_argument("--hypotheses", required=True, type=Path, help="C stage output: hypotheses.jsonl")
+    parser = argparse.ArgumentParser(description="Generate source/API targets.json from Stage C hypotheses")
+    parser.add_argument("--hypotheses", required=True, type=Path, help="C stage output directory or hypotheses JSONL file")
     parser.add_argument("--out", default=Path("targets.json"), type=Path, help="Output targets.json")
     parser.add_argument("--auto-fill", action="store_true", help="Generate best-effort source/API payload plans")
     args = parser.parse_args()
 
-    hypotheses = read_jsonl(args.hypotheses)
+    hypotheses = read_hypotheses(args.hypotheses)
     targets = build_targets(hypotheses=hypotheses, auto_fill=args.auto_fill)
     dump_json(args.out, targets)
 

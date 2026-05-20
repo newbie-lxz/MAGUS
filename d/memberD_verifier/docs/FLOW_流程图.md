@@ -1,11 +1,15 @@
 # 最简单流程
 
 ```text
-C 写 c/out/hypotheses.jsonl
+C 写一个或多个 c/out/*.jsonl
+        ↓
+D 按文件名排序读取并检查重复 project_id + hypothesis_id
         ↓
 运行 gen_targets_from_hypotheses.py --auto-fill
         ↓
 得到 source_api targets.auto.json
+        ↓
+如果存在 verification_contexts.jsonl，绑定 execution/oracle 到 targets.executable.json
         ↓
 运行 verifier.py
         ↓

@@ -48,7 +48,7 @@
             "expect_nonzero_exit": true
           },
           "execution": {
-            "repo_path": "D:/datasets/openssl",
+            "repo_path": "/datasets/openssl",
             "config_cmd": "./Configure enable-asan",
             "build_cmd": "make -j4",
             "run_cmd": "${PYTHON} poc_parse_cert.py"

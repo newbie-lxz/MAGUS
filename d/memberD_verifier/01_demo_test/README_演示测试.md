@@ -1,13 +1,20 @@
 # 演示测试流程
 
 这个文件夹只保留源码/API 误用演示。这里的 API 指 C/C++ 函数调用接口，不是 HTTP API。
+本目录只保留 Ubuntu/Linux 脚本，不提供 Windows 路径。
+
+先运行：
+
+```text
+./01_setup_linux.sh
+```
 
 ## 源码/API 计划演示
 
 运行：
 
 ```text
-07_source_api_demo_windows.bat
+./07_source_api_demo_linux.sh
 ```
 
 这个演示会生成：
@@ -25,7 +32,7 @@ out_source_api/verification.failed.jsonl
 运行：
 
 ```text
-08_source_api_executable_demo_windows.bat
+./08_source_api_executable_demo_linux.sh
 ```
 
 这个演示会进入 `mock_source_project` 执行 `poc.py`，命中 oracle 后写入：

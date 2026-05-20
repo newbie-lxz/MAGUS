@@ -27,7 +27,7 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
             "seed_inputs": ["malformed serialized bytes"]
           },
           "execution": {
-            "repo_path": "D:/datasets/openssl",
+            "repo_path": "/datasets/openssl",
             "config_cmd": "./Configure enable-asan",
             "build_cmd": "make -j4",
             "run_cmd": "${PYTHON} poc_parse_cert.py"
@@ -45,7 +45,7 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
 
 ## 字段解释
 
-- `project_id`：必须和 C 的 `hypotheses.jsonl` 里一致。
+- `project_id`：必须和 C 的 `c/out/*.jsonl` 假设记录里一致。
 - `target_type`：固定为 `source_api`，历史 `native` 可视为同义。
 - `cases`：每个假设一个 case，key 是 `hypothesis_id`。
 - `payload_kind`：固定为 `api_misuse_plan` 或历史 `native_plan`。

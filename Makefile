@@ -1,4 +1,4 @@
-.PHONY: build-analyzer gen-srcs-compile-commands gen-input run-a run-llm run-b run-c run-ab run-abc
+.PHONY: build-analyzer gen-srcs-compile-commands gen-input run-a run-b run-c run-d run-abcd
 
 A_INPUT ?= a/input/zlib.in.jsonl
 A_OUTPUT ?= a/out/samples.raw.jsonl
@@ -41,17 +41,14 @@ gen-input:
 run-a:
 	python3 pipeline.py a --input $(A_INPUT) --output $(A_OUTPUT)
 
-run-llm:
-	python3 pipeline.py llm --input $(A_OUTPUT) --projects $(A_INPUT) --output $(C_LLM_INPUT)
-
 run-b:
 	python3 pipeline.py b --input $(B_INPUT) --output-dir $(B_OUTPUT_DIR) --min-support $(MIN_SUPPORT)
 
 run-c:
 	python3 pipeline.py c --llm-input $(C_LLM_INPUT) --b-candidates $(B_CANDIDATES) --output $(C_OUTPUT) $(if $(C_MAX_SAMPLES),--max-samples $(C_MAX_SAMPLES),)
 
-run-ab:
-	python3 pipeline.py ab --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --min-support $(MIN_SUPPORT)
+run-d:
+	python3 pipeline.py d
 
-run-abc:
-	python3 pipeline.py abc --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) $(if $(C_MAX_SAMPLES),--c-max-samples $(C_MAX_SAMPLES),)
+run-abcd:
+	python3 pipeline.py abcd --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) $(if $(C_MAX_SAMPLES),--c-max-samples $(C_MAX_SAMPLES),)

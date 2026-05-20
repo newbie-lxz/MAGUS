@@ -8,7 +8,7 @@
 A -> B -> C -> D
 ```
 
-D 只接 C 加工后的 `hypotheses.jsonl`。
+D 只接 C 加工后的 `c/out/*.jsonl`。
 
 这里的文件只是我查看 `D:\lxz_whu\APP-Miner\out.zip` 时抽取出来的参考材料，用来确认 A 同学的包里有什么。
 

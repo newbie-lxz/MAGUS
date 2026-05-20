@@ -10,20 +10,22 @@ C 的源码/API 假设 -> payload / PoC runner -> 动态验证 -> confirmed/fail
 
 ## 输入
 
-C 写给 D 的正式文件：
+C 写给 D 的正式位置：
 
 ```text
-c/out/hypotheses.jsonl
+c/out/*.jsonl
 ```
 
-里面应包含漏洞假设、CWE、前置条件、调用路径、代码证据、置信度，以及可选的 `verification_context`。
+D 会按文件名排序批量读取这些文件，并拒绝重复的 `project_id + hypothesis_id`。里面应包含漏洞假设、CWE、前置条件、调用路径、代码证据、置信度，以及可选的 `verification_context`。
+
+如果 C 不提供 `verification_context`，D 可以在 `02_run_with_C/verification_contexts.jsonl` 里维护执行上下文 sidecar，再由外层脚本绑定到 generated targets；C 和 D core 都不需要改。
 
 ## D 自动做什么
 
 1. 识别源码/API 误用类型，例如空指针、整数溢出、UAF、缓冲区溢出、命令注入、路径穿越。
 2. 根据 `route`、`attack_path`、`file`、`evidence_slice` 生成 `*.api-plan.json`。
 3. 生成可执行 `*.payload.py` runner。
-4. 如果 C 提供 `repo_path` 加 `run_cmd` / `poc_cmd` / `test_cmd`，执行 runner。
+4. 如果 C 或 sidecar 提供 `repo_path` 加 `run_cmd` / `poc_cmd` / `test_cmd`，执行 runner。
 5. 按 oracle 判断 confirmed 或 failed。
 6. 输出 runtime trace、失败原因和回流建议。
 

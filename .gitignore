@@ -21,3 +21,6 @@ a/cmd/__pycache__/
 # Stage B generated artifacts
 b/b_output/
 b/__pycache__/
+
+# Stage D local environment
+d/memberD_verifier/.venv/
