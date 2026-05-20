@@ -10,13 +10,15 @@ C 的源码/API 假设 -> payload / PoC runner -> 动态验证 -> confirmed/fail
 
 ## 输入
 
-C 写给 D 的正式位置：
+C 写给 D 的正式动态验证队列位置：
 
 ```text
 c/out/*.jsonl
 ```
 
-D 会按文件名排序批量读取这些文件，并拒绝重复的 `project_id + hypothesis_id`。里面应包含漏洞假设、CWE、前置条件、调用路径、代码证据、置信度，以及可选的 `verification_context`。
+D 信任这个目录只包含 C 分流出的 `P1`/`P2` 候选，会按文件名排序批量读取这些文件，并拒绝重复的 `project_id + hypothesis_id`。里面应包含漏洞假设、CWE、前置条件、调用路径、代码证据、置信度，以及可选的 `verification_context`。
+
+C 的 `P0` 静态强确认写到 `c/final/static_confirmed.jsonl`，`P3` 审计记录写到 `c/audit/audit.jsonl`；这两类不是 D 的输入。
 
 如果 C 不提供 `verification_context`，D 可以在 `02_run_with_C/verification_contexts.jsonl` 里维护执行上下文 sidecar，再由外层脚本绑定到 generated targets；C 和 D core 都不需要改。
 

@@ -1,0 +1,23 @@
+{
+  "status": "failed",
+  "reason": "NOT_EXPLOITABLE",
+  "failure_code": "NOT_EXPLOITABLE",
+  "failure_note": "payload did not satisfy oracle",
+  "observations": [
+    "exit=1 for /home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python tools/juliet_win_shim/run_cwe15_case.py --source-file /usr/include/c++/11/ext/new_allocator.h --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv"
+  ],
+  "runtime_trace": [
+    {
+      "cmd": "/home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python tools/juliet_win_shim/run_cwe15_case.py --source-file /usr/include/c++/11/ext/new_allocator.h --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv",
+      "cwd": "/home/sq_hu/MAGUS",
+      "exit_code": 1,
+      "elapsed_ms": 54,
+      "stdout_tail": "MAGUS_CWE15_BUILD_FAILED\n",
+      "stderr_tail": "/usr/include/c++/11/ext/new_allocator.h:32:10: fatal error: 'bits/c++config.h' file not found\n   32 | #include <bits/c++config.h>\n      |          ^~~~~~~~~~~~~~~~~~\n1 error generated.\n",
+      "timed_out": false
+    }
+  ],
+  "timestamps": {
+    "finished_at": "2026-05-20T12:01:17Z"
+  }
+}

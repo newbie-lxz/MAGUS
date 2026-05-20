@@ -245,7 +245,7 @@ def main() -> None:
     parser_c.add_argument(
         "--output",
         default=str(DEFAULT_STAGE_C_OUTPUT),
-        help="Stage C 输出 hypotheses.jsonl",
+        help="Stage C 输出给 Stage D 的 P1/P2 hypotheses.jsonl",
     )
     parser_c.add_argument(
         "--max-samples",
@@ -265,7 +265,7 @@ def main() -> None:
     parser_abcd.add_argument(
         "--c-output",
         default=str(DEFAULT_STAGE_C_OUTPUT),
-        help="Stage C 输出 hypotheses.jsonl",
+        help="Stage C 输出给 Stage D 的 P1/P2 hypotheses.jsonl",
     )
     parser_abcd.add_argument(
         "--min-support",

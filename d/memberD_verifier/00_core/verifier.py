@@ -335,6 +335,14 @@ def evidence_fields(hyp: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def routing_fields(hyp: Dict[str, Any]) -> Dict[str, Any]:
+    fields: Dict[str, Any] = {}
+    for key in ("priority", "routing_decision", "suspicion_reason", "agent_verdict"):
+        if hyp.get(key) not in (None, "", []):
+            fields[key] = hyp.get(key)
+    return fields
+
+
 def get_case(target: Dict[str, Any], hyp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     cases = target.get("cases") or {}
     hypothesis_id = hyp.get("hypothesis_id")
@@ -361,6 +369,7 @@ def failed_record(hyp: Dict[str, Any], code: str, note: str, suggested_action: s
         "timestamps": {"failed_at": utc_now()},
     }
     record.update(evidence_fields(hyp))
+    record.update(routing_fields(hyp))
     return record
 
 
@@ -496,9 +505,6 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, timeout:
     if missing:
         return None, failed_record(hyp, "HYPOTHESIS_WRONG", f"missing required fields: {', '.join(missing)}")
 
-    if hyp.get("agent_verdict") and str(hyp.get("agent_verdict")).lower() not in {"accept", "accepted"}:
-        return None, failed_record(hyp, "HYPOTHESIS_WRONG", f"agent_verdict is {hyp.get('agent_verdict')!r}", "send only accepted C hypotheses")
-
     case = get_case(target, hyp)
     if case is None:
         return None, failed_record(
@@ -606,6 +612,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, timeout:
             record["cwe_candidates"] = cwe
         if hyp.get("confidence") is not None:
             record["confidence"] = hyp.get("confidence")
+        record.update(routing_fields(hyp))
         return record, None
 
     record = failed_record(

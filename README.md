@@ -4,8 +4,8 @@ MAGUS is a multi-stage mining pipeline plus a small root-level orchestrator:
 
 - `a/`: Stage `A` static-analysis pipeline that emits `samples.raw.jsonl`, the derived `samples.stats.jsonl` view, and `samples.llm.jsonl` evidence.
 - `b/`: Stage `B` miner that consumes Stage `A` `samples.stats.jsonl` records, mines high-support feature patterns, and scores candidates.
-- `c/`: Stage `C` adversarial audit that consumes Stage `A` `samples.llm.jsonl` evidence and Stage `B` `candidates.scored.jsonl`.
-- `d/`: Stage `D` source/API verifier that consumes Stage `C` `c/out/*.jsonl` hypotheses and produces confirmed or failed dynamic-verification records.
+- `c/`: Stage `C` red-team audit that consumes Stage `A` `samples.llm.jsonl` evidence and Stage `B` `candidates.scored.jsonl`, then routes findings into static confirmations, D candidates, or audit-only records.
+- `d/`: Stage `D` source/API verifier that consumes the Stage `C` dynamic-verification queue in `c/out/*.jsonl` and produces confirmed or failed dynamic-verification records.
 - `pipeline.py`: root entrypoint for generating Stage `A` input, running Stage `A`, Stage `B`, Stage `C`, Stage `D`, or the full `A -> B -> C -> D` flow from one place.
 - `tools/gen_srcs_compile_commands.py`: explicit helper for generating `srcs/compile_commands.json` for the checked-in Juliet sample tree.
 
@@ -88,7 +88,7 @@ make run-b
 make run-c
 ```
 
-- Run only Stage `D` after Stage `C` has written one or more `*.jsonl` files under `c/out/`:
+- Run only Stage `D` after Stage `C` has written one or more dynamic-verification candidate files under `c/out/`:
 
 ```bash
 make run-d
@@ -102,7 +102,7 @@ make run-abcd
 
 This command reaches Stage `C` and will call the DeepSeek API through the OpenAI-compatible Python SDK before entering Stage `D`.
 
-Stage `D` still uses the formal script under `d/memberD_verifier/02_run_with_C`. The root `d` and `abcd` commands call that script, which reads every `c/out/*.jsonl` file in filename order, rejects duplicate `project_id + hypothesis_id` records, generates source/API targets, optionally binds `verification_contexts.jsonl`, runs the verifier, and validates the output files. Prepare the local D Python environment once before running D:
+Stage `D` still uses the formal script under `d/memberD_verifier/02_run_with_C`. The root `d` and `abcd` commands call that script, which reads every `c/out/*.jsonl` file in filename order, trusts that Stage `C` has already selected the records that need dynamic verification, rejects duplicate `project_id + hypothesis_id` records, generates source/API targets, optionally binds `verification_contexts.jsonl`, runs the verifier, and validates the output files. Prepare the local D Python environment once before running D:
 
 ```bash
 (cd d/memberD_verifier/01_demo_test && ./01_setup_linux.sh)
@@ -139,7 +139,8 @@ Important contract boundary:
 - Stage `B` consumes Stage `A` stats records with schema `stagea.stats.features.v1`
 - Stage `B` validates the required stats fields before mining and rejects unsupported schemas
 - Stage `C` consumes Stage `A` `samples.llm.jsonl` and Stage `B` `candidates.scored.jsonl`; it does not read `samples.raw.jsonl`
-- Stage `D` consumes Stage `C` `c/out/*.jsonl`; it does not read Stage `A` or Stage `B` outputs directly, and it verifies C/C++ source/API misuse cases rather than HTTP endpoints
+- Stage `C` routes records by priority: `P0` static confirmations go to `c/final/static_confirmed.jsonl`, `P1`/`P2` dynamic-verification candidates go to `c/out/*.jsonl`, and `P3` audit-only records go to `c/audit/audit.jsonl`
+- Stage `D` consumes every record Stage `C` places under `c/out/*.jsonl`; it does not re-check `P1`/`P2` or `agent_verdict`, does not read Stage `A` or Stage `B` outputs directly, and verifies C/C++ source/API misuse cases rather than HTTP endpoints
 
 ## Outputs
 
@@ -150,7 +151,7 @@ Default outputs:
 - Stage `A` LLM evidence output: `a/out/samples.llm.jsonl`
 - Generated Stage `A` project input: `a/input/srcs.in.jsonl`
 - Stage `B` outputs: `b/b_output/patterns.json`, `b/b_output/candidates.scored.jsonl`, `b/b_output/b_miner_stats.json`
-- Stage `C` default output: `c/out/hypotheses.jsonl`; Stage `D` batch input: all `c/out/*.jsonl`
+- Stage `C` D-candidate output: `c/out/hypotheses.jsonl`; Stage `C` static-confirmed output: `c/final/static_confirmed.jsonl`; Stage `C` audit-only output: `c/audit/audit.jsonl`; Stage `D` batch input: all `c/out/*.jsonl`
 - Stage `D` outputs: `d/memberD_verifier/02_run_with_C/output/verification.jsonl`, `verification.failed.jsonl`, `verification.summary.md`, and `payloads/*.api-plan.json` / `payloads/*.payload.py`
 
 If you override `A_OUTPUT`, `pipeline.py` derives the matching stats path automatically during full runs; `make run-a`, `make run-c`, and `make run-abcd` derive the matching `samples.llm.jsonl` path for `C_LLM_INPUT`.

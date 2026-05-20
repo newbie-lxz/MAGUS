@@ -1,0 +1,59 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "cwe15",
+  "sample_id": "path_6704906c7588",
+  "hypothesis_id": "hyp_path_6704906c7588",
+  "claim": "NO_VULNERABILITY_FOUND",
+  "cwe_candidates": null,
+  "source_file": "/usr/include/c++/11/bits/stl_list.h",
+  "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
+  "api_sequence": [
+    "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv"
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_6704906c7588",
+    "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
+    "input_source": "Juliet CWE15 WinSock recv stub payload",
+    "seed_inputs": [
+      "magus-cwe15-controlled-host"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing /usr/include/c++/11/bits/stl_list.h",
+    "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
+    "Drive the API sequence with misuse-oriented inputs for generic",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "ASan/UBSan crash",
+      "non-zero test exit caused by crafted source/API input",
+      "unexpected success on invalid API state",
+      "differential behavior between vulnerable and fixed revision"
+    ],
+    "failure_patterns": [
+      "MAGUS_CWE15_CONFIRMED"
+    ],
+    "expect_nonzero_exit": false
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": "/home/sq_hu/MAGUS",
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file /usr/include/c++/11/bits/stl_list.h --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
+    "poc_cmd": null,
+    "test_cmd": null,
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
+    "file": "/usr/include/c++/11/bits/stl_list.h",
+    "line": 443,
+    "evidence_slice": "call:strcpy"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-20T12:01:17Z"
+  }
+}

@@ -1,7 +1,9 @@
 # 最简单流程
 
 ```text
-C 写一个或多个 c/out/*.jsonl
+C 分流：P0 写 c/final，P1/P2 写 c/out，P3 写 c/audit
+        ↓
+D 读取 c/out/*.jsonl 动态验证队列
         ↓
 D 按文件名排序读取并检查重复 project_id + hypothesis_id
         ↓

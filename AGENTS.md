@@ -5,8 +5,8 @@
 - This root workspace is the MAGUS pipeline. It contains Stage `A`, Stage `B`, Stage `C`, and the downstream Stage `D` verifier. The root orchestration layer connects Stage `A` through Stage `D`.
 - Stage `A` still owns code extraction, derived sample generation, and LLM evidence export.
 - Stage `B` owns pattern mining and candidate scoring over Stage `A` stats records.
-- Stage `C` owns adversarial audit over Stage `A` LLM evidence and Stage `B` candidates.
-- Stage `D` owns dynamic source/API verification over Stage `C` hypotheses.
+- Stage `C` owns red-team audit and routing over Stage `A` LLM evidence and Stage `B` candidates.
+- Stage `D` owns dynamic source/API verification over the Stage `C` candidates placed under `c/out/*.jsonl`.
 
 ## Repo Map
 
@@ -35,7 +35,7 @@
 - `pipeline.py a` runs Stage `A` only, including `samples.llm.jsonl` export beside the raw output.
 - `pipeline.py gen-input` generates a Stage `A` projects JSONL from `compile_commands.json`; it does not run Stage `A`.
 - `pipeline.py b` runs Stage `B` only.
-- `pipeline.py c` runs Stage `C` over Stage `A` LLM evidence and Stage `B` candidates.
+- `pipeline.py c` runs Stage `C` over Stage `A` LLM evidence and Stage `B` candidates, routing `P0` static confirmations, `P1`/`P2` D candidates, and `P3` audit-only records.
 - `pipeline.py d` runs Stage `D` over Stage `C` `c/out/*.jsonl` by calling `d/memberD_verifier/02_run_with_C/01_auto_attack_from_C_linux.sh`.
 - `pipeline.py abcd` chains Stage `A`, Stage `B`, Stage `C`, and Stage `D`.
 - `make gen-input`, `make run-a`, `make run-b`, `make run-c`, `make run-d`, and `make run-abcd` are thin wrappers over `pipeline.py`.
@@ -45,8 +45,9 @@
 - Stage `A` LLM evidence is produced through `a/cmd/llm_export.py` as part of the root `a` and `abcd` flows.
 - Stage `B` expects Stage `A` `samples.stats.jsonl` records with schema `stagea.stats.features.v1` and validates that contract before mining.
 - Stage `C` expects Stage `A` `samples.llm.jsonl` plus Stage `B` `candidates.scored.jsonl`; it must not read `samples.raw.jsonl` as its evidence input.
+- Stage `C` writes `P1`/`P2` dynamic-verification candidates to `c/out/*.jsonl`, `P0` static confirmations to `c/final/static_confirmed.jsonl`, and `P3` audit-only records to `c/audit/audit.jsonl`.
 - Stage `C` uses the DeepSeek-compatible OpenAI Python SDK client configured in `c/agent1.py`; `make run-abcd` reaches this networked LLM call.
-- Stage `D` expects Stage `C` hypotheses under `c/out/*.jsonl`; it reads those files in filename order, rejects duplicate `project_id + hypothesis_id` records, and must not read Stage `A` or Stage `B` outputs directly.
+- Stage `D` expects Stage `C` dynamic-verification candidates under `c/out/*.jsonl`; it reads those files in filename order, trusts Stage `C` routing instead of re-checking `P1`/`P2` or `agent_verdict`, rejects duplicate `project_id + hypothesis_id` records, and must not read Stage `A` or Stage `B` outputs directly.
 - Stage `D` verifies C/C++ source/API misuse hypotheses and does not generate HTTP requests, `base_url` payloads, or `*.http` files.
 - The root pipeline does not currently expose a Stage `B` worker-count flag.
 

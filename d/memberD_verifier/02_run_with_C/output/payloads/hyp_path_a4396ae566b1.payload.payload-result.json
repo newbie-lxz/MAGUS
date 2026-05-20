@@ -11,13 +11,13 @@
       "cmd": "/home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
       "cwd": "/home/sq_hu/MAGUS",
       "exit_code": 0,
-      "elapsed_ms": 161,
+      "elapsed_ms": 174,
       "stdout_tail": "Calling bad()...\nMAGUS_CWE15_SET_COMPUTER_NAME value=magus-cwe15-controlled-host\nMAGUS_CWE15_CONFIRMED external payload reached SetComputerNameA\nFinished bad()\n",
       "stderr_tail": "",
       "timed_out": false
     }
   ],
   "timestamps": {
-    "finished_at": "2026-05-20T10:08:03Z"
+    "finished_at": "2026-05-20T12:01:19Z"
   }
 }

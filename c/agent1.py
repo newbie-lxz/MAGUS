@@ -7,6 +7,7 @@ import functools
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 
 from openai import OpenAI
@@ -16,6 +17,7 @@ MODEL_NAME = "deepseek-v4-flash"          # 使用Flash模型，速度更快
 API_KEY = "sk-accf76251b06423b8c02257bb8da0758"
 BASE_URL = "https://api.deepseek.com/v1"
 CONFIDENCE_THRESHOLD = 0.60               # 放宽到0.60，让更多假设进入D阶段（原0.65）
+STATIC_CONFIDENCE_THRESHOLD = 0.90        # P0：C阶段静态强确认，直接进入静态报告
 MAX_WORKERS = 5                           # 并发线程数，平衡速度与稳定性
 MAX_CALL_CHAIN = 8                        # 调用序列最多保留个数（精简token）
 MAX_SINK_SOURCE = 3                       # sink/source最多保留个数（精简token）
@@ -28,9 +30,21 @@ def parse_args():
     parser = argparse.ArgumentParser(description="C阶段：基于A阶段LLM证据和B阶段候选执行双Agent审计")
     parser.add_argument("--llm-input", default="data/samples.llm.jsonl", help="A阶段导出的 samples.llm.jsonl")
     parser.add_argument("--b-candidates", default="data/candidates.scored.jsonl", help="B阶段输出 candidates.scored.jsonl")
-    parser.add_argument("--output", default="data/hypotheses.jsonl", help="C阶段输出 hypotheses.jsonl")
-    parser.add_argument("--max-samples", type=int, default=20, help="最多审计候选数量")
+    parser.add_argument("--output", default="data/hypotheses.jsonl", help="C阶段输出给D验证的 hypotheses.jsonl")
+    parser.add_argument("--static-output", default="", help="P0静态强确认报告；默认从 --output 推导")
+    parser.add_argument("--audit-output", default="", help="P3和错误审计日志；默认从 --output 推导")
+    parser.add_argument("--max-samples", type=int, default=None, help="最多审计候选数量；默认不限制")
     return parser.parse_args()
+
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def default_side_output(output_path: Path, subdir: str, filename: str) -> Path:
+    if output_path.parent.name == "out":
+        return output_path.parent.parent / subdir / filename
+    return output_path.with_name(f"{output_path.stem}.{filename}")
 
 
 def read_jsonl(path):
@@ -223,8 +237,8 @@ def build_evidence_brief(cand, llm_map):
     return "\n".join(lines)
 
 
-# ==================== 提示词模板（完整，未修改）====================
-PROPOSER_PROMPT = """你是一位安全审计专家。基于以下代码证据，判断是否存在安全漏洞。
+# ==================== 红队三轮提示词 ====================
+PROPOSER_PROMPT = """你是一位红队安全审计专家。基于以下代码证据，高召回判断是否存在安全漏洞。
 
 **审计信息**：
 {evidence_brief}
@@ -249,37 +263,63 @@ PROPOSER_PROMPT = """你是一位安全审计专家。基于以下代码证据�
 
 **注意**：即使代码中可能存在防御检查，你也必须输出假设条件和路径，不要提前过滤。"""
 
-CHALLENGER_PROMPT = """你是独立复审专家，请严格审查红队提出的漏洞假设，并给出调整后的置信度。
+RED_REVIEW_PROMPT = """你仍然是红队安全审计专家，不是蓝队。请对第一轮判断做自查和修正。
 
 **代码证据**：
 {evidence_brief}
 
-**红队假设**：
+**第一轮判断**：
 {proposer_json}
 
-**任务**：检查假设条件合理性、路径上的防御措施，给出调整后的置信度。
+**任务**：
+- 如果第一轮已发现漏洞，检查 source/sink 或 API misuse 路径是否真实、是否引用了不存在的代码。
+- 如果第一轮判断为 NO_VULNERABILITY_FOUND，但证据中存在具体可验证漏洞路径，必须纠正为漏洞。
+- 只有发现硬矛盾（路径不可达、sink不存在、source和sink不连通、把good路径当bad路径等）时，才列入 hard_contradictions。
 
 **输出格式（严格JSON）**：
 {{
-  "condition_checks": [{{"condition_id": "A1", "status": "valid|contradicted", "reason": "..."}}],
-  "guard_checks": [{{"target_step": 1, "guard_location": "L?", "guard_code": "...", "reason": "..."}}],
-  "adjusted_confidence": 0.5,
-  "summary": "结论"
+  "claim": "漏洞描述，无漏洞写'NO_VULNERABILITY_FOUND'",
+  "cwe_candidates": ["CWE-XXX"],
+  "trigger_path": [
+    {{"step": 1, "loc": "L? 或 描述", "code": "关键代码行"}}
+  ],
+  "preconditions": ["攻击者能够控制某个输入或参数"],
+  "confidence": 0.8,
+  "hard_contradictions": [],
+  "evidence_complete": true,
+  "review_notes": "自查结论"
 }}"""
 
-REBUTTAL_PROMPT = """你是原红队专家，请回应蓝队的审查结果。
+RED_FINAL_PROMPT = """你是红队最终整理者。请汇总前两轮结果，输出可用于分流的最终漏洞假设。
 
-**原假设**：
+**代码证据**：
+{evidence_brief}
+
+**第一轮判断**：
 {proposer_json}
 
-**蓝队审查**：
-{challenger_json}
+**第二轮自查**：
+{review_json}
 
-**输出JSON**：
+**分流要求**：
+- 如果存在可验证漏洞路径，输出具体漏洞假设。
+- 如果无漏洞，输出 NO_VULNERABILITY_FOUND。
+- 如果发现硬矛盾，写入 hard_contradictions。
+- 不要输出 HTTP/base_url/token/*.http 等Web验证内容；这里的API指C/C++函数调用接口或调用序列。
+
+**输出格式（严格JSON）**：
 {{
-  "final_claim": "最终漏洞描述或NO_VULNERABILITY_FOUND",
-  "final_confidence": 0.5,
-  "rebuttal_notes": "理由"
+  "claim": "最终漏洞描述或NO_VULNERABILITY_FOUND",
+  "cwe_candidates": ["CWE-XXX"],
+  "trigger_path": [
+    {{"step": 1, "loc": "L? 或 描述", "code": "关键代码行"}}
+  ],
+  "preconditions": ["攻击者能够控制某个输入或参数"],
+  "confidence": 0.8,
+  "hard_contradictions": [],
+  "evidence_complete": true,
+  "stability": "stable_vulnerability|corrected_to_vulnerability|unstable_vulnerability|no_vulnerability|hard_contradiction",
+  "final_notes": "最终整理说明"
 }}"""
 
 
@@ -300,96 +340,276 @@ def call_llm(prompt):
         return None
 
 
-def build_hypothesis(cand, prop, final_claim, final_conf, agent_verdict, repo_path):
-    """
-    构造最终输出的一条假设，符合新D阶段输入格式。
-    将红方的trigger_path转换为字符串数组attack_path，并自动生成verification_context。
-    """
-    # 将触发路径步骤列表转为字符串数组
-    attack_path_strs = []
-    for step in prop.get("trigger_path", []):
-        desc = step.get("code", "")
-        loc = step.get("loc", "")
-        if loc and loc != "unknown":
-            attack_path_strs.append(f"{desc} @ {loc}")
+def response_claim(resp):
+    if not isinstance(resp, dict):
+        return ""
+    return str(resp.get("claim") or resp.get("final_claim") or "")
+
+
+def response_confidence(resp, default=0.0):
+    if not isinstance(resp, dict):
+        return default
+    for key in ("confidence", "final_confidence", "adjusted_confidence"):
+        value = resp.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return default
+
+
+def response_cwes(resp):
+    if not isinstance(resp, dict):
+        return []
+    value = resp.get("cwe_candidates") or resp.get("CWE_candidates") or resp.get("cwe_list") or []
+    if isinstance(value, list):
+        return value
+    if value:
+        return [value]
+    return []
+
+
+def no_vulnerability_claim(claim):
+    text = " ".join(str(claim or "").split()).lower()
+    markers = [
+        "no_vulnerability_found",
+        "no vulnerability",
+        "not a vulnerability",
+        "无漏洞",
+        "不存在漏洞",
+        "没有漏洞",
+    ]
+    return not text or any(marker in text for marker in markers)
+
+
+def is_vulnerability_response(resp):
+    claim = response_claim(resp)
+    return bool(claim) and not no_vulnerability_claim(claim)
+
+
+def hard_contradictions(resp):
+    if not isinstance(resp, dict):
+        return []
+    result = []
+    for key in ("hard_contradictions", "contradictions", "blocking_guards"):
+        value = resp.get(key)
+        if value in (None, "", []):
+            continue
+        if isinstance(value, list):
+            result.extend(value)
         else:
-            attack_path_strs.append(desc)
+            result.append(value)
+    stability = str(resp.get("stability") or "").lower()
+    if stability == "hard_contradiction" and not result:
+        result.append("stability=hard_contradiction")
+    return result
+
+
+def trigger_path_items(resp):
+    if not isinstance(resp, dict):
+        return []
+    value = resp.get("trigger_path") or resp.get("attack_path") or []
+    if isinstance(value, list):
+        return value
+    if value:
+        return [value]
+    return []
+
+
+def attack_path_strings(resp, cand):
+    attack_path_strs = []
+    for step in trigger_path_items(resp):
+        if isinstance(step, dict):
+            desc = str(step.get("code") or step.get("function") or step.get("loc") or "").strip()
+            loc = str(step.get("loc") or "").strip()
+            if desc and loc and loc != "unknown" and loc not in desc:
+                attack_path_strs.append(f"{desc} @ {loc}")
+            elif desc:
+                attack_path_strs.append(desc)
+        elif step not in (None, "", []):
+            attack_path_strs.append(str(step))
     if not attack_path_strs and cand.get("route"):
         attack_path_strs = [cand["route"]]
+    return attack_path_strs
 
-    return {
+
+def evidence_complete(resp, cand):
+    required = ("project_id", "sample_id", "route", "file", "line", "evidence_slice")
+    if any(cand.get(field) in (None, "", []) for field in required):
+        return False
+    if not attack_path_strings(resp, cand):
+        return False
+    if isinstance(resp, dict) and resp.get("evidence_complete") is False:
+        return False
+    return True
+
+
+def selected_vulnerability_response(responses):
+    for resp in reversed(responses):
+        if is_vulnerability_response(resp):
+            return resp
+    return responses[-1] if responses else {}
+
+
+def route_record(cand, responses):
+    first_is_vuln = is_vulnerability_response(responses[0]) if responses else False
+    vuln_flags = [is_vulnerability_response(resp) for resp in responses]
+    vuln_count = sum(1 for flag in vuln_flags if flag)
+    any_vuln = bool(vuln_count)
+    selected = selected_vulnerability_response(responses)
+    contradictions = []
+    for resp in responses:
+        contradictions.extend(hard_contradictions(resp))
+
+    if not any_vuln:
+        return selected, "P3", "audit_only", "red_team_no_vulnerability", contradictions
+
+    if contradictions and not is_vulnerability_response(responses[-1]):
+        return selected, "P3", "audit_only", "hard_contradiction", contradictions
+
+    if not evidence_complete(selected, cand):
+        return selected, "P3", "audit_only", "evidence_incomplete", contradictions
+
+    confidence = response_confidence(selected)
+    all_vuln = vuln_count == len(responses)
+    has_cwe = bool(response_cwes(selected))
+    if all_vuln and confidence >= STATIC_CONFIDENCE_THRESHOLD and has_cwe:
+        return selected, "P0", "static_confirmed", "red_team_static_strong", contradictions
+
+    if not first_is_vuln and any_vuln:
+        return selected, "P1", "candidate_for_d", "corrected_to_vulnerability", contradictions
+    if vuln_count >= 2 and confidence >= CONFIDENCE_THRESHOLD:
+        return selected, "P1", "candidate_for_d", "red_team_stable_needs_dynamic_verification", contradictions
+    return selected, "P2", "candidate_for_d", "red_team_vulnerability_once", contradictions
+
+
+def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, contradictions, red_team_rounds, repo_path):
+    attack_path = attack_path_strings(selected, cand)
+    confidence = response_confidence(selected)
+    record = {
         "project_id": cand["project_id"],
         "sample_id": cand["sample_id"],
         "hypothesis_id": f"hyp_{cand['sample_id']}",
-        "claim": final_claim,
-        "CWE_candidates": prop.get("cwe_candidates", []),
-        "preconditions": prop.get("preconditions", []),
-        "attack_path": attack_path_strs,
-        "confidence": final_conf,
+        "claim": response_claim(selected) or "NO_VULNERABILITY_FOUND",
+        "CWE_candidates": response_cwes(selected),
+        "preconditions": selected.get("preconditions", []) if isinstance(selected, dict) else [],
+        "attack_path": attack_path,
+        "confidence": confidence,
+        "priority": priority,
         "agent_verdict": agent_verdict,
+        "routing_decision": agent_verdict,
+        "suspicion_reason": routing_reason,
+        "hard_contradictions": contradictions,
+        "red_team_rounds": red_team_rounds,
         "route": cand.get("route", ""),
         "file": cand.get("file", ""),
         "line": cand.get("line", 0),
         "evidence_slice": cand.get("evidence_slice", ""),
-        "verification_context": infer_verification_context(repo_path)   # 自动推断环境配置
+        "verification_context": infer_verification_context(repo_path),
+        "timestamps": {"routed_at": utc_now()},
+    }
+    if priority == "P0":
+        record["status"] = "static_confirmed"
+        record["verification_stage"] = "C"
+        record["d_verification"] = "skipped_by_policy"
+    elif priority in {"P1", "P2"}:
+        record["status"] = "pending_dynamic_verification"
+        record["d_verification"] = "pending"
+    else:
+        record["status"] = "audit_only"
+        record["d_verification"] = "not_applicable"
+    return record
+
+
+def audit_error_record(cand, exc):
+    return {
+        "project_id": cand.get("project_id"),
+        "sample_id": cand.get("sample_id"),
+        "hypothesis_id": f"hyp_{cand.get('sample_id', 'unknown')}",
+        "priority": "P3",
+        "agent_verdict": "audit_only",
+        "routing_decision": "audit_only",
+        "suspicion_reason": "stage_c_processing_error",
+        "error": str(exc),
+        "route": cand.get("route", ""),
+        "file": cand.get("file", ""),
+        "line": cand.get("line", 0),
+        "evidence_slice": cand.get("evidence_slice", ""),
+        "timestamps": {"routed_at": utc_now()},
     }
 
 
 def audit_one(cand, llm_map):
     """
-    单个样本的红蓝对抗审计流程：
-    1. 红方Proposer提出漏洞假设
-    2. 若红方认为无漏洞则直接剪枝返回
-    3. 蓝方Challenger审查并调整置信度
-    4. 红方Rebuttal回应并给出最终置信度与漏洞描述
-    5. 根据最终置信度和阈值决定agent_verdict
+    单个样本的三轮红队审计流程：
+    1. 红队提出高召回漏洞假设。
+    2. 红队自查并修正，特别捕捉先非漏洞后纠正为漏洞的样本。
+    3. 红队最终整理，按P0/P1/P2/P3分流。
     """
     sample_id = cand["sample_id"]
     brief = build_evidence_brief(cand, llm_map)
     repo_path = llm_map.get(sample_id, {}).get("repo_path", "")
 
-    # 红方
-    print(f"🔴 Proposer {sample_id}")
+    print(f"[C] red round 1 proposer {sample_id}")
     prop_resp = call_llm(PROPOSER_PROMPT.format(evidence_brief=brief))
     if not prop_resp:
-        prop_resp = {"claim": "NO_VULNERABILITY_FOUND", "confidence": 0.0}
+        prop_resp = {"claim": "NO_VULNERABILITY_FOUND", "confidence": 0.0, "llm_error": "round_1_failed"}
 
-    # 无漏洞剪枝（直接拒绝，不进入蓝队）
-    if "NO_VULNERABILITY_FOUND" in prop_resp.get("claim", ""):
-        return build_hypothesis(cand, prop_resp, "NO_VULNERABILITY_FOUND", 0.0, "reject", repo_path)
-
-    # 蓝方
-    print(f"🔵 Challenger {sample_id}")
-    chall_resp = call_llm(CHALLENGER_PROMPT.format(
+    print(f"[C] red round 2 review {sample_id}")
+    review_resp = call_llm(RED_REVIEW_PROMPT.format(
         evidence_brief=brief,
-        proposer_json=json.dumps(prop_resp, ensure_ascii=False)
-    ))
-    adjusted_conf = chall_resp.get("adjusted_confidence", prop_resp.get("confidence", 0.5)) if chall_resp else prop_resp.get("confidence", 0.5)
-
-    # 红方回应
-    print(f"🟡 Rebuttal {sample_id}")
-    rebut_resp = call_llm(REBUTTAL_PROMPT.format(
         proposer_json=json.dumps(prop_resp, ensure_ascii=False),
-        challenger_json=json.dumps(chall_resp, ensure_ascii=False) if chall_resp else "{}"
     ))
-    if rebut_resp:
-        final_claim = rebut_resp.get("final_claim", prop_resp.get("claim", ""))
-        final_conf = rebut_resp.get("final_confidence", adjusted_conf)
-    else:
-        final_claim = prop_resp.get("claim", "")
-        final_conf = adjusted_conf
+    if not review_resp:
+        review_resp = dict(prop_resp)
+        review_resp["llm_error"] = "round_2_failed_reused_round_1"
 
-    agent_verdict = "accept" if (final_conf >= CONFIDENCE_THRESHOLD and "NO_VULNERABILITY_FOUND" not in final_claim) else "reject"
-    return build_hypothesis(cand, prop_resp, final_claim, final_conf, agent_verdict, repo_path)
+    print(f"[C] red round 3 final {sample_id}")
+    final_resp = call_llm(RED_FINAL_PROMPT.format(
+        evidence_brief=brief,
+        proposer_json=json.dumps(prop_resp, ensure_ascii=False),
+        review_json=json.dumps(review_resp, ensure_ascii=False),
+    ))
+    if not final_resp:
+        final_resp = dict(review_resp)
+        final_resp["llm_error"] = "round_3_failed_reused_round_2"
+
+    red_team_rounds = [
+        {"round": 1, "role": "red_proposer", "response": prop_resp},
+        {"round": 2, "role": "red_self_review", "response": review_resp},
+        {"round": 3, "role": "red_final", "response": final_resp},
+    ]
+    responses = [prop_resp, review_resp, final_resp]
+    selected, priority, decision, reason, contradictions = route_record(cand, responses)
+    return build_hypothesis(cand, selected, priority, decision, reason, contradictions, red_team_rounds, repo_path)
 
 
-# ==================== 主程序（并发 + 流式写入）====================
+# ==================== 主程序（并发 + 即时分流写入）====================
+def truncate_jsonl(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8"):
+        pass
+
+
+def append_jsonl(file_obj, row):
+    file_obj.write(json.dumps(row, ensure_ascii=False) + "\n")
+    file_obj.flush()
+
+
 def main():
-    """主流程：加载数据，并发处理每个候选样本，流式写入结果文件。"""
+    """主流程：加载数据，并发处理每个候选样本，并按P0/P1/P2/P3即时分流写入。"""
     args = parse_args()
     candidates_path = Path(args.b_candidates)
     llm_samples_path = Path(args.llm_input)
     output_path = Path(args.output)
+    static_output_path = Path(args.static_output) if args.static_output else default_side_output(
+        output_path, "final", "static_confirmed.jsonl"
+    )
+    audit_output_path = Path(args.audit_output) if args.audit_output else default_side_output(
+        output_path, "audit", "audit.jsonl"
+    )
 
     candidates = load_candidates(candidates_path)
     llm_map = load_llm_samples(llm_samples_path)
@@ -399,26 +619,46 @@ def main():
     if args.max_samples is not None:
         candidates = candidates[:args.max_samples]
 
-    # 清空输出文件（流式写入前准备）
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
-        pass
+    truncate_jsonl(output_path)
+    truncate_jsonl(static_output_path)
+    truncate_jsonl(audit_output_path)
+
+    d_count = 0
+    static_count = 0
+    audit_count = 0
 
     # 使用线程池并发处理，提高整体吞吐量
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    with (
+        open(output_path, "a", encoding="utf-8", buffering=1) as d_file,
+        open(static_output_path, "a", encoding="utf-8", buffering=1) as static_file,
+        open(audit_output_path, "a", encoding="utf-8", buffering=1) as audit_file,
+        ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor,
+    ):
         future_to_cand = {executor.submit(audit_one, cand, llm_map): cand for cand in candidates}
         for future in as_completed(future_to_cand):
             cand = future_to_cand[future]
             try:
                 hyp = future.result()
-                # 每完成一个立即追加写入，避免内存积压，防止程序崩溃导致数据丢失
-                with open(output_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(hyp, ensure_ascii=False) + "\n")
-                print(f"✅ {cand['sample_id']} conf={hyp['confidence']:.2f} verdict={hyp['agent_verdict']}")
             except Exception as e:
-                print(f"❌ 处理 {cand['sample_id']} 失败: {e}")
+                hyp = audit_error_record(cand, e)
 
-    print(f"🎉 完成，结果保存到 {output_path}")
+            if hyp.get("priority") == "P0":
+                append_jsonl(static_file, hyp)
+                static_count += 1
+            elif hyp.get("priority") in {"P1", "P2"}:
+                append_jsonl(d_file, hyp)
+                d_count += 1
+            else:
+                append_jsonl(audit_file, hyp)
+                audit_count += 1
+            print(
+                f"[C] {cand['sample_id']} priority={hyp.get('priority')} "
+                f"decision={hyp.get('routing_decision')} reason={hyp.get('suspicion_reason')}"
+            )
+
+    print(f"[C] D candidates: {d_count} -> {output_path}")
+    print(f"[C] P0 static confirmed: {static_count} -> {static_output_path}")
+    print(f"[C] audit only: {audit_count} -> {audit_output_path}")
 
 
 if __name__ == "__main__":

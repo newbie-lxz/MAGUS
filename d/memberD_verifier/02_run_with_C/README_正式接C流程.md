@@ -11,7 +11,15 @@ C 输出目录由 Stage C 写到：
 c/out/
 ```
 
-D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按文件名排序合并。D 不直接接 A 的输出；A 的输出已经被 B/C 加工，D 只收 C 传来的 `c/out/*.jsonl` 假设文件。
+D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按文件名排序合并。D 不直接接 A 的输出；A 的输出已经被 B/C 加工，D 只收 C 放入 `c/out/*.jsonl` 的动态验证候选。
+
+C 的分流约定是：
+
+```text
+P0 -> c/final/static_confirmed.jsonl  # 静态强确认，不进入 D
+P1/P2 -> c/out/*.jsonl                # D 动态验证队列
+P3 -> c/audit/audit.jsonl             # 审计记录，不进入 D
+```
 
 如果多个文件里出现相同的 `project_id + hypothesis_id`，脚本会直接失败，要求先消除重复输入。
 
@@ -35,7 +43,7 @@ line
 evidence_slice
 ```
 
-如果 `agent_verdict` 存在，只有 `accept` / `accepted` 会继续验证；`reject` 会作为失败回流输出。CWE 字段可以是 Stage C 当前的 `CWE_candidates`，也可以是 `cwe_candidates`。
+D 信任 `c/out` 的分流结果，不再根据 `agent_verdict` 或 `priority` 做准入判断；CWE 字段可以是 Stage C 当前的 `CWE_candidates`，也可以是 `cwe_candidates`。
 
 ## 2. 可选执行上下文
 
