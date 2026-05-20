@@ -26,12 +26,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_657af4f5f3ba",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_74L7goodG2BEv",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -42,12 +39,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file /usr/include/c++/11/bits/alloc_traits.h --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_74L7goodG2BEv"
           }
         },
         "hyp_path_646f5b0acc7b": {
@@ -71,12 +69,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_646f5b0acc7b",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -87,12 +82,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file /usr/include/c++/11/ext/new_allocator.h --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_72L7goodG2BEv"
           }
         },
         "hyp_path_6704906c7588": {
@@ -116,12 +112,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_6704906c7588",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -132,12 +125,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file /usr/include/c++/11/bits/stl_list.h --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_73L7goodG2BEv"
           }
         },
         "hyp_path_f81bed3d35cf": {
@@ -162,12 +156,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_f81bed3d35cf",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_743badEv",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -178,12 +169,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_743badEv"
           }
         },
         "hyp_path_e5b9f8c11eba": {
@@ -209,12 +201,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_e5b9f8c11eba",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -225,12 +214,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_733badEv"
           }
         },
         "hyp_path_6902ad55fb81": {
@@ -255,12 +245,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_6902ad55fb81",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -271,12 +258,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv"
           }
         },
         "hyp_path_65ab71da3e37": {
@@ -301,12 +289,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_65ab71da3e37",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -317,12 +302,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_bad"
           }
         },
         "hyp_path_dbfae15f7a0a": {
@@ -348,12 +334,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_dbfae15f7a0a",
             "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_723badEv",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -364,12 +347,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_72a.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_723badEv"
           }
         },
         "hyp_path_a4396ae566b1": {
@@ -394,12 +378,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_a4396ae566b1",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -410,12 +391,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad"
           }
         },
         "hyp_path_a0780d094b3f": {
@@ -440,12 +422,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_a0780d094b3f",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -456,12 +435,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_bad"
           }
         },
         "hyp_path_f479965c2ca3": {
@@ -486,12 +466,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_f479965c2ca3",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_21_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -502,12 +479,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_21_bad"
           }
         },
         "hyp_path_3c989a45e355": {
@@ -532,12 +510,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_3c989a45e355",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -548,12 +523,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_bad"
           }
         },
         "hyp_path_012deba47e03": {
@@ -577,12 +553,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_012deba47e03",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_54_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -593,12 +566,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_54_bad"
           }
         },
         "hyp_path_27da96012b18": {
@@ -623,12 +597,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_27da96012b18",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_64_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -639,12 +610,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_64_bad"
           }
         },
         "hyp_path_7fe61828cb90": {
@@ -669,12 +641,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_7fe61828cb90",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -685,12 +654,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_bad"
           }
         },
         "hyp_path_5bb3b64a9c37": {
@@ -715,12 +685,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_5bb3b64a9c37",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_53_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -731,12 +698,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_53_bad"
           }
         },
         "hyp_path_b17dc291ac62": {
@@ -761,12 +729,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_b17dc291ac62",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_63_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -777,12 +742,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_63a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_63_bad"
           }
         },
         "hyp_path_bf54b497543b": {
@@ -808,12 +774,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_bf54b497543b",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -824,12 +787,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_bad"
           }
         },
         "hyp_path_1a2b9b32264e": {
@@ -854,12 +818,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_1a2b9b32264e",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_09_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -870,12 +831,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_09.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_09_bad"
           }
         },
         "hyp_path_37d605387e5a": {
@@ -900,12 +862,9 @@
           "payload": {
             "marker": "memberD_source_api_probe_hyp_path_37d605387e5a",
             "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_03_bad",
-            "input_source": "unknown",
+            "input_source": "Juliet CWE15 WinSock recv stub payload",
             "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
+              "magus-cwe15-controlled-host"
             ]
           },
           "oracle": {
@@ -916,12 +875,13 @@
               "differential behavior between vulnerable and fixed revision"
             ],
             "failure_patterns": [
-              "Segmentation fault",
-              "AddressSanitizer",
-              "null pointer",
-              "core dumped"
+              "MAGUS_CWE15_CONFIRMED"
             ],
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_03.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_03_bad"
           }
         }
       }

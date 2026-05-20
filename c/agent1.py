@@ -285,13 +285,13 @@ REBUTTAL_PROMPT = """你是原红队专家，请回应蓝队的审查结果。
 
 # ==================== LLM调用与假设构建模块 ====================
 def call_llm(prompt):
-    """调用大模型API，返回解析后的JSON字典。设置max_tokens=400确保输出完整。"""
+    """调用大模型API，返回解析后的JSON字典。设置max_tokens=2000确保输出完整。"""
     try:
         r = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
-            max_tokens=400,       # 保持足够大，避免截断
+            max_tokens=2000,      # 保持足够大，避免截断
             temperature=0.0
         )
         return json.loads(r.choices[0].message.content)

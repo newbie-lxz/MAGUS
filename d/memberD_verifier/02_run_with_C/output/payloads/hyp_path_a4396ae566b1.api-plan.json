@@ -1,0 +1,62 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "cwe15",
+  "sample_id": "path_a4396ae566b1",
+  "hypothesis_id": "hyp_path_a4396ae566b1",
+  "claim": "存在安全漏洞：外部控制的输入用于设置系统主机名，攻击者可通过网络连接发送恶意数据，导致主机名被任意设置，可能引发系统配置篡改或后续攻击。",
+  "cwe_candidates": [
+    "CWE-15"
+  ],
+  "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+  "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+  "api_sequence": [
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ L29-101 (badSource函数)",
+    "data = badSource(data); if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\");} @ L108-112"
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_a4396ae566b1",
+    "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+    "input_source": "Juliet CWE15 WinSock recv stub payload",
+    "seed_inputs": [
+      "magus-cwe15-controlled-host"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+    "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+    "Drive the API sequence with misuse-oriented inputs for CWE-15",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "ASan/UBSan crash",
+      "non-zero test exit caused by crafted source/API input",
+      "unexpected success on invalid API state",
+      "differential behavior between vulnerable and fixed revision"
+    ],
+    "failure_patterns": [
+      "MAGUS_CWE15_CONFIRMED"
+    ],
+    "expect_nonzero_exit": false
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": "/home/sq_hu/MAGUS",
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+    "poc_cmd": null,
+    "test_cmd": null,
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_bad",
+    "file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
+    "line": 79,
+    "evidence_slice": "call:SetComputerNameA"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-20T10:08:03Z"
+  }
+}

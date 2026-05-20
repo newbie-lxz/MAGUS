@@ -1,0 +1,1 @@
+{"project_id":"cwe15","repo_path":"/home/sq_hu/MAGUS","run_cmd":"${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file ${source_file} --entry-symbol ${entry_symbol}","oracle":{"failure_patterns":["MAGUS_CWE15_CONFIRMED"],"expect_nonzero_exit":false},"input_source":"Juliet CWE15 WinSock recv stub payload","seed_inputs":["magus-cwe15-controlled-host"]}

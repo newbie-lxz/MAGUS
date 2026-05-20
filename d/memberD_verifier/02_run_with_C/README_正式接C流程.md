@@ -57,6 +57,11 @@ hypothesis_id > route > project_id
 {"project_id":"juliet_small_c","repo_path":"srcs/juliet-small","test_cmd":"./repros/run_juliet_case.sh ${file} ${entry_symbol}","oracle":{"failure_patterns":["AddressSanitizer","Segmentation fault"],"expect_nonzero_exit":false}}
 ```
 
+当前仓库的 `project_id=cwe15` 使用项目级 sidecar 绑定到
+`tools/juliet_win_shim/run_cwe15_case.py`。该 runner 会在 Linux 下编译单个
+Juliet CWE15 Win32 样本，链接本仓库的 WinSock/Windows API runtime stub，并用
+`MAGUS_CWE15_CONFIRMED` 作为 oracle 标记确认外部输入到达 `SetComputerNameA`。
+
 自动脚本会先生成 `targets.auto.json`，如果发现 `verification_contexts.jsonl`，再通过 `bind_verification_contexts.py` 输出 `targets.executable.json` 给原 verifier 执行。
 sidecar 里的记录必须能命中当前 targets；如果出现未匹配的 `project_id`、`route` 或 `hypothesis_id`，脚本会直接失败。
 

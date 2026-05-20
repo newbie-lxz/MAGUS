@@ -1,0 +1,62 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "cwe15",
+  "sample_id": "path_6902ad55fb81",
+  "hypothesis_id": "hyp_path_6902ad55fb81",
+  "claim": "程序从网络接收数据后直接调用SetComputerNameA设置计算机名，攻击者可通过发送不超过31字节的恶意数据控制系统配置，构成CWE-15漏洞。",
+  "cwe_candidates": [
+    "CWE-15"
+  ],
+  "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp",
+  "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
+  "api_sequence": [
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp:90-94",
+    "badSource(data); /* POTENTIAL FLAW: set the hostname to data obtained from a potentially external source */ if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\");} @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp:110-114"
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_6902ad55fb81",
+    "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
+    "input_source": "Juliet CWE15 WinSock recv stub payload",
+    "seed_inputs": [
+      "magus-cwe15-controlled-host"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp",
+    "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
+    "Drive the API sequence with misuse-oriented inputs for CWE-15",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "ASan/UBSan crash",
+      "non-zero test exit caused by crafted source/API input",
+      "unexpected success on invalid API state",
+      "differential behavior between vulnerable and fixed revision"
+    ],
+    "failure_patterns": [
+      "MAGUS_CWE15_CONFIRMED"
+    ],
+    "expect_nonzero_exit": false
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": "/home/sq_hu/MAGUS",
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": "${PYTHON} tools/juliet_win_shim/run_cwe15_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
+    "poc_cmd": null,
+    "test_cmd": null,
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_433badEv",
+    "file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_43.cpp",
+    "line": 82,
+    "evidence_slice": "call:SetComputerNameA"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-20T10:08:02Z"
+  }
+}
