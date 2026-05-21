@@ -40,7 +40,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contexts", default=FLOW_DIR / "verification_contexts.jsonl", type=Path)
     parser.add_argument("--targets-out", default=FLOW_DIR / "targets.auto.json", type=Path)
     parser.add_argument("--bound-targets-out", default=FLOW_DIR / "targets.executable.json", type=Path)
-    parser.add_argument("--timeout", default=10.0, type=float, help="Payload runner timeout seconds")
     parser.add_argument("--poll-interval", default=0.2, type=float, help="Seconds between JSONL polls")
     parser.add_argument("--dry-run", action="store_true", help="Generate payloads and plans without executing run_cmd")
     return parser.parse_args()
@@ -243,7 +242,7 @@ def process_hypothesis(
         dump_json(args.bound_targets_out, executable_targets)
 
     target = executable_one["targets"][0]
-    return verifier.run_one(hyp, target, args.out_dir, args.timeout, args.dry_run)
+    return verifier.run_one(hyp, target, args.out_dir, args.dry_run)
 
 
 def run(args: argparse.Namespace) -> int:

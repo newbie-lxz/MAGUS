@@ -12,7 +12,7 @@
 - `c/agent1.py` now routes failed LLM rounds to `P3` audit-only records instead of sending them to D as dynamic-verification candidates.
 - Remaining risk: a transport/API/timeout/JSON parsing problem still does not fail the Stage C run by default, so a transient LLM outage can move candidates into `c/audit/audit.jsonl` rather than forcing operator intervention.
 - Future work should distinguish transport/API errors, empty responses, malformed JSON, and truncated JSON; failed LLM calls should either retry with a bounded policy or fail the Stage C run with a clear diagnostic.
-- Stage C `c/out/*.jsonl` should contain only dynamic-verification candidates selected for D: `P1`/`P2` plus `P0` records completed while Stage C still has time budget. Infrastructure failure fallbacks must not enter `c/out`.
+- Stage C `c/out/*.jsonl` should contain only dynamic-verification candidates selected for D: `P1`/`P2` plus completed `P0` records. Infrastructure failure fallbacks must not enter `c/out`.
 
 ## Stage C Interrupt Handling
 

@@ -32,6 +32,7 @@ MIN_EVIDENCE_FIELDS = ["project_id", "sample_id", "hypothesis_id", "route", "fil
 UNRESOLVED_VALUES = ("AUTO_DETECT_FAILED", "TODO", "replace with", "真实", "待填写")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = PROJECT_ROOT.parent.parent
+P0_TIMEOUT_SECONDS = 10.0
 
 
 SOURCE_API_PAYLOAD_RUNNER = r'''#!/usr/bin/env python3
@@ -88,7 +89,13 @@ def failure_code_patterns(oracle: dict[str, Any]) -> dict[str, list[str]]:
     return {str(code): pattern_list(patterns) for code, patterns in raw.items()}
 
 
-def run_command(cmd: Any, cwd: Path, timeout: int) -> dict[str, Any]:
+def parse_timeout(value: Any) -> float | None:
+    if value in (None, "", []):
+        return None
+    return float(value)
+
+
+def run_command(cmd: Any, cwd: Path, timeout: float | None) -> dict[str, Any]:
     started = time.perf_counter()
     if isinstance(cmd, str):
         cmd = cmd.replace("${PYTHON}", sys.executable)
@@ -178,7 +185,7 @@ def main() -> int:
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     build = plan.get("build") or {}
     oracle = plan.get("oracle") or {}
-    timeout = int(build.get("timeout_sec") or 60)
+    timeout = parse_timeout(build.get("timeout_sec"))
     repo_path = build.get("repo_path")
 
     if not repo_path:
@@ -256,6 +263,10 @@ if __name__ == "__main__":
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def timeout_for_hypothesis(hyp: Dict[str, Any]) -> float | None:
+    return P0_TIMEOUT_SECONDS if str(hyp.get("priority") or "").upper() == "P0" else None
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -458,7 +469,13 @@ def source_execution_missing(config: Dict[str, Any]) -> List[str]:
     return missing
 
 
-def write_source_api_plan(payload_path: Path, hyp: Dict[str, Any], case: Dict[str, Any], target: Dict[str, Any]) -> None:
+def write_source_api_plan(
+    payload_path: Path,
+    hyp: Dict[str, Any],
+    case: Dict[str, Any],
+    target: Dict[str, Any],
+    command_timeout: float | None,
+) -> None:
     payload_path.parent.mkdir(parents=True, exist_ok=True)
     execution = source_execution_config(target, case)
     repo_path = execution.get("repo_path")
@@ -486,7 +503,7 @@ def write_source_api_plan(payload_path: Path, hyp: Dict[str, Any], case: Dict[st
             "poc_cmd": execution.get("poc_cmd"),
             "test_cmd": execution.get("test_cmd"),
             "docker_image": execution.get("docker_image"),
-            "timeout_sec": execution.get("timeout_sec"),
+            "timeout_sec": command_timeout,
         },
         "evidence": evidence_fields(hyp),
         "timestamps": {"generated_at": utc_now()},
@@ -500,7 +517,7 @@ def write_source_payload_runner(runner_path: Path, plan_name: str) -> None:
     runner_path.write_text(script + "\n", encoding="utf-8")
 
 
-def execute_source_payload(runner_path: Path, timeout: float) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+def execute_source_payload(runner_path: Path, timeout: float | None) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     runner_path = runner_path.resolve()
     result_path = runner_path.with_suffix(".payload-result.json")
     cmd = [sys.executable, str(runner_path), "--result", str(result_path)]
@@ -533,7 +550,7 @@ def is_source_api_case(target: Dict[str, Any], case: Optional[Dict[str, Any]]) -
     )
 
 
-def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, timeout: float, dry_run: bool) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run: bool) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     missing = missing_fields(hyp)
     if missing:
         return None, failed_record(hyp, "HYPOTHESIS_WRONG", f"missing required fields: {', '.join(missing)}")
@@ -558,7 +575,8 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, timeout:
     runner_rel = Path("payloads") / f"{hyp['hypothesis_id']}.payload.py"
     plan_abs = out_dir / plan_rel
     runner_abs = out_dir / runner_rel
-    write_source_api_plan(plan_abs, hyp, case, target)
+    timeout = timeout_for_hypothesis(hyp)
+    write_source_api_plan(plan_abs, hyp, case, target, timeout)
     write_source_payload_runner(runner_abs, plan_rel.name)
 
     execution = source_execution_config(target, case)
@@ -602,11 +620,17 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, timeout:
 
     result, runner_error = execute_source_payload(runner_abs, timeout)
     if runner_error:
+        failure_code = "TIMEOUT" if runner_error.startswith("payload runner timed out") else "ENV_MISSING"
+        suggested_action = (
+            "inspect payload runner runtime or route this hypothesis as P1/P2 when longer dynamic verification is required"
+            if failure_code == "TIMEOUT"
+            else "check that local Python can execute the generated payload runner"
+        )
         record = failed_record(
             hyp,
-            "ENV_MISSING",
+            failure_code,
             runner_error,
-            "check that local Python can execute the generated payload runner",
+            suggested_action,
         )
         record["payload_ref"] = runner_rel.as_posix()
         record["plan_ref"] = plan_rel.as_posix()
@@ -695,7 +719,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--hypotheses", required=True, type=Path, help="Path to C output directory or hypotheses JSONL file")
     parser.add_argument("--targets", required=True, type=Path, help="Path to source/API targets.json")
     parser.add_argument("--out-dir", required=True, type=Path, help="Output directory")
-    parser.add_argument("--timeout", default=10.0, type=float, help="Payload runner timeout seconds")
     parser.add_argument("--dry-run", action="store_true", help="Generate payloads and plans without executing run_cmd")
     args = parser.parse_args(argv)
 
@@ -718,7 +741,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 )
             )
             continue
-        success, failed = run_one(hyp, target, args.out_dir, args.timeout, args.dry_run)
+        success, failed = run_one(hyp, target, args.out_dir, args.dry_run)
         if success:
             success_rows.append(success)
         if failed:

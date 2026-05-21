@@ -8,7 +8,7 @@
 
 ## 自动模式
 
-1. 确认 C 已经把需要动态验证的 `P1`/`P2` 候选，以及在 C deadline 前完成的 `P0` 候选，输出为一个或多个 JSONL 文件：
+1. 确认 C 已经把需要动态验证的 `P1`/`P2` 候选，以及已完成的 `P0` 候选，输出为一个或多个 JSONL 文件：
 
 ```text
 c/out/*.jsonl
@@ -16,7 +16,7 @@ c/out/*.jsonl
 
 D 信任 `c/out` 是 C 已经分流好的动态验证队列，会按文件名排序读取这些文件；如果不同文件里有重复的 `project_id + hypothesis_id`，会直接报错。
 
-C 的 late `P0` 静态 fallback 在 `c/final/static_confirmed.jsonl`，`P3` 审计记录在 `c/audit/audit.jsonl`，D 不读取这两类文件。`c/out` 里的 P0 仍需 D 做 route-bound 动态验证。
+C 的 `P3` 审计记录在 `c/audit/audit.jsonl`，D 不读取。`c/out` 里的 P0 仍需 D 做 route-bound 动态验证；D 只对 P0 施加每条 10 秒执行 timeout，P1/P2 不受 D timeout 限制。
 
 2. 运行：
 

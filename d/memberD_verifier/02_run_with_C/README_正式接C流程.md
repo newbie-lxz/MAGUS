@@ -18,11 +18,14 @@ D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按�
 C 的分流约定是：
 
 ```text
-P0 + C还有时间预算 -> c/out/*.jsonl                 # D 动态验证队列
-P0 + C deadline已过 -> c/final/static_confirmed.jsonl # C 静态fallback
+P0 -> c/out/*.jsonl                                # D 动态验证队列
 P1/P2 -> c/out/*.jsonl                              # D 动态验证队列
 P3 -> c/audit/audit.jsonl                           # 审计记录，不进入 D
 ```
+
+Stage C 的时间预算只控制是否继续提交候选，以及未完成 worker 是否转成
+`P3` 超时审计记录。已完成的 P0 不因 C deadline 改写到非 D 输出；
+D 只对 P0 施加每条 10 秒执行 timeout；P1/P2 不受 D timeout 限制。
 
 如果多个文件里出现相同的 `project_id + hypothesis_id`，脚本会直接失败，要求先消除重复输入。
 

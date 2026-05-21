@@ -20,7 +20,7 @@ MODEL_NAME = "deepseek-v4-flash"          # 使用Flash模型，速度更快
 API_KEY = ""
 BASE_URL = "https://api.deepseek.com/v1"
 CONFIDENCE_THRESHOLD = 0.60               # 放宽到0.60，让更多假设进入D阶段（原0.65）
-STATIC_CONFIDENCE_THRESHOLD = 0.90        # P0：静态强确认；有时间时进入D，否则落回C静态报告
+STATIC_CONFIDENCE_THRESHOLD = 0.90        # P0：静态强确认；已完成结果进入D做route-bound验证
 MAX_WORKERS = 5                           # 并发线程数，平衡速度与稳定性
 LLM_MAX_OUTPUT_TOKENS = 4096              # max_tokens只限制模型输出长度，不扩大输入上下文
 LLM_REQUEST_TIMEOUT_SECONDS = 60.0        # 单次LLM请求上限，会被全局deadline进一步收紧
@@ -40,7 +40,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description="C阶段：基于B阶段C-ready候选执行双Agent审计")
     parser.add_argument("--candidates", default="data/candidates.for_c.jsonl", help="B阶段输出的 candidates.for_c.jsonl")
     parser.add_argument("--output", default="data/hypotheses.jsonl", help="C阶段输出给D验证的 hypotheses.jsonl")
-    parser.add_argument("--static-output", default="", help="P0无剩余时间交给D时的C静态fallback报告；默认从 --output 推导")
     parser.add_argument("--audit-output", default="", help="P3和错误审计日志；默认从 --output 推导")
     parser.add_argument("--time-limit-seconds", type=float, default=None, help="C阶段提交候选的时间预算；默认不限制")
     return parser.parse_args()
@@ -808,31 +807,19 @@ def route_p0_to_d(hyp):
     hyp["verification_stage"] = "D"
     hyp["d_verification"] = "pending"
     hyp["stage_c_static_verdict"] = "static_confirmed"
-    hyp["stage_c_p0_routing"] = "sent_to_d_with_time_remaining"
+    hyp["stage_c_p0_routing"] = "sent_to_d"
     return hyp
 
 
-def route_p0_to_static_fallback(hyp):
-    hyp["status"] = "static_confirmed"
-    hyp["verification_stage"] = "C"
-    hyp["d_verification"] = "skipped_no_time_remaining"
-    hyp["stage_c_p0_routing"] = "static_fallback_no_time_remaining"
-    return hyp
-
-
-def process_completed_future(future, cand, d_file, static_file, audit_file, p0_to_d):
+def process_completed_future(future, cand, d_file, audit_file):
     try:
         hyp = future.result()
     except Exception as e:
         hyp = audit_error_record(cand, e)
 
     if hyp.get("priority") == "P0":
-        if p0_to_d:
-            append_jsonl(d_file, route_p0_to_d(hyp))
-            bucket = "p0_d"
-        else:
-            append_jsonl(static_file, route_p0_to_static_fallback(hyp))
-            bucket = "static"
+        append_jsonl(d_file, route_p0_to_d(hyp))
+        bucket = "p0_d"
     elif hyp.get("priority") in {"P1", "P2"}:
         append_jsonl(d_file, hyp)
         bucket = "d"
@@ -847,11 +834,11 @@ def process_completed_future(future, cand, d_file, static_file, audit_file, p0_t
     return bucket
 
 
-def process_hypothesis_record(hyp, cand, d_file, static_file, audit_file):
-    return process_completed_future(CompletedFuture(hyp), cand, d_file, static_file, audit_file, p0_to_d=True)
+def process_hypothesis_record(hyp, cand, d_file, audit_file):
+    return process_completed_future(CompletedFuture(hyp), cand, d_file, audit_file)
 
 
-def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_file):
+def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
     if time_limit_seconds is not None and time_limit_seconds <= 0:
         raise ValueError("--time-limit-seconds must be greater than 0")
 
@@ -860,7 +847,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
     next_index = 0
     submitted_count = 0
     exhausted_reported = False
-    counts = {"d": 0, "p0_d": 0, "static": 0, "audit": 0}
+    counts = {"d": 0, "p0_d": 0, "audit": 0}
 
     def within_budget():
         return deadline is None or time.monotonic() < deadline
@@ -901,9 +888,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
             CompletedFuture(message.get("hyp")),
             cand,
             d_file,
-            static_file,
             audit_file,
-            p0_to_d=within_budget(),
         )
         counts[bucket] += 1
 
@@ -929,9 +914,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
                 CompletedFuture(audit_timeout_record(cand, [])),
                 cand,
                 d_file,
-                static_file,
                 audit_file,
-                p0_to_d=False,
             )
             counts[bucket] += 1
             running.pop(pid, None)
@@ -973,9 +956,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, static_file, audit_f
                     ),
                     cand,
                     d_file,
-                    static_file,
                     audit_file,
-                    p0_to_d=within_budget(),
                 )
                 counts[bucket] += 1
                 running.pop(pid, None)
@@ -990,9 +971,6 @@ def main():
     args = parse_args()
     candidates_path = Path(args.candidates)
     output_path = Path(args.output)
-    static_output_path = Path(args.static_output) if args.static_output else default_side_output(
-        output_path, "final", "static_confirmed.jsonl"
-    )
     audit_output_path = Path(args.audit_output) if args.audit_output else default_side_output(
         output_path, "audit", "audit.jsonl"
     )
@@ -1000,20 +978,17 @@ def main():
     candidates = load_candidates(candidates_path)
 
     truncate_jsonl(output_path)
-    truncate_jsonl(static_output_path)
     truncate_jsonl(audit_output_path)
 
     # 使用线程池并发处理，提高整体吞吐量
     with (
         open(output_path, "a", encoding="utf-8", buffering=1) as d_file,
-        open(static_output_path, "a", encoding="utf-8", buffering=1) as static_file,
         open(audit_output_path, "a", encoding="utf-8", buffering=1) as audit_file,
     ):
         counts, submitted_count, skipped_count = run_audit_queue(
             candidates,
             args.time_limit_seconds,
             d_file,
-            static_file,
             audit_file,
         )
 
@@ -1023,7 +998,6 @@ def main():
     d_candidate_count = counts["d"] + counts["p0_d"]
     print(f"[C] D candidates: {d_candidate_count} -> {output_path}")
     print(f"[C] P0 routed to D: {counts['p0_d']} -> {output_path}")
-    print(f"[C] P0 static fallback: {counts['static']} -> {static_output_path}")
     print(f"[C] audit only: {counts['audit']} -> {audit_output_path}")
 
 

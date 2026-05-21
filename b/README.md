@@ -38,7 +38,7 @@ From the repository root:
 make run-b
 ```
 
-The root Stage `A` command emits both `samples.stats.jsonl` and `samples.llm.jsonl`; Stage `B` consumes both files so it can prepare the C-ready queue. Use `make run-abcd` for the full `A -> B -> streamed C/D` chain, where Stage `D` verifies complete Stage `C` JSONL records as they are flushed. Stage `C` writes `P1`/`P2` records to that stream, and also writes `P0` records when C still has time budget so D can route-bound verify them.
+The root Stage `A` command emits both `samples.stats.jsonl` and `samples.llm.jsonl`; Stage `B` consumes both files so it can prepare the C-ready queue. Use `make run-abcd` for the full `A -> B -> streamed C/D` chain, where Stage `D` verifies complete Stage `C` JSONL records as they are flushed. Stage `C` writes `P1`/`P2` records to that stream, and also writes completed `P0` records so D can route-bound verify them.
 
 Or directly from `b/`:
 

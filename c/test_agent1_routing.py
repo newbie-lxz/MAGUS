@@ -126,39 +126,38 @@ class OutputRoutingTests(unittest.TestCase):
             "d_verification": "pending_routing_decision",
         }
 
-    def test_p0_goes_to_d_when_time_remains(self):
-        d_file, static_file, audit_file = io.StringIO(), io.StringIO(), io.StringIO()
+    def test_p0_goes_to_d(self):
+        d_file, audit_file = io.StringIO(), io.StringIO()
         bucket = agent1.process_completed_future(
             agent1.CompletedFuture(self._p0_record()),
             _candidate(),
             d_file,
-            static_file,
             audit_file,
-            p0_to_d=True,
         )
         self.assertEqual(bucket, "p0_d")
-        self.assertEqual(static_file.getvalue(), "")
+        self.assertEqual(audit_file.getvalue(), "")
         row = json.loads(d_file.getvalue())
         self.assertEqual(row["status"], "pending_dynamic_verification")
         self.assertEqual(row["d_verification"], "pending")
-        self.assertEqual(row["stage_c_p0_routing"], "sent_to_d_with_time_remaining")
+        self.assertEqual(row["stage_c_p0_routing"], "sent_to_d")
 
-    def test_p0_falls_back_to_static_when_no_time_remains(self):
-        d_file, static_file, audit_file = io.StringIO(), io.StringIO(), io.StringIO()
+    def test_p3_goes_to_audit(self):
+        record = self._p0_record()
+        record["priority"] = "P3"
+        record["agent_verdict"] = "audit_only"
+        record["routing_decision"] = "audit_only"
+        d_file, audit_file = io.StringIO(), io.StringIO()
         bucket = agent1.process_completed_future(
-            agent1.CompletedFuture(self._p0_record()),
+            agent1.CompletedFuture(record),
             _candidate(),
             d_file,
-            static_file,
             audit_file,
-            p0_to_d=False,
         )
-        self.assertEqual(bucket, "static")
+        self.assertEqual(bucket, "audit")
         self.assertEqual(d_file.getvalue(), "")
-        row = json.loads(static_file.getvalue())
-        self.assertEqual(row["status"], "static_confirmed")
-        self.assertEqual(row["d_verification"], "skipped_no_time_remaining")
-        self.assertEqual(row["stage_c_p0_routing"], "static_fallback_no_time_remaining")
+        row = json.loads(audit_file.getvalue())
+        self.assertEqual(row["priority"], "P3")
+        self.assertEqual(row["routing_decision"], "audit_only")
 
 
 if __name__ == "__main__":
