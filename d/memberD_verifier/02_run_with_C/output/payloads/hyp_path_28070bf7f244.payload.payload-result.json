@@ -1,0 +1,23 @@
+{
+  "status": "failed",
+  "reason": "NOT_EXPLOITABLE",
+  "failure_code": "NOT_EXPLOITABLE",
+  "failure_note": "payload did not satisfy oracle",
+  "observations": [
+    "NOT_EXPLOITABLE matched patterns: MAGUS_JULIET_NOT_CONFIRMED"
+  ],
+  "runtime_trace": [
+    {
+      "cmd": "/home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python tools/juliet_win_shim/run_juliet_win_case.py --source-file juliet-api-misuse/testcases/CWE114_Process_Control/CWE114_Process_Control__w32_char_file_16.c --entry-symbol CWE114_Process_Control__w32_char_file_16_case0 --route juliet-api-misuse/testcases/CWE114_Process_Control/CWE114_Process_Control__w32_char_file_16.c::CWE114_Process_Control__w32_char_file_16_case0",
+      "cwd": "/home/sq_hu/MAGUS",
+      "exit_code": 1,
+      "elapsed_ms": 425,
+      "stdout_tail": "Calling case0()...\nMAGUS_JULIET_SINK name=LoadLibraryA tainted=0 value=\nMAGUS_JULIET_SINK name=FreeLibrary tainted=0 value=\nLibrary loaded and freed successfully\nFinished case0()\nMAGUS_JULIET_ROUTE_EXECUTED scenario=bad entry_symbol=CWE114_Process_Control__w32_char_file_16_case0 source_file=/home/sq_hu/MAGUS/srcs_sanitized/juliet-api-misuse/testcases/CWE114_Process_Control/CWE114_Process_Control__w32_char_file_16.c\nMAGUS_JULIET_NOT_CONFIRMED\nentry_symbol=CWE114_Process_Control__w32_char_file_16_case0\nroute=juliet-api-misuse/testcases/CWE114_Process_Control/CWE114_Process_Control__w32_char_file_16.c::CWE114_Process_Control__w32_char_file_16_case0\nsource_file=/home/sq_hu/MAGUS/srcs_sanitized/juliet-api-misuse/testcases/CWE114_Process_Control/CWE114_Process_Control__w32_char_file_16.c\nmain_source=/home/sq_hu/MAGUS/srcs_sanitized/juliet-api-misuse/testcases/CWE114_Process_Control/CWE114_Process_Control__w32_char_file_16.c\n",
+      "stderr_tail": "",
+      "timed_out": false
+    }
+  ],
+  "timestamps": {
+    "finished_at": "2026-05-21T13:51:10Z"
+  }
+}

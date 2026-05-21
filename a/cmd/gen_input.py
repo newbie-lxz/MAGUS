@@ -11,7 +11,7 @@ from typing import Any
 # 这个脚本从 compile_commands.json 生成一个 projects.in.jsonl 记录，供 Stage A 使用。
 CANONICAL_ANALYSIS_BACKEND = "llvm_api_dfa"
 DEFAULT_ANALYZER_JOBS = 2
-DEFAULT_ANALYSIS_TIMEOUT = 900
+DEFAULT_ANALYSIS_TIMEOUT = 1800
 SUPPORTED_SOURCE_SUFFIXES = {".c", ".cc", ".cpp", ".cxx"}
 KNOWN_COMPILER_NAMES = {
     "cc",

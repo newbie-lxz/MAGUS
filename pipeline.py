@@ -444,7 +444,7 @@ def main() -> None:
     parser_gen_input.add_argument("--language", default="c", help="Stage A language")
     parser_gen_input.add_argument("--framework", default="generic", help="Stage A framework")
     parser_gen_input.add_argument("--analyzer-jobs", type=int, default=2, help="Stage A analyzer_jobs")
-    parser_gen_input.add_argument("--analysis-timeout", type=int, default=900, help="Stage A analysis_timeout")
+    parser_gen_input.add_argument("--analysis-timeout", type=int, default=1800, help="Stage A analysis_timeout")
     parser_gen_input.add_argument("--clang", default="clang", help="C bitcode compiler")
     parser_gen_input.add_argument("--clangxx", default="clang++", help="C++ bitcode compiler")
     parser_gen_input.add_argument("--bc-dir", default="bc", help="repo_path 下的 bitcode 输出目录")

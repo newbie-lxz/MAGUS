@@ -324,6 +324,10 @@ UINT WINAPI GetSystemDirectoryW(LPWSTR lpBuffer, UINT uSize);
 DWORD WINAPI SearchPathA(LPCSTR lpPath, LPCSTR lpFileName, LPCSTR lpExtension, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart);
 DWORD WINAPI SearchPathW(LPCWSTR lpPath, LPCWSTR lpFileName, LPCWSTR lpExtension, DWORD nBufferLength, LPWSTR lpBuffer, LPWSTR *lpFilePart);
 
+wchar_t *_wgetenv(const wchar_t *name);
+int _putenv(const char *envstring);
+int _wputenv(const wchar_t *envstring);
+
 LSTATUS WINAPI RegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions, DWORD samDesired, HKEY *phkResult);
 LSTATUS WINAPI RegOpenKeyExW(HKEY hKey, LPCWSTR lpSubKey, DWORD ulOptions, DWORD samDesired, HKEY *phkResult);
 LSTATUS WINAPI RegCreateKeyA(HKEY hKey, LPCSTR lpSubKey, HKEY *phkResult);

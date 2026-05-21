@@ -28,6 +28,7 @@ BUILD_FAILED_MARKER = "MAGUS_JULIET_BUILD_FAILED"
 RUNNER_ERROR_MARKER = "MAGUS_JULIET_RUNNER_ERROR"
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
 SCENARIO_LABELS = {"bad": "case0", "good": "case1"}
+COMPAT_HEADER = SHIM_DIR / "juliet_win_compat.h"
 
 
 def parse_args() -> argparse.Namespace:
@@ -290,6 +291,8 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
             str(SHIM_DIR),
             "-I",
             str(support_dir),
+            "-include",
+            str(COMPAT_HEADER),
             str(unit),
             "-o",
             str(obj),

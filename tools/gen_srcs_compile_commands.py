@@ -8,7 +8,15 @@ from typing import Any
 
 
 SUPPORTED_SUFFIXES = {".c", ".cc", ".cpp", ".cxx"}
-DEFAULT_INCLUDE_DIRS = ("juliet-api-misuse/testcasesupport",)
+WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_INCLUDE_DIRS = (
+    str(WORKSPACE_ROOT / "tools" / "juliet_win_shim"),
+    "juliet-api-misuse/testcasesupport",
+)
+DEFAULT_DEFINES = ("_WIN32",)
+DEFAULT_FORCE_INCLUDES = (
+    str(WORKSPACE_ROOT / "tools" / "juliet_win_shim" / "juliet_win_compat.h"),
+)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -29,6 +37,18 @@ def parse_args() -> argparse.Namespace:
         action="append",
         default=[],
         help="include directory under repo-path or absolute path; repeatable",
+    )
+    parser.add_argument(
+        "--define",
+        action="append",
+        default=[],
+        help="preprocessor define to add with -D; repeatable; defaults to _WIN32 for Juliet Win32 samples",
+    )
+    parser.add_argument(
+        "--force-include",
+        action="append",
+        default=[],
+        help="header to include with compiler -include; repeatable; defaults to the Juliet Win32 compatibility shim",
     )
     parser.add_argument("--force", action="store_true", help="overwrite an existing output file")
     return parser.parse_args()
@@ -77,6 +97,34 @@ def include_dirs(args: argparse.Namespace, repo_path: Path) -> list[Path]:
     return paths
 
 
+def force_include_files(args: argparse.Namespace, repo_path: Path) -> list[Path]:
+    raw_files = args.force_include or list(DEFAULT_FORCE_INCLUDES)
+    paths: list[Path] = []
+    seen: set[Path] = set()
+    for raw_file in raw_files:
+        path = resolve_under_repo(repo_path, raw_file)
+        if path in seen:
+            continue
+        if not path.exists() or not path.is_file():
+            raise ValueError(f"force include file does not exist: {path}")
+        seen.add(path)
+        paths.append(path)
+    return paths
+
+
+def defines(args: argparse.Namespace) -> list[str]:
+    raw_defines = args.define or list(DEFAULT_DEFINES)
+    values: list[str] = []
+    seen: set[str] = set()
+    for raw_define in raw_defines:
+        value = raw_define.strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        values.append(value)
+    return values
+
+
 def discover_sources(repo_path: Path, globs: list[str]) -> list[Path]:
     sources: dict[str, Path] = {}
     for pattern in globs:
@@ -97,10 +145,22 @@ def compiler_for(source_path: Path, cc: str, cxx: str) -> str:
     return cc if source_path.suffix.lower() == ".c" else cxx
 
 
-def compile_record(repo_path: Path, source_path: Path, include_paths: list[Path], cc: str, cxx: str) -> dict[str, Any]:
+def compile_record(
+    repo_path: Path,
+    source_path: Path,
+    include_paths: list[Path],
+    force_includes: list[Path],
+    define_values: list[str],
+    cc: str,
+    cxx: str,
+) -> dict[str, Any]:
     arguments = [compiler_for(source_path, cc, cxx)]
+    for define_value in define_values:
+        arguments.append(f"-D{define_value}")
     for include_path in include_paths:
         arguments.extend(["-I", str(include_path)])
+    for force_include in force_includes:
+        arguments.extend(["-include", str(force_include)])
     arguments.extend(["-c", str(source_path), "-o", "/tmp/magus-unused.o"])
     return {
         "directory": str(repo_path),
@@ -124,9 +184,11 @@ def main() -> int:
 
     output_path = resolve_path(args.output) if args.output else repo_path / "compile_commands.json"
     includes = include_dirs(args, repo_path)
+    force_includes = force_include_files(args, repo_path)
+    define_values = defines(args)
     sources = discover_sources(repo_path, source_globs(args))
     records = [
-        compile_record(repo_path, source_path, includes, args.cc, args.cxx)
+        compile_record(repo_path, source_path, includes, force_includes, define_values, args.cc, args.cxx)
         for source_path in sources
     ]
     write_output(output_path, records, args.force)

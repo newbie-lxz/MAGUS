@@ -25,17 +25,24 @@ def _load_agent1():
 agent1 = _load_agent1()
 
 
-def _candidate():
+def _candidate(
+    sample_id="s",
+    route="file.c::bad",
+    file="file.c",
+    line=10,
+    evidence_slice="call:sink",
+    static_supported=True,
+):
     return {
         "project_id": "p",
-        "sample_id": "s",
-        "route": "file.c::bad",
-        "file": "file.c",
-        "line": 10,
-        "evidence_slice": "call:sink",
+        "sample_id": sample_id,
+        "route": route,
+        "file": file,
+        "line": line,
+        "evidence_slice": evidence_slice,
         "stage_b": {
             "static_confirmation_support": {
-                "supported": True,
+                "supported": static_supported,
                 "reason": "high_risk_sink",
                 "guidance": "allow_p0_if_a_evidence_proves_source_sink_route",
             }
@@ -158,6 +165,82 @@ class OutputRoutingTests(unittest.TestCase):
         row = json.loads(audit_file.getvalue())
         self.assertEqual(row["priority"], "P3")
         self.assertEqual(row["routing_decision"], "audit_only")
+
+
+class TemplateReuseTests(unittest.TestCase):
+    def test_juliet_template_signature_groups_source_families(self):
+        first = _candidate(
+            file=(
+                "juliet-api-misuse/testcases/CWE114_Process_Control/"
+                "CWE114_Process_Control__w32_char_listen_socket_74a.cpp"
+            ),
+            line=464,
+        )
+        second = _candidate(
+            file=(
+                "juliet-api-misuse/testcases/CWE114_Process_Control/"
+                "CWE114_Process_Control__w32_wchar_t_environment_74a.cpp"
+            ),
+            line=464,
+        )
+        different_line = dict(second)
+        different_line["line"] = 465
+
+        self.assertEqual(agent1.template_reuse_signature(first), agent1.template_reuse_signature(second))
+        self.assertNotEqual(
+            agent1.template_reuse_signature(first),
+            agent1.template_reuse_signature(different_line),
+        )
+
+    def test_template_reused_hypothesis_rebinds_candidate_location(self):
+        target = _candidate(
+            sample_id="target",
+            route="target.c::target_case0",
+            file="target.c",
+            line=22,
+            evidence_slice="LoadLibraryW(data);",
+        )
+        representative = {
+            "sample_id": "representative",
+            "hypothesis_id": "hyp_representative",
+            "red_team_rounds": [
+                {"round": 1, "role": "red_proposer", "response": _vuln(0.95)},
+                {"round": 2, "role": "red_self_review", "response": _vuln(0.95)},
+                {"round": 3, "role": "red_final", "response": _vuln(0.95)},
+            ],
+        }
+
+        hyp = agent1.template_reused_hypothesis(target, representative, ("sig", "x"))
+
+        self.assertEqual(hyp["sample_id"], "target")
+        self.assertEqual(hyp["hypothesis_id"], "hyp_target")
+        self.assertEqual(hyp["route"], "target.c::target_case0")
+        self.assertEqual(hyp["file"], "target.c")
+        self.assertEqual(hyp["line"], 22)
+        self.assertEqual(hyp["evidence_slice"], "LoadLibraryW(data);")
+        self.assertTrue(any("target.c::target_case0" in item for item in hyp["attack_path"]))
+        self.assertEqual(
+            hyp["stage_c_template_reuse"]["representative_hypothesis_id"],
+            "hyp_representative",
+        )
+
+    def test_template_reuse_still_respects_static_confirmation_support(self):
+        target = _candidate(static_supported=False)
+        representative = {
+            "sample_id": "representative",
+            "hypothesis_id": "hyp_representative",
+            "red_team_rounds": [
+                {"round": 1, "role": "red_proposer", "response": _vuln(0.95)},
+                {"round": 2, "role": "red_self_review", "response": _vuln(0.95)},
+                {"round": 3, "role": "red_final", "response": _vuln(0.95)},
+            ],
+        }
+
+        hyp = agent1.template_reused_hypothesis(target, representative, ("sig", "x"))
+
+        self.assertEqual(hyp["priority"], "P1")
+        self.assertEqual(hyp["routing_decision"], "candidate_for_d")
+        self.assertEqual(hyp["suspicion_reason"], "stage_b_static_confirmation_unsupported")
 
 
 if __name__ == "__main__":

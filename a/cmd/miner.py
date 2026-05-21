@@ -123,7 +123,7 @@ class ProjectInput:
         return path if path.is_absolute() else (repo_path / path).resolve()
 
     def analysis_timeout(self) -> int:
-        raw = self.extensions.get("analysis_timeout", 900)
+        raw = self.extensions.get("analysis_timeout", 1800)
         if isinstance(raw, bool):
             raise ValueError("extensions.analysis_timeout must be an integer")
         try:
@@ -417,17 +417,25 @@ def detect_bitcode_format(path: Path) -> str:
 
 def run_command(stage: str, command, cwd: Path, env: dict[str, str], timeout: int) -> CommandResult:
     """执行一个 Stage A 子阶段命令并保留完整 stdout/stderr。"""
-    shell = isinstance(command, str)
-    result = subprocess.run(
-        command,
-        cwd=str(cwd),
-        env=env,
-        timeout=timeout,
-        capture_output=True,
-        text=True,
-        shell=shell,
-        executable="/bin/bash" if shell else None,
-    )
+    if isinstance(command, str):
+        result = subprocess.run(
+            ["/bin/bash", "-s"],
+            input=command,
+            cwd=str(cwd),
+            env=env,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+        )
+    else:
+        result = subprocess.run(
+            command,
+            cwd=str(cwd),
+            env=env,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+        )
     return CommandResult(
         stage=stage,
         command=command,
@@ -1946,12 +1954,15 @@ def main() -> None:
 
     all_samples: list[dict] = []
     successful_projects: list[ProjectInput] = []
+    failed_projects = 0
     for project in projects:
         if not prepare_project(project, base_dir):
+            failed_projects += 1
             continue
 
         samples = run_project(project, output_path)
         if samples is None:
+            failed_projects += 1
             continue
         successful_projects.append(project)
         all_samples.extend(samples)
@@ -1967,6 +1978,9 @@ def main() -> None:
         raise SystemExit(1) from exc
 
     print(f"wrote {len(all_samples)} samples to {output_path}", file=sys.stderr)
+    if failed_projects:
+        print(f"Stage A failed for {failed_projects} project(s)", file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

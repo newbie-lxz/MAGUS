@@ -23,6 +23,7 @@ ROUTE_CONFIRMED_MARKER = "MAGUS_CWE15_ROUTE_CONFIRMED"
 NOT_ROUTE_BOUND_MARKER = "MAGUS_CWE15_NOT_ROUTE_BOUND"
 NOT_CONFIRMED_MARKER = "MAGUS_CWE15_NOT_CONFIRMED"
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
+COMPAT_HEADER = SHIM_DIR / "juliet_win_compat.h"
 
 
 def parse_args() -> argparse.Namespace:
@@ -163,12 +164,15 @@ def main() -> int:
             command = [
                 unit_compiler,
                 "-c",
+                "-D_WIN32",
                 "-DINCLUDEMAIN" if unit == entry_unit else "-DMAGUS_COMPANION_UNIT",
                 omit_macro,
                 "-I",
                 str(SHIM_DIR),
                 "-I",
                 str(SUPPORT_DIR),
+                "-include",
+                str(COMPAT_HEADER),
                 str(unit),
                 "-o",
                 str(obj),
@@ -187,6 +191,7 @@ def main() -> int:
             command = [
                 compiler,
                 "-c",
+                "-D_WIN32",
                 "-DglobalReturnsTrueOrFalse=magus_unused_globalReturnsTrueOrFalse" if unit == SUPPORT_IO else "-DMAGUS_WINAPI_RUNTIME_STUBS",
                 "-I",
                 str(SHIM_DIR),

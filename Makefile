@@ -12,13 +12,15 @@ SRC_CC ?= clang
 SRC_CXX ?= clang++
 SRC_CC_SOURCE_GLOB ?=
 SRC_CC_INCLUDE_DIR ?=
+SRC_CC_DEFINE ?=
+SRC_CC_FORCE_INCLUDE ?=
 SRC_CC_FORCE ?=
 GEN_INPUT_OUTPUT ?= a/input/srcs.in.jsonl
 GEN_PROJECT_ID ?= srcs_sanitized
 GEN_LANGUAGE ?= c
 GEN_FRAMEWORK ?= generic
 GEN_ANALYZER_JOBS ?= 2
-GEN_ANALYSIS_TIMEOUT ?= 900
+GEN_ANALYSIS_TIMEOUT ?= 1800
 GEN_CLANG ?= clang
 GEN_CLANGXX ?= clang++
 GEN_BC_DIR ?= bc
@@ -42,7 +44,7 @@ sanitize-srcs:
 	python3 tools/sanitize_juliet_tree.py --input $(ORIGINAL_SRC_ROOT) --output $(SRC_ROOT) $(if $(SANITIZE_FORCE),--force,)
 
 gen-srcs-compile-commands: sanitize-srcs
-	python3 tools/gen_srcs_compile_commands.py --repo-path $(SRC_ROOT) --output $(SRC_CC_OUTPUT) --cc $(SRC_CC) --cxx $(SRC_CXX) $(foreach glob,$(SRC_CC_SOURCE_GLOB),--source-glob $(glob)) $(foreach dir,$(SRC_CC_INCLUDE_DIR),--include-dir $(dir)) $(if $(SRC_CC_FORCE),--force,)
+	python3 tools/gen_srcs_compile_commands.py --repo-path $(SRC_ROOT) --output $(SRC_CC_OUTPUT) --cc $(SRC_CC) --cxx $(SRC_CXX) $(foreach glob,$(SRC_CC_SOURCE_GLOB),--source-glob $(glob)) $(foreach dir,$(SRC_CC_INCLUDE_DIR),--include-dir $(dir)) $(foreach define,$(SRC_CC_DEFINE),--define $(define)) $(foreach header,$(SRC_CC_FORCE_INCLUDE),--force-include $(header)) $(if $(SRC_CC_FORCE),--force,)
 
 gen-input:
 	python3 pipeline.py gen-input --repo-path $(SRC_ROOT) --compile-commands $(COMPILE_COMMANDS) --output $(GEN_INPUT_OUTPUT) --project-id $(GEN_PROJECT_ID) --language $(GEN_LANGUAGE) --framework $(GEN_FRAMEWORK) --analyzer-jobs $(GEN_ANALYZER_JOBS) --analysis-timeout $(GEN_ANALYSIS_TIMEOUT) --clang $(GEN_CLANG) --clangxx $(GEN_CLANGXX) --bc-dir $(GEN_BC_DIR) $(foreach glob,$(GEN_SOURCE_GLOB),--source-glob $(glob)) $(if $(GEN_FORCE),--force,)
