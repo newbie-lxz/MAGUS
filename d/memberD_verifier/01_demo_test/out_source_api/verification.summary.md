@@ -1,9 +1,11 @@
 # Member D Verification Summary
 
-- generated_at: 2026-05-19T11:41:30Z
+- generated_at: 2026-05-21T06:41:58Z
 - target_type: source_api
 - confirmed: 0
 - failed: 1
+- final_report_jsonl: verification.report.jsonl
+- final_report_md: verification.report.md
 
 
 ## Failed / 回流

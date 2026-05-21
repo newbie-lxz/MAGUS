@@ -13,7 +13,7 @@ c/out/
 
 D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按文件名排序合并。D 不直接接 A 的输出；A 的输出已经被 B/C 加工，D 只收 C 放入 `c/out/*.jsonl` 的动态验证候选。
 
-根目录 `make run-abcd` 使用流式接入：`pipeline.py` 先启动本目录的 `stream_from_C.py`，让它监听当前 `C_OUTPUT` 文件；随后启动 C。C 每写入一条完整 JSONL 记录，D 就生成 target、绑定可选 sidecar、执行 verifier，并追加 confirmed/failed 输出。C 结束后 pipeline 写 done 文件，D 读完剩余完整行再退出。这个模式只消费本次 `C_OUTPUT` 文件；本目录的 `01_auto_attack_from_C_linux.sh` 仍是独立批处理入口，读取所有 `c/out/*.jsonl`。
+根目录 `make run-abcd` 使用流式接入：`pipeline.py` 先启动本目录的 `stream_from_C.py`，让它监听当前 `C_OUTPUT` 文件；随后启动 C。C 每写入一条完整 JSONL 记录，D 就生成 target、绑定可选 sidecar、执行 verifier，并追加 confirmed/failed 输出。C 结束后 pipeline 写 done 文件，D 读完剩余完整行再退出，然后 Report 从 D 输出生成最终报告。这个模式只消费本次 `C_OUTPUT` 文件；本目录的 `01_auto_attack_from_C_linux.sh` 仍是独立批处理入口，读取所有 `c/out/*.jsonl`，并在 D 校验通过后运行 Report。
 
 C 的分流约定是：
 
@@ -134,6 +134,15 @@ output/verification.jsonl
 output/verification.failed.jsonl
 output/verification.summary.md
 ```
+
+`validate_outputs.py` 只校验 D 输出。自动脚本在 D 校验通过后调用 `report/code/generate_report.py`，最终漏洞报告写到仓库根目录：
+
+```text
+report/verification.report.jsonl
+report/verification.report.md
+```
+
+报告只从 D confirmed 记录生成。报告的每条 confirmed 漏洞必须包含：漏洞位置（文件路径、行号、route）、漏洞类型、风险等级、触发条件、运行证据和 payload/plan 引用。`report/code/validate_report.py` 会校验报告文件存在，并要求报告行数与 `verification.jsonl` confirmed 行数一致。
 
 `verification.failed.jsonl` 中的 `NOT_ROUTE_BOUND` 表示执行成功但不能把证据归因到当前候选 route。
 

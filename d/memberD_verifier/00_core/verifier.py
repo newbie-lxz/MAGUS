@@ -269,6 +269,46 @@ def timeout_for_hypothesis(hyp: Dict[str, Any]) -> float | None:
     return P0_TIMEOUT_SECONDS if str(hyp.get("priority") or "").upper() == "P0" else None
 
 
+def scalar_list(value: Any) -> List[Any]:
+    if value in (None, "", []):
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def text_list(value: Any) -> List[str]:
+    items: List[str] = []
+    for item in scalar_list(value):
+        if item in (None, "", []):
+            continue
+        if isinstance(item, (dict, list)):
+            text = json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+        else:
+            text = str(item)
+        text = " ".join(text.split())
+        if text:
+            items.append(text)
+    return items
+
+
+def cwe_candidates(row: Dict[str, Any]) -> List[str]:
+    values = row.get("cwe_candidates") or row.get("CWE_candidates") or row.get("cwe_list") or []
+    return text_list(values)
+
+
+def hypothesis_context_fields(hyp: Dict[str, Any]) -> Dict[str, Any]:
+    fields: Dict[str, Any] = {}
+    for key in ("claim", "preconditions", "attack_path", "confidence"):
+        value = hyp.get(key)
+        if value not in (None, "", []):
+            fields[key] = value
+    cwes = cwe_candidates(hyp)
+    if cwes:
+        fields["cwe_candidates"] = cwes
+    return fields
+
+
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
     text = path.read_text(encoding="utf-8-sig").strip()
     if not text:
@@ -413,6 +453,7 @@ def failed_record(hyp: Dict[str, Any], code: str, note: str, suggested_action: s
         "timestamps": {"failed_at": utc_now()},
     }
     record.update(evidence_fields(hyp))
+    record.update(hypothesis_context_fields(hyp))
     record.update(routing_fields(hyp))
     return record
 
@@ -662,13 +703,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
             "timestamps": {"verified_at": utc_now()},
         }
         record.update(evidence_fields(hyp))
-        if hyp.get("claim"):
-            record["claim"] = hyp.get("claim")
-        cwe = hyp.get("cwe_candidates") or hyp.get("CWE_candidates") or hyp.get("cwe_list")
-        if cwe:
-            record["cwe_candidates"] = cwe
-        if hyp.get("confidence") is not None:
-            record["confidence"] = hyp.get("confidence")
+        record.update(hypothesis_context_fields(hyp))
         record.update(routing_fields(hyp))
         return record, None
 
@@ -682,6 +717,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
     record["plan_ref"] = plan_rel.as_posix()
     record["target_type"] = "source_api"
     record["attack_type"] = case.get("attack_type")
+    record.update(hypothesis_context_fields(hyp))
     record["observations"] = result.get("observations") or []
     record["runtime_trace"] = result.get("runtime_trace") or []
     return None, record

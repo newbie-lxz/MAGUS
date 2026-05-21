@@ -34,7 +34,11 @@ C 的 `P3` 审计记录在 `c/audit/audit.jsonl`，D 不读取。`c/out` 里的 
 02_run_with_C/output/verification.jsonl
 02_run_with_C/output/verification.failed.jsonl
 02_run_with_C/output/verification.summary.md
+report/verification.report.jsonl
+report/verification.report.md
 ```
+
+`report/verification.report.jsonl` / `report/verification.report.md` 是最终漏洞报告，只汇总 D confirmed 记录。每条报告包含漏洞位置（文件路径、行号、route）、漏洞类型、风险等级、触发条件、运行证据和 payload/plan 引用。
 
 如果 C 的假设文件没有可执行上下文，可以在同目录补一个 sidecar：
 

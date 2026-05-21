@@ -2,15 +2,16 @@
 
 ## Scope
 
-- This root workspace is the MAGUS pipeline. It contains Stage `A`, Stage `B`, Stage `C`, and the downstream Stage `D` verifier. The root orchestration layer connects Stage `A` through Stage `D`.
+- This root workspace is the MAGUS pipeline. It contains Stage `A`, Stage `B`, Stage `C`, the downstream Stage `D` verifier, and the final Report stage. The root orchestration layer connects Stage `A` through Report.
 - Stage `A` still owns code extraction, derived sample generation, and LLM evidence export.
 - Stage `B` owns pattern mining and candidate scoring over Stage `A` stats records, then prepares a route-aggregated C-ready audit queue from matching Stage `A` LLM evidence plus Stage `B` metadata.
 - Stage `C` owns red-team audit and routing over Stage `B` C-ready candidates.
 - Stage `D` owns dynamic source/API verification over the Stage `C` candidates placed under `c/out/*.jsonl`.
+- Report owns final vulnerability report generation from Stage `D` confirmed/failed verification outputs.
 
 ## Repo Map
 
-- `pipeline.py`: root orchestration entrypoint for `build-analyzer`, `gen-input`, `a`, `b`, `c`, `d`, `abcd`, `stats-path`, and `llm-path`
+- `pipeline.py`: root orchestration entrypoint for `build-analyzer`, `gen-input`, `a`, `b`, `c`, `d`, `report`, `abcd`, `stats-path`, and `llm-path`
 - `Makefile`: convenience wrappers around `pipeline.py`
 - `tools/gen_srcs_compile_commands.py`: explicit helper that generates `srcs/compile_commands.json` for the checked-in Juliet sample tree
 - `a/`: standalone Stage `A` project and transient/failure artifacts
@@ -22,6 +23,8 @@
 - `d/使用说明.md`: Stage `D` high-level handoff and run contract
 - `d/memberD_verifier/02_run_with_C/01_auto_attack_from_C_linux.sh`: Stage `D` automatic verifier entrypoint for all `c/out/*.jsonl`
 - `d/memberD_verifier/02_run_with_C/stream_from_C.py`: Stage `D` streaming verifier entrypoint used by root `abcd`
+- `report/code/generate_report.py`: final report generator over Stage `D` `verification.jsonl` and `verification.failed.jsonl`
+- `report/code/validate_report.py`: final report validator
 - `README.md`: root overview for the combined pipeline
 
 ## Engineering Rules
@@ -37,9 +40,10 @@
 - `pipeline.py gen-input` generates a Stage `A` projects JSONL from `compile_commands.json`; it does not run Stage `A`.
 - `pipeline.py b` runs Stage `B` only over Stage `A` stats and matching LLM evidence.
 - `pipeline.py c` runs Stage `C` over Stage `B` `candidates.for_c.jsonl`, routing completed `P0` static confirmations and `P1`/`P2` dynamic candidates to Stage `D`, and routing `P3` audit-only records to audit output.
-- `pipeline.py d` runs Stage `D` over Stage `C` `c/out/*.jsonl` by calling `d/memberD_verifier/02_run_with_C/01_auto_attack_from_C_linux.sh`.
-- `pipeline.py abcd` chains Stage `A` and Stage `B`, then streams Stage `C` dynamic candidates into Stage `D` while Stage `C` is still running.
-- `make gen-input`, `make run-a`, `make run-b`, `make run-c`, `make run-d`, and `make run-abcd` are thin wrappers over `pipeline.py`.
+- `pipeline.py d` runs Stage `D` over Stage `C` `c/out/*.jsonl` by calling `d/memberD_verifier/02_run_with_C/01_auto_attack_from_C_linux.sh`; the script runs Report after D validation.
+- `pipeline.py report` generates the final report from a Stage `D` output directory.
+- `pipeline.py abcd` chains Stage `A` and Stage `B`, streams Stage `C` dynamic candidates into Stage `D` while Stage `C` is still running, then runs Report.
+- `make gen-input`, `make run-a`, `make run-b`, `make run-c`, `make run-d`, `make run-report`, and `make run-abcd` are thin wrappers over `pipeline.py`.
 - `make gen-srcs-compile-commands` is an explicit helper for the checked-in `srcs` Juliet sample tree; it only writes `srcs/compile_commands.json` and does not run Stage `A`.
 - Stage `A` default root runs emit `samples.raw.jsonl`, `samples.stats.jsonl`, and `samples.llm.jsonl`.
 - Stage `A` input generation is explicit and requires an existing `compile_commands.json`; it must not fall back to guessing compile flags from bare source scans.
@@ -55,6 +59,7 @@
 - Stage `D` batch and streaming modes share an output lock under `d/memberD_verifier/02_run_with_C/.stage_d_output.lock`; do not run another D writer against the same output directory while one mode is active.
 - Stage `D` verifies C/C++ source/API misuse hypotheses and does not generate HTTP requests, `base_url` payloads, or `*.http` files.
 - Stage `D` confirmed output requires route-bound dynamic evidence. The executable harness can run the full source project/testcase, but its oracle must prove the candidate route or source/API sequence was reached; otherwise the record stays in failed output, using `NOT_ROUTE_BOUND` when route attribution cannot be proven.
+- Report writes final report artifacts `report/verification.report.jsonl` and `report/verification.report.md` from Stage `D` `verification.jsonl` and `verification.failed.jsonl`. Each confirmed vulnerability report row must include location (`file_path`, `line`, `route`), vulnerability type, risk level, and trigger condition. The Report validator checks that the report has one row per confirmed record.
 - The root pipeline does not currently expose a Stage `B` worker-count flag.
 
 ## Commands
@@ -67,11 +72,13 @@
 - `make run-b`
 - `make run-c`
 - `make run-d`
+- `make run-report`
 - `make run-abcd`
 - `make run-c C_TIME_LIMIT_SECONDS=600`
 - `make run-abcd C_TIME_LIMIT_SECONDS=600`
 - `(cd d/memberD_verifier/01_demo_test && ./01_setup_linux.sh)`
 - `(cd d/memberD_verifier/02_run_with_C && ./01_auto_attack_from_C_linux.sh)`
+- `python3 pipeline.py report --d-output-dir d/memberD_verifier/02_run_with_C/output --out-dir report`
 - `python3 pipeline.py stats-path --raw-output a/out/samples.raw.jsonl`
 - `python3 pipeline.py llm-path --raw-output a/out/samples.raw.jsonl`
 - `python3 pipeline.py gen-input --repo-path srcs --compile-commands srcs/compile_commands.json --output a/input/srcs.in.jsonl`
@@ -82,3 +89,4 @@
 - If Stage `B` input or output fields change, update `b/README.md` and keep the contract aligned with the loader validation in `b/b_miner.py`.
 - If Stage `C` input or output fields change, keep this file and `README.md` aligned with `c/agent1.py` CLI validation.
 - If Stage `D` input, sidecar, or output fields change, keep this file, `README.md`, `d/使用说明.md`, and `d/memberD_verifier/02_run_with_C/README_正式接C流程.md` aligned with `d/memberD_verifier/00_core/gen_targets_from_hypotheses.py`, `verifier.py`, and `bind_verification_contexts.py`.
+- If Report input or output fields change, keep this file, `README.md`, `d/使用说明.md`, and `d/memberD_verifier/02_run_with_C/README_正式接C流程.md` aligned with `report/code/generate_report.py` and `report/code/validate_report.py`.

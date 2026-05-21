@@ -4,6 +4,7 @@ D 不负责 A/B/C 的挖掘和审计。D 只负责最后一段源码/API 动态�
 
 ```text
 C 的源码/API 假设 -> payload / PoC runner -> 动态验证 -> confirmed/failed 回流
+Report 读取 D 输出 -> 最终漏洞报告
 ```
 
 这里的 API 指 C/C++ 函数调用接口和调用序列，不是 HTTP API。
@@ -30,6 +31,7 @@ D 信任这个目录只包含 C 分流出的动态验证候选：`P1`/`P2`，以
 4. 如果 C 或 sidecar 提供 `repo_path` 加 `run_cmd` / `poc_cmd` / `test_cmd`，执行 runner。
 5. 按 oracle 判断 confirmed 或 failed；confirmed 必须有 route-bound 动态证据，否则输出 failed，例如 `NOT_ROUTE_BOUND`。
 6. 输出 runtime trace、失败原因和回流建议。
+7. 外层脚本在 D 结束后把 confirmed/failed 结果交给 Report 阶段生成最终漏洞报告。
 
 ## 输出
 
@@ -39,6 +41,13 @@ payloads/*.api-plan.json
 verification.jsonl
 verification.failed.jsonl
 verification.summary.md
+```
+
+最终漏洞报告由仓库根目录的 Report 阶段生成：
+
+```text
+report/verification.report.jsonl
+report/verification.report.md
 ```
 
 ## 汇报说法

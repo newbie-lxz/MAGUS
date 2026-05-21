@@ -17,6 +17,10 @@ STAGE_C_DIR = REPO_ROOT / "c"
 STAGE_D_DIR = REPO_ROOT / "d/memberD_verifier"
 STAGE_D_RUN_DIR = REPO_ROOT / "d/memberD_verifier/02_run_with_C"
 STAGE_D_PYTHON = STAGE_D_DIR / ".venv/bin/python"
+REPORT_DIR = REPO_ROOT / "report"
+REPORT_GENERATOR = REPORT_DIR / "code/generate_report.py"
+REPORT_VALIDATOR = REPORT_DIR / "code/validate_report.py"
+DEFAULT_STAGE_D_OUTPUT_DIR = STAGE_D_RUN_DIR / "output"
 DEFAULT_STAGE_A_INPUT = STAGE_A_DIR / "input/zlib.in.jsonl"
 DEFAULT_STAGE_A_OUTPUT = STAGE_A_DIR / "out/samples.raw.jsonl"
 DEFAULT_STAGE_A_GENERATED_INPUT = STAGE_A_DIR / "input/srcs.in.jsonl"
@@ -179,6 +183,35 @@ def run_stage_d() -> None:
     run_command(["./01_auto_attack_from_C_linux.sh"], STAGE_D_RUN_DIR)
 
 
+def run_report(d_output_dir: Path, output_dir: Path) -> None:
+    confirmed = d_output_dir / "verification.jsonl"
+    failed = d_output_dir / "verification.failed.jsonl"
+    run_command(
+        [
+            sys.executable,
+            str(REPORT_GENERATOR),
+            "--confirmed",
+            str(confirmed),
+            "--failed",
+            str(failed),
+            "--out-dir",
+            str(output_dir),
+        ],
+        REPO_ROOT,
+    )
+    run_command(
+        [
+            sys.executable,
+            str(REPORT_VALIDATOR),
+            "--confirmed",
+            str(confirmed),
+            "--report-dir",
+            str(output_dir),
+        ],
+        REPO_ROOT,
+    )
+
+
 def ensure_stage_d_python() -> None:
     if not STAGE_D_PYTHON.exists() or not os.access(STAGE_D_PYTHON, os.X_OK):
         raise SystemExit(
@@ -263,6 +296,7 @@ def run_stage_c_with_streaming_d(
             raise SystemExit(c_returncode)
         if d_returncode != 0:
             raise SystemExit(d_returncode)
+        run_report(DEFAULT_STAGE_D_OUTPUT_DIR, REPORT_DIR)
 
 
 def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_flag: str) -> None:
@@ -272,7 +306,7 @@ def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_fl
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="MAGUS pipeline runner. Supports separate Stage A, B, C, D, or chained A->B->streamed C/D execution."
+        description="MAGUS pipeline runner. Supports separate Stage A, B, C, D, Report, or chained A->B->streamed C/D->Report execution."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -353,9 +387,21 @@ def main() -> None:
         default=None,
         help="Stage C 可选候选提交时间预算，默认不限制",
     )
-    subparsers.add_parser("d", help="只运行 Stage D")
+    subparsers.add_parser("d", help="运行 Stage D，并在 D 完成后生成最终报告")
 
-    parser_abcd = subparsers.add_parser("abcd", help="串联运行 Stage A、Stage B，并流式运行 Stage C -> Stage D")
+    parser_report = subparsers.add_parser("report", help="只从 Stage D 输出生成最终报告")
+    parser_report.add_argument(
+        "--d-output-dir",
+        default=str(DEFAULT_STAGE_D_OUTPUT_DIR),
+        help="Stage D verification 输出目录",
+    )
+    parser_report.add_argument(
+        "--out-dir",
+        default=str(REPORT_DIR),
+        help="最终报告输出目录",
+    )
+
+    parser_abcd = subparsers.add_parser("abcd", help="串联运行 Stage A、Stage B，并流式运行 Stage C -> Stage D -> Report")
     add_stage_a_args(parser_abcd, "--a-input", "--a-output")
     parser_abcd.add_argument(
         "--b-output-dir",
@@ -431,6 +477,10 @@ def main() -> None:
 
     if args.command == "d":
         run_stage_d()
+        return
+
+    if args.command == "report":
+        run_report(resolve_path(args.d_output_dir), resolve_path(args.out_dir))
         return
 
     if args.command == "abcd":

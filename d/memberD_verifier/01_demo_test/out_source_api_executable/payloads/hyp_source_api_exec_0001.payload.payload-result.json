@@ -8,16 +8,16 @@
   ],
   "runtime_trace": [
     {
-      "cmd": "/usr/bin/python3 poc.py",
+      "cmd": "/home/sq_hu/MAGUS/d/memberD_verifier/.venv/bin/python poc.py",
       "cwd": "/home/sq_hu/MAGUS/d/memberD_verifier/01_demo_test/mock_source_project",
       "exit_code": 1,
-      "elapsed_ms": 8,
+      "elapsed_ms": 16,
       "stdout_tail": "triggering mock source/API misuse path\nAddressSanitizer: SEGV on unknown address\nSUMMARY: AddressSanitizer: null pointer dereference\n",
       "stderr_tail": "",
       "timed_out": false
     }
   ],
   "timestamps": {
-    "finished_at": "2026-05-19T11:41:30Z"
+    "finished_at": "2026-05-21T06:42:07Z"
   }
 }
