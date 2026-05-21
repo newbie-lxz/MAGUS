@@ -25,7 +25,7 @@ from typing import Any
 SCHEMA_VERSION = "stagea.stats.features.v1"
 PATTERN_SCHEMA_VERSION = "stageb.feature_patterns.v1"
 CANDIDATE_SCHEMA_VERSION = "stageb.feature_candidates.v1"
-C_READY_SCHEMA_VERSION = "stageb.c_ready_candidates.v2"
+C_READY_SCHEMA_VERSION = "stageb.c_ready_candidates.v3"
 C_READY_MAX_STAGE_B_CANDIDATES = 12
 C_READY_MAX_MERGED_LIST_ITEMS = 16
 C_READY_MAX_EVIDENCE_SLICES = 8
@@ -94,6 +94,34 @@ RISK_SINK_WEIGHT = 0.45
 RISK_DEVIATION_WEIGHT = 0.45
 STATIC_CONFIRMATION_MIN_SINK_SCORE = 0.70
 STATIC_CONFIRMATION_MIN_DEVIATION_SCORE = 0.40
+
+C_PRIORITY_BASE_WEIGHTS = {
+    "threshold_pass": 100.0,
+    "risk_score": 10.0,
+    "sink_score": 2.0,
+    "pattern_deviation_score": 1.0,
+    "rarity_score": 0.5,
+    "candidate_count": 0.01,
+    "static_confirmation_supported": 0.5,
+}
+
+C_PRIORITY_SIGNAL_WEIGHTS = {
+    "environment_source": 8.0,
+    "stdin_source": 8.0,
+    "network_source_or_sink": 2.0,
+    "network_receive_call": 1.4,
+    "network_setup_call": 2.0,
+    "external_memory_sink": 2.0,
+    "candidate_count_ge_8": 1.0,
+    "candidate_count_ge_12": 2.0,
+}
+
+C_PRIORITY_DEMOTION_WEIGHTS = {
+    "main_dispatch_route": -5.0,
+    "relative_path_route": -10.0,
+    "filesystem_file_source_without_external_input": -5.0,
+    "filesystem_sink_without_external_input": -5.0,
+}
 
 
 @dataclass
@@ -643,6 +671,11 @@ def c_ready_records(
             "llm_evidence": merged_llm,
             "prepared_for_c_at": prepared_at,
         }
+        priority_payload = c_ready_priority_payload(record)
+        record["c_priority_score"] = priority_payload["score"]
+        record["c_priority_components"] = priority_payload["components"]
+        stage_b["c_priority_score"] = priority_payload["score"]
+        stage_b["c_priority_components"] = priority_payload["components"]
         route_records.append(record)
 
     route_records.sort(key=c_ready_record_priority_key)
@@ -651,8 +684,9 @@ def c_ready_records(
         record["processing_rank"] = rank
         record["stage_b"]["processing_rank"] = rank
         record["priority_basis"] = {
-            "primary": "route_aggregated_threshold_pass_desc",
+            "primary": "c_priority_score_desc",
             "secondary": [
+                "route_aggregated_threshold_pass_desc",
                 "max_risk_score_desc",
                 "max_sink_score_desc",
                 "max_pattern_deviation_score_desc",
@@ -860,9 +894,117 @@ def candidate_summary(candidate: ScoredCandidate) -> dict[str, Any]:
     }
 
 
-def c_ready_record_priority_key(record: dict[str, Any]) -> tuple[int, float, float, float, float, int, str, str]:
+def lower_string_set(values: list[Any]) -> set[str]:
+    return {str(value).strip().lower() for value in values if str(value).strip()}
+
+
+def contains_any(text: str, needles: set[str]) -> bool:
+    return any(needle in text for needle in needles)
+
+
+def c_ready_priority_policy() -> dict[str, Any]:
+    return {
+        "objective": "front_load_likely_stage_c_p0_p1_p2_under_time_budget",
+        "base_weights": C_PRIORITY_BASE_WEIGHTS,
+        "positive_signal_weights": C_PRIORITY_SIGNAL_WEIGHTS,
+        "demotion_weights": C_PRIORITY_DEMOTION_WEIGHTS,
+        "runtime_inputs": [
+            "stage_b scores",
+            "source_kinds",
+            "sink_types",
+            "seed_tokens",
+            "route",
+            "file",
+            "evidence_slice",
+        ],
+        "candidate_count_base_cap": 20,
+        "excludes": [
+            "Stage C output",
+            "Stage D output",
+            "Juliet bad/good labels",
+            "sanitization map labels",
+        ],
+    }
+
+
+def c_ready_priority_payload(record: dict[str, Any]) -> dict[str, Any]:
+    stage_b = record["stage_b"]
+    source_kinds = lower_string_set(stage_b.get("source_kinds", []))
+    sink_types = lower_string_set(stage_b.get("sink_types", []))
+    seed_tokens = [str(token).strip().lower() for token in stage_b.get("seed_tokens", []) if str(token).strip()]
+    seed_text = " ".join(seed_tokens)
+    route_text = f"{record.get('file', '')} {record.get('route', '')}".lower()
+    evidence_text = str(record.get("evidence_slice") or "").lower()
+    candidate_count = int(stage_b.get("candidate_count", 0) or 0)
+
+    components: dict[str, float] = {
+        "threshold_pass": C_PRIORITY_BASE_WEIGHTS["threshold_pass"] * int(bool(stage_b.get("threshold_pass"))),
+        "risk_score": C_PRIORITY_BASE_WEIGHTS["risk_score"] * float(stage_b.get("max_risk_score", 0.0) or 0.0),
+        "sink_score": C_PRIORITY_BASE_WEIGHTS["sink_score"] * float(stage_b.get("max_sink_score", 0.0) or 0.0),
+        "pattern_deviation_score": C_PRIORITY_BASE_WEIGHTS["pattern_deviation_score"]
+        * float(stage_b.get("max_pattern_deviation_score", 0.0) or 0.0),
+        "rarity_score": C_PRIORITY_BASE_WEIGHTS["rarity_score"]
+        * float(stage_b.get("max_rarity_score", 0.0) or 0.0),
+        "candidate_count": C_PRIORITY_BASE_WEIGHTS["candidate_count"] * min(candidate_count, 20),
+    }
+    if stage_b.get("static_confirmation_support", {}).get("supported"):
+        components["static_confirmation_supported"] = C_PRIORITY_BASE_WEIGHTS["static_confirmation_supported"]
+
+    external_source = False
+    if "environment" in source_kinds or "getenv" in seed_text or "getenv" in evidence_text or "environment" in route_text:
+        components["environment_source"] = C_PRIORITY_SIGNAL_WEIGHTS["environment_source"]
+        external_source = True
+    if "stdin" in source_kinds or "fgets" in seed_text or "fgets" in evidence_text or "console" in route_text:
+        components["stdin_source"] = C_PRIORITY_SIGNAL_WEIGHTS["stdin_source"]
+        external_source = True
+    if (
+        "network" in source_kinds
+        or "network" in sink_types
+        or "network:" in seed_text
+        or contains_any(seed_text, {"recv", "accept", "bind", "listen", "socket", "connect"})
+    ):
+        components["network_source_or_sink"] = C_PRIORITY_SIGNAL_WEIGHTS["network_source_or_sink"]
+        external_source = True
+    if "recv" in seed_text or "recv(" in evidence_text:
+        components["network_receive_call"] = C_PRIORITY_SIGNAL_WEIGHTS["network_receive_call"]
+    if contains_any(seed_text, {"accept", "bind", "listen", "socket", "connect"}):
+        components["network_setup_call"] = C_PRIORITY_SIGNAL_WEIGHTS["network_setup_call"]
+    if "memory" in sink_types and external_source:
+        components["external_memory_sink"] = C_PRIORITY_SIGNAL_WEIGHTS["external_memory_sink"]
+    if candidate_count >= 8:
+        components["candidate_count_ge_8"] = C_PRIORITY_SIGNAL_WEIGHTS["candidate_count_ge_8"]
+    if candidate_count >= 12:
+        components["candidate_count_ge_12"] = C_PRIORITY_SIGNAL_WEIGHTS["candidate_count_ge_12"]
+
+    if Path(str(record.get("file", ""))).name == "main.cpp" or str(record.get("route", "")).endswith("::main"):
+        components["main_dispatch_route"] = C_PRIORITY_DEMOTION_WEIGHTS["main_dispatch_route"]
+    if "relativepath" in route_text or "relative_path" in route_text:
+        components["relative_path_route"] = C_PRIORITY_DEMOTION_WEIGHTS["relative_path_route"]
+    file_source_route = "__w32_char_file_" in route_text or "__w32_wchar_t_file_" in route_text
+    if not external_source and (file_source_route or "filesystem" in source_kinds):
+        components["filesystem_file_source_without_external_input"] = (
+            C_PRIORITY_DEMOTION_WEIGHTS["filesystem_file_source_without_external_input"]
+        )
+    if not external_source and "filesystem" in sink_types:
+        components["filesystem_sink_without_external_input"] = (
+            C_PRIORITY_DEMOTION_WEIGHTS["filesystem_sink_without_external_input"]
+        )
+
+    rounded_components = {
+        key: round(value, 4)
+        for key, value in components.items()
+        if value != 0.0
+    }
+    return {
+        "score": round(sum(rounded_components.values()), 4),
+        "components": rounded_components,
+    }
+
+
+def c_ready_record_priority_key(record: dict[str, Any]) -> tuple[float, int, float, float, float, float, int, str, str]:
     stage_b = record["stage_b"]
     return (
+        -stage_b["c_priority_score"],
         -int(stage_b["threshold_pass"]),
         -stage_b["max_risk_score"],
         -stage_b["max_sink_score"],
@@ -903,6 +1045,7 @@ def stats_payload(
         "c_ready_candidates": c_ready_count,
         "risk_threshold": risk_threshold,
         "risk_score_weights": risk_score_weights(),
+        "c_ready_priority_policy": c_ready_priority_policy(),
         "static_confirmation_support_policy": {
             "min_sink_score": STATIC_CONFIRMATION_MIN_SINK_SCORE,
             "min_pattern_deviation_score": STATIC_CONFIRMATION_MIN_DEVIATION_SCORE,
@@ -916,6 +1059,7 @@ def stats_payload(
             "missing_feature_count_desc",
         ],
         "c_ready_sort_order": [
+            "c_priority_score_desc",
             "route_aggregated_threshold_pass_desc",
             "max_risk_score_desc",
             "max_sink_score_desc",

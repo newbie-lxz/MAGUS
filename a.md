@@ -1,6 +1,6 @@
 # Stage A 详细分析
 
-本文档描述当前仓库中 Stage A 的真实实现。Stage A 的职责是对 C/C++ 项目做基于 LLVM IR 的 API 级静态分析，围绕每一个可解析的调用点恢复一个 seed-centric 的相关 API/check 子图，并输出后续 Stage B/Stage C 使用的数据视图。
+本文档描述当前仓库中 Stage A 的真实实现。Stage A 的职责是对 C/C++ 项目做基于 LLVM IR 的 API 级静态分析，围绕每一个可解析的调用点恢复一个 seed-centric 的相关 API/check 子图，并输出 Stage B 直接消费、再由 Stage B 汇总进 C-ready 队列供 Stage C 使用的数据视图。
 
 相关实现文件：
 
@@ -57,7 +57,7 @@ Stage B 不直接消费 raw，而是消费这个 stats 视图。
 
 这是 Stage A 的 LLM 证据视图，由 `a/cmd/llm_export.py` 从 raw 输出导出。根目录 `make run-a` 和 `make run-abcd` 都会产生它。
 
-它用于 Stage C，重点保留 LLM 审计需要的信息：
+它由 Stage B 读取并合并进 `candidates.for_c.jsonl` 的 `llm_evidence`，再随 B 的 C-ready 队列交给 Stage C。它重点保留 LLM 审计需要的信息：
 
 - seed、focus、entrypoint。
 - `representative_traces`：最多 3 条 source-sink 候选路径。
@@ -1164,8 +1164,8 @@ Stage A 倾向显式失败，不做静默 fallback。
 - `source_sink_flows` 是相关图上的候选可达路径，不是漏洞真值。
 - 跨函数分析只在同 module 内做有限深度展开。
 - 间接调用候选最多 8 个，超过会记录告警。
-- Stage B 使用 stats，不读取 raw。
-- Stage C 使用 llm evidence，不读取 raw。
+- Stage B 使用 stats 和 matching LLM evidence，不读取 raw。
+- Stage C 使用 Stage B 的 C-ready 队列，不直接读取 Stage A raw/stats/LLM evidence。
 
 ## 11. 一个完整样本如何形成
 
@@ -1210,7 +1210,7 @@ Stage A 给 Stage B 的不是漏洞结论，而是结构化行为特征：
 
 Stage B 在这些 feature token 集合上挖高支持模式，寻找“常见结构”和“候选异常/关注模式”。
 
-Stage A 给 Stage C 的也不是完整源码，而是压缩后的审计证据：
+Stage A 给 Stage B 的 LLM evidence 也不是完整源码，而是压缩后的审计证据；Stage B 会把这些证据合并进 C-ready 队列交给 Stage C：
 
 ```text
 seed + focus + 局部图 + source-sink trace + 源码窗口 + 内部函数摘要。

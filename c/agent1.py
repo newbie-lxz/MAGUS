@@ -32,7 +32,7 @@ EVIDENCE_TEXT_MAX_CHARS = 1200            # 单段证据文本最多保留字符
 MAX_CALL_CHAIN = 12                       # 调用序列最多保留个数
 MAX_SINK_SOURCE = 5                       # source/sink、trace、代码片段最多保留个数
 MAX_INTERNAL_SUMMARIES = 3                # 内部函数摘要最多保留个数
-C_READY_SCHEMA_VERSION = "stageb.c_ready_candidates.v2"
+C_READY_SCHEMA_VERSION = "stageb.c_ready_candidates.v3"
 POSITIVE_TEMPLATE_REUSE_POLICY = "positive_only"
 JULIET_TEMPLATE_RE = re.compile(r"^(?P<cwe>CWE\d+_.+)__w32_(?P<body>.+)$")
 
@@ -109,6 +109,16 @@ def validate_candidate(cand, path, index):
         )
     if not isinstance(cand.get("stage_b"), dict):
         raise ValueError(f"{path}: candidate #{index} stage_b must be an object")
+    if not isinstance(cand.get("c_priority_score"), (int, float)) or isinstance(cand.get("c_priority_score"), bool):
+        raise ValueError(f"{path}: candidate #{index} c_priority_score must be a number")
+    if not isinstance(cand.get("c_priority_components"), dict):
+        raise ValueError(f"{path}: candidate #{index} c_priority_components must be an object")
+    if not isinstance(cand["stage_b"].get("c_priority_score"), (int, float)) or isinstance(
+        cand["stage_b"].get("c_priority_score"), bool
+    ):
+        raise ValueError(f"{path}: candidate #{index} stage_b.c_priority_score must be a number")
+    if not isinstance(cand["stage_b"].get("c_priority_components"), dict):
+        raise ValueError(f"{path}: candidate #{index} stage_b.c_priority_components must be an object")
     static_support = cand["stage_b"].get("static_confirmation_support")
     if not isinstance(static_support, dict):
         raise ValueError(f"{path}: candidate #{index} stage_b.static_confirmation_support must be an object")

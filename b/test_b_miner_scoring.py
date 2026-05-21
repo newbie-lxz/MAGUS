@@ -44,5 +44,92 @@ class RiskScoringTests(unittest.TestCase):
         self.assertEqual(support["reason"], "high_risk_sink")
 
 
+class CReadyPriorityTests(unittest.TestCase):
+    def _record(
+        self,
+        *,
+        file,
+        route,
+        source_kinds,
+        sink_types,
+        seed_tokens,
+        max_risk_score=0.4,
+        max_sink_score=0.7,
+        candidate_count=4,
+        evidence_slice="",
+    ):
+        return {
+            "project_id": "p",
+            "route": route,
+            "file": file,
+            "evidence_slice": evidence_slice,
+            "stage_b": {
+                "threshold_pass": False,
+                "max_risk_score": max_risk_score,
+                "max_sink_score": max_sink_score,
+                "max_pattern_deviation_score": 0.0,
+                "max_rarity_score": 0.0,
+                "candidate_count": candidate_count,
+                "source_kinds": source_kinds,
+                "sink_types": sink_types,
+                "seed_tokens": seed_tokens,
+                "static_confirmation_support": {"supported": True},
+            },
+        }
+
+    def test_c_ready_priority_boosts_external_input_routes(self):
+        environment_route = self._record(
+            file="juliet/CWE114_Process_Control__w32_char_environment_01.c",
+            route="juliet/CWE114_Process_Control__w32_char_environment_01.c::case0",
+            source_kinds=["environment"],
+            sink_types=["memory"],
+            seed_tokens=["env:getenv", "call:LoadLibraryA"],
+            evidence_slice="data = getenv(\"ADD\"); LoadLibraryA(data);",
+        )
+        file_route = self._record(
+            file="juliet/CWE114_Process_Control__w32_char_file_01.c",
+            route="juliet/CWE114_Process_Control__w32_char_file_01.c::case0",
+            source_kinds=["filesystem"],
+            sink_types=["filesystem"],
+            seed_tokens=["filesystem:fopen"],
+            max_risk_score=0.5,
+            max_sink_score=0.8,
+        )
+
+        env_priority = b_miner.c_ready_priority_payload(environment_route)
+        file_priority = b_miner.c_ready_priority_payload(file_route)
+
+        self.assertGreater(env_priority["score"], file_priority["score"])
+        self.assertIn("environment_source", env_priority["components"])
+        self.assertIn("filesystem_file_source_without_external_input", file_priority["components"])
+
+    def test_c_ready_priority_keeps_threshold_pass_dominant(self):
+        threshold_route = self._record(
+            file="low.c",
+            route="low.c::route",
+            source_kinds=[],
+            sink_types=[],
+            seed_tokens=[],
+            max_risk_score=0.1,
+            max_sink_score=0.0,
+        )
+        threshold_route["stage_b"]["threshold_pass"] = True
+        high_signal_route = self._record(
+            file="juliet/CWE114_Process_Control__w32_char_environment_01.c",
+            route="juliet/CWE114_Process_Control__w32_char_environment_01.c::case0",
+            source_kinds=["environment"],
+            sink_types=["memory"],
+            seed_tokens=["env:getenv"],
+            max_risk_score=0.9,
+            max_sink_score=0.9,
+            candidate_count=20,
+        )
+
+        self.assertGreater(
+            b_miner.c_ready_priority_payload(threshold_route)["score"],
+            b_miner.c_ready_priority_payload(high_signal_route)["score"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
