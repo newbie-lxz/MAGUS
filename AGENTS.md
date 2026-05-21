@@ -25,6 +25,8 @@
 - `d/memberD_verifier/02_run_with_C/stream_from_C.py`: Stage `D` streaming verifier entrypoint used by root `abcd`
 - `report/code/generate_report.py`: final report generator over Stage `D` `verification.jsonl` and `verification.failed.jsonl`
 - `report/code/validate_report.py`: final report validator
+- `test/evaluate_juliet_report.py`: paper-evaluation helper that compares the final report with Juliet answers and writes FP/FN/metric/timing artifacts
+- `test/README.md`: Juliet report evaluation usage notes
 - `README.md`: root overview for the combined pipeline
 
 ## Engineering Rules
@@ -61,6 +63,7 @@
 - Stage `D` auto-detects checked-in `srcs/juliet-api-misuse` hypotheses and generates an executable Linux Juliet Win32 shim runner plus route-bound oracle for batch and streaming modes; those records do not need `verification_contexts.jsonl` unless an explicit override is required.
 - Stage `D` confirmed output requires route-bound dynamic evidence. The executable harness can run the full source project/testcase, but its oracle must prove the candidate route or source/API sequence was reached; otherwise the record stays in failed output, using `NOT_ROUTE_BOUND` when route attribution cannot be proven.
 - Report writes final report artifacts `report/verification.report.jsonl` and `report/verification.report.md` from Stage `D` `verification.jsonl` and `verification.failed.jsonl`. Each confirmed vulnerability report row must include location (`file_path`, `line`, `route`), vulnerability type, risk level, and trigger condition. The Report validator checks that the report has one row per confirmed record.
+- `test/evaluate_juliet_report.py` compares `report/verification.report.jsonl` with Juliet answers for paper testing. By default it infers Juliet truth from bad/good testcase paths under `srcs/juliet-api-misuse`; it can also consume an explicit JSONL/JSON/CSV answer file. It reports false positives, false negatives, duplicate true positives, precision/recall/F1, and elapsed time from Stage `A` start to final report generation when `--stage-a-start`, `--timing-json`, or `--run-command` is supplied.
 - The root pipeline does not currently expose a Stage `B` worker-count flag.
 
 ## Commands
@@ -83,6 +86,8 @@
 - `python3 pipeline.py stats-path --raw-output a/out/samples.raw.jsonl`
 - `python3 pipeline.py llm-path --raw-output a/out/samples.raw.jsonl`
 - `python3 pipeline.py gen-input --repo-path srcs --compile-commands srcs/compile_commands.json --output a/input/srcs.in.jsonl`
+- `python3 test/evaluate_juliet_report.py --report report/verification.report.jsonl --scope-compile-commands srcs/compile_commands.cwe15.json --stage-a-start 2026-05-20T10:00:00Z`
+- `python3 test/evaluate_juliet_report.py --run-command "python3 pipeline.py abcd" --scope-compile-commands srcs/compile_commands.cwe15.json`
 
 ## Sync Rules
 

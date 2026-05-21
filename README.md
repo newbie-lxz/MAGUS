@@ -7,6 +7,7 @@ MAGUS is a multi-stage mining pipeline plus a small root-level orchestrator:
 - `c/`: Stage `C` red-team audit that consumes Stage `B` `candidates.for_c.jsonl`, then routes findings into static confirmations, D candidates, or audit-only records.
 - `d/`: Stage `D` source/API verifier that consumes the Stage `C` dynamic-verification queue in `c/out/*.jsonl` and produces confirmed/failed dynamic-verification records.
 - `report/code/`: final report generator and validator; it reads Stage `D` verification outputs and writes final report artifacts under `report/`.
+- `test/`: paper-evaluation helpers, including Juliet final-report comparison and timing summaries.
 - `pipeline.py`: root entrypoint for generating Stage `A` input, running Stage `A`, Stage `B`, Stage `C`, Stage `D`, Report, or the full `A -> B -> streamed C/D -> Report` flow from one place.
 - `tools/gen_srcs_compile_commands.py`: explicit helper for generating `srcs/compile_commands.json` for the checked-in Juliet sample tree.
 
@@ -21,6 +22,7 @@ MAGUS is a multi-stage mining pipeline plus a small root-level orchestrator:
 - `c/`: standalone Stage `C` audit agent and outputs
 - `d/`: standalone Stage `D` source/API verifier, Linux scripts, and usage notes
 - `report/code/`: standalone Report generator and validator
+- `test/`: final-report evaluation scripts and generated evaluation artifacts
 
 ## Common Commands
 
@@ -118,6 +120,25 @@ Stage `D` has two root modes. `make run-d` uses the formal batch script under `d
 
 Stage `D` currently uses only the Python standard library, so the setup script creates a no-pip virtual environment unless `00_core/requirements.txt` contains real dependencies.
 
+- Compare the final report with Juliet answers for paper evaluation:
+
+```bash
+python3 test/evaluate_juliet_report.py \
+  --report report/verification.report.jsonl \
+  --scope-compile-commands srcs/compile_commands.cwe15.json \
+  --stage-a-start 2026-05-20T10:00:00Z
+```
+
+To time a fresh full run from Stage `A` start through final report generation and then evaluate it:
+
+```bash
+python3 test/evaluate_juliet_report.py \
+  --run-command "python3 pipeline.py abcd" \
+  --scope-compile-commands srcs/compile_commands.cwe15.json
+```
+
+The evaluator infers Juliet ground truth from testcase bad/good paths by default, or from an explicit `--answer-file`. It writes paper-ready precision/recall/F1, false-positive, false-negative, duplicate-report, and elapsed-time artifacts under `test/out/juliet_eval`.
+
 - Show the derived `samples.stats.jsonl` path for a given Stage `A` raw output:
 
 ```bash
@@ -142,6 +163,7 @@ The root orchestrator intentionally preserves separate validation:
 - `make run-abcd` chains Stage `A` and Stage `B`, then streams Stage `C` dynamic candidates into Stage `D`
 - Stage `D` can still be validated independently from `d/memberD_verifier` or through `make run-d`
 - Report can be regenerated independently with `make run-report` from an existing Stage `D` output directory
+- Juliet report evaluation can be run independently from the final report; `--run-command` is only a convenience wrapper for timing a fresh pipeline run.
 
 Important contract boundary:
 
@@ -152,6 +174,7 @@ Important contract boundary:
 - Stage `C` routes records by priority: `P1`/`P2` dynamic-verification candidates go to `c/out/*.jsonl`; completed `P0` static confirmations also go to `c/out/*.jsonl` so Stage `D` can route-bound verify them; `P3` audit-only records go to `c/audit/audit.jsonl`. Stage `C` time budgets only stop new submissions and turn unfinished in-flight work into `P3` timeout audit records. A debated candidate is written to `P3` only when every red-team round returns no vulnerability; if any round reports a vulnerability, hard contradictions or incomplete evidence keep it in the dynamic-verification queue instead of suppressing it.
 - Stage `D` batch mode consumes every record Stage `C` places under `c/out/*.jsonl`; root full-chain streaming mode consumes the current Stage `C --output` file as JSONL lines become complete. In both modes D does not re-check `P1`/`P2` or `agent_verdict`, does not read Stage `A` or Stage `B` outputs directly, and verifies C/C++ source/API misuse cases rather than HTTP endpoints. Stage `D` applies a 10-second execution timeout only to `P0`; `P1`/`P2` dynamic-verification records are not D-time-limited. Confirmed records require route-bound dynamic evidence; D returns failed records such as `NOT_EXPLOITABLE`, `NOT_ROUTE_BOUND`, `ENV_MISSING`, `HYPOTHESIS_WRONG`, `TIMEOUT`, or `NON_DETERMINISTIC` when execution or attribution is insufficient. Records whose `file`/`project_id` points at `srcs/juliet-api-misuse` get an executable Juliet Win32 shim runner and oracle from target generation automatically; sidecar context is still available for non-Juliet projects or explicit overrides.
 - Report consumes Stage `D` `verification.jsonl` and `verification.failed.jsonl`; it does not read Stage `A`, Stage `B`, or Stage `C` outputs directly. `validate_report.py` requires one report row per confirmed D record.
+- `test/evaluate_juliet_report.py` consumes the final report plus Juliet answers only. It does not change pipeline outputs; it classifies report rows against Juliet bad/good cases and measures elapsed time from Stage `A` start to final report generation when timing inputs are provided.
 
 ## Outputs
 
@@ -165,6 +188,7 @@ Default outputs:
 - Stage `C` dynamic-verification output: `c/out/hypotheses.jsonl` for `P1`/`P2` plus completed `P0` records; Stage `C` audit-only output: `c/audit/audit.jsonl`; Stage `D` batch input: all `c/out/*.jsonl`; Stage `D` streaming input in `run-abcd`: the current `C_OUTPUT` file
 - Stage `D` outputs: `d/memberD_verifier/02_run_with_C/output/verification.jsonl`, `verification.failed.jsonl`, `verification.summary.md`, and `payloads/*.api-plan.json` / `payloads/*.payload.py`
 - Report outputs: `report/verification.report.jsonl` and `report/verification.report.md`
+- Juliet evaluation outputs: `test/out/juliet_eval/summary.md`, `summary.json`, `false_positives.csv`, `false_negatives.csv`, `true_positives.csv`, `duplicate_true_positives.csv`, `all_findings.csv`, and `truth_cases.csv`
 
 If you override `A_OUTPUT`, `pipeline.py` derives the matching stats and LLM paths automatically during full runs; `make run-b` derives the matching `samples.llm.jsonl` path for `B_LLM_INPUT`.
 
