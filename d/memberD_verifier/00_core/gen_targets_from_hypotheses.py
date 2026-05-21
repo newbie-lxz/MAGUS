@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
@@ -30,6 +31,8 @@ DEFAULT_FAILURE_PATTERNS = [
 ]
 
 UNRESOLVED_VALUES = {"AUTO_DETECT_FAILED", "TODO", "待填写", "真实"}
+WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
+JULIET_API_MISUSE_ROOT = WORKSPACE_ROOT / "srcs" / "juliet-api-misuse"
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -244,6 +247,74 @@ def first_value(source: Dict[str, Any], keys: Iterable[str]) -> Any:
     return None
 
 
+def resolve_candidate_source_path(source_file: Any) -> Path | None:
+    if source_file in (None, "", []):
+        return None
+    raw = Path(str(source_file))
+    candidates = [raw] if raw.is_absolute() else [
+        WORKSPACE_ROOT / raw,
+        JULIET_API_MISUSE_ROOT / raw,
+        WORKSPACE_ROOT / "srcs" / raw,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
+
+
+def is_juliet_api_misuse_hypothesis(hyp: Dict[str, Any], source_file: Any) -> bool:
+    text = as_text([source_file, hyp.get("project_id"), hyp.get("sample_id")]).lower()
+    if "juliet-api-misuse" in text:
+        return True
+    resolved = resolve_candidate_source_path(source_file)
+    if resolved is None:
+        return False
+    try:
+        resolved.relative_to(JULIET_API_MISUSE_ROOT.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def juliet_win32_test_cmd(source_file: Any, symbol: str, route: Any) -> str:
+    return " ".join(
+        [
+            "${PYTHON}",
+            "tools/juliet_win_shim/run_juliet_win_case.py",
+            "--source-file",
+            shlex.quote(str(source_file)),
+            "--entry-symbol",
+            shlex.quote(symbol),
+            "--route",
+            shlex.quote(str(route or "")),
+        ]
+    )
+
+
+def juliet_win32_execution_context(source_file: Any, symbol: str, route: Any) -> Dict[str, Any]:
+    return {
+        "repo_path": str(WORKSPACE_ROOT),
+        "test_cmd": juliet_win32_test_cmd(source_file, symbol, route),
+    }
+
+
+def juliet_win32_oracle() -> Dict[str, Any]:
+    return {
+        "accepted_evidence": [
+            "Juliet bad/good main banner proves the selected route executed",
+            "MAGUS_JULIET_ROUTE_CONFIRMED proves a tainted Win32/API sink or point-flaw marker was reached",
+        ],
+        "failure_patterns": ["MAGUS_JULIET_ROUTE_CONFIRMED"],
+        "required_patterns": ["MAGUS_JULIET_ROUTE_EXECUTED"],
+        "failure_code_patterns": {
+            "NOT_ROUTE_BOUND": ["MAGUS_JULIET_NOT_ROUTE_BOUND"],
+            "ENV_MISSING": ["MAGUS_JULIET_BUILD_FAILED", "MAGUS_JULIET_RUNNER_ERROR"],
+            "NOT_EXPLOITABLE": ["MAGUS_JULIET_NOT_CONFIRMED"],
+        },
+        "expect_nonzero_exit": False,
+    }
+
+
 def has_unresolved_marker(value: Any) -> bool:
     if value in (None, "", []):
         return False
@@ -315,6 +386,12 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
             seed_inputs = verification_context["seed_inputs"]
         input_source = verification_context.get("input_source")
 
+    explicit_oracle: Dict[str, Any] = {}
+    if isinstance(hyp.get("oracle"), dict):
+        explicit_oracle.update(hyp["oracle"])
+    if isinstance(verification_context, dict) and isinstance(verification_context.get("oracle"), dict):
+        explicit_oracle.update(verification_context["oracle"])
+
     case: Dict[str, Any] = {
         "name": f"auto_{attack_type}" if auto_fill else "source_api_misuse",
         "target_type": "source_api",
@@ -354,10 +431,15 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
         case["execution"] = execution
     if hyp.get("poc_code") or hyp.get("harness_code"):
         case["harness_code"] = hyp.get("poc_code") or hyp.get("harness_code")
-    if isinstance(hyp.get("oracle"), dict):
-        case["oracle"].update(hyp["oracle"])
-    if isinstance(verification_context, dict) and isinstance(verification_context.get("oracle"), dict):
-        case["oracle"].update(verification_context["oracle"])
+    case["oracle"].update(explicit_oracle)
+    if auto_fill and is_juliet_api_misuse_hypothesis(hyp, source_file):
+        case["name"] = "juliet_win32_source_api"
+        case["payload_kind"] = "juliet_win32_dynamic_case"
+        case["execution"] = juliet_win32_execution_context(source_file, symbol, hyp.get("route"))
+        if execution:
+            case["execution"].update(execution)
+        case["oracle"] = juliet_win32_oracle()
+        case["oracle"].update(explicit_oracle)
     return case
 
 
@@ -408,7 +490,7 @@ def main() -> int:
     print(f"generated: {args.out}")
     print(f"projects:  {len(targets['targets'])}")
     print(f"cases:     {total_cases}")
-    print("next: run verifier.py; confirmed requires repo_path plus run_cmd/poc_cmd/test_cmd and an oracle")
+    print("next: run verifier.py; Juliet api-misuse targets include runner/oracle automatically; other projects require execution context")
     return 0
 
 

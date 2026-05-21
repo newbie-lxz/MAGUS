@@ -71,14 +71,17 @@ hypothesis_id > route > project_id
 {"project_id":"juliet_small_c","repo_path":"srcs/juliet-small","test_cmd":"./repros/run_juliet_case.sh ${file} ${entry_symbol}","oracle":{"failure_patterns":["AddressSanitizer","Segmentation fault"],"expect_nonzero_exit":false}}
 ```
 
-当前仓库的 `project_id=cwe15` 使用项目级 sidecar 绑定到
-`tools/juliet_win_shim/run_cwe15_case.py`。该 runner 会在 Linux 下编译单个
-Juliet CWE15 Win32 样本，链接本仓库的 WinSock/Windows API runtime stub。runner
-会根据 `${route}` / `${entry_symbol}` 选择 Juliet 的 bad 或 good 场景；遇到
-`*_bad.cpp`、`*_goodG2B.cpp`、`*b.c` 这类 helper 文件时，会回到同组主文件完整
-编译运行，不抽取 C 的 evidence slice。只有当前场景被执行且外部 payload 到达
-`SetComputerNameA` 时才输出 `MAGUS_CWE15_ROUTE_CONFIRMED`；仅能证明同文件其他
-路径触发时不会 confirmed。
+当前仓库的 `srcs/juliet-api-misuse` 不需要项目级 sidecar。`gen_targets_from_hypotheses.py`
+会自动绑定到 `tools/juliet_win_shim/run_juliet_win_case.py`，在 Linux 下编译单个
+Juliet Win32 testcase，并链接本仓库的 Win32 API shim。runner 会根据 `${route}` /
+`${entry_symbol}` 选择 Juliet 的 bad 或 good 场景；遇到 `*_bad.cpp`、
+`*_goodG2B.cpp`、`*b.c` 这类 helper 文件时，会回到同组主文件完整编译运行，不抽取
+C 的 evidence slice。只有当前场景被执行且外部 payload 到达对应 source/API sink，
+或坏路径触发了点缺陷 API 标记，才输出 `MAGUS_JULIET_ROUTE_CONFIRMED`；仅能证明同文件
+其他路径触发时不会 confirmed。
+
+内置 shim 覆盖 WinSock、WinLDAP、WinCrypt、进程/命令执行、注册表/路径、管道/权限、
+句柄生命周期、临时文件、弱 PRNG、VirtualLock 等 Juliet Win32 API misuse 场景。
 
 sidecar 的 oracle 支持：
 
@@ -88,7 +91,7 @@ required_patterns        # confirmed 前必须同时存在的 route-bound 模式
 failure_code_patterns    # 把输出模式映射为 NOT_ROUTE_BOUND / NOT_EXPLOITABLE 等失败码
 ```
 
-自动脚本会先生成 `targets.auto.json`，如果发现 `verification_contexts.jsonl`，再通过 `bind_verification_contexts.py` 输出 `targets.executable.json` 给原 verifier 执行。
+自动脚本会先生成 `targets.auto.json`；`srcs/juliet-api-misuse` 记录在这一步已经带有可执行 runner/oracle。如果发现 `verification_contexts.jsonl`，再通过 `bind_verification_contexts.py` 输出 `targets.executable.json` 给原 verifier 执行。
 sidecar 里的记录必须能命中当前 targets；如果出现未匹配的 `project_id`、`route` 或 `hypothesis_id`，脚本会直接失败。
 
 ## 3. 自动验证

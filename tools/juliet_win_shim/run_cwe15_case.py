@@ -108,7 +108,12 @@ def main_source(companions: list[Path], source: Path) -> Path:
 
 
 def scenario_for(args: argparse.Namespace, source: Path) -> str:
-    text = f"{args.route} {args.entry_symbol} {source.name}".lower()
+    text = f"{args.route} {args.entry_symbol}".lower()
+    if "good" in text:
+        return "good"
+    if "bad" in text:
+        return "bad"
+    text = source.name.lower()
     if "good" in text:
         return "good"
     if "bad" in text:

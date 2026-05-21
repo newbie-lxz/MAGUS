@@ -38,6 +38,14 @@ struct sockaddr_in {
     char sin_zero[8];
 };
 
+struct hostent {
+    char *h_name;
+    char **h_aliases;
+    short h_addrtype;
+    short h_length;
+    char **h_addr_list;
+};
+
 #ifndef TRUE
 #define TRUE 1
 #endif
@@ -54,18 +62,24 @@ struct sockaddr_in {
 #define SOCK_STREAM 1
 #define IPPROTO_TCP 6
 #define INADDR_ANY 0UL
+#define SD_SEND 1
 
 #define MAKEWORD(low, high) ((WORD)((((WORD)(high)) << 8) | ((WORD)(low))))
 
 int WSAStartup(WORD wVersionRequired, WSADATA *lpWSAData);
 int WSACleanup(void);
 SOCKET socket(int af, int type, int protocol);
+int connect(SOCKET s, const struct sockaddr *name, int namelen);
 int bind(SOCKET s, const struct sockaddr *name, int namelen);
 int listen(SOCKET s, int backlog);
 SOCKET accept(SOCKET s, struct sockaddr *addr, int *addrlen);
 int recv(SOCKET s, char *buf, int len, int flags);
+int send(SOCKET s, const char *buf, int len, int flags);
+int shutdown(SOCKET s, int how);
 int closesocket(SOCKET s);
 unsigned short htons(unsigned short hostshort);
+unsigned long inet_addr(const char *cp);
+struct hostent *gethostbyaddr(const char *addr, int len, int type);
 
 #ifdef __cplusplus
 }
