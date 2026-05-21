@@ -1,0 +1,102 @@
+/* TEMPLATE GENERATED TESTCASE FILE
+Filename: CWE121_Stack_Based_Buffer_Overflow__CWE131_loop_16.c
+Label Definition File: CWE121_Stack_Based_Buffer_Overflow__CWE131.label.xml
+Template File: sources-sink-16.tmpl.c
+*/
+/*
+ * @description
+ * CWE: 121 Stack Based Buffer Overflow
+ * Case0Source:  Allocate memory without using sizeof(int)
+ * Case1Source: Allocate memory using sizeof(int)
+ * Sink: loop
+ *    Case0Sink : Copy array to data using a loop
+ * Flow Variant: 16 Control flow: while(1)
+ *
+ * */
+
+#include "std_testcase.h"
+
+#ifndef OMITCASE0
+
+void CWE121_Stack_Based_Buffer_Overflow__CWE131_loop_16_case0()
+{
+    int * data;
+    data = NULL;
+    while(1)
+    {
+        /* NOTE: Allocate memory without using sizeof(int) */
+        data = (int *)ALLOCA(10);
+        break;
+    }
+    {
+        int source[10] = {0};
+        size_t i;
+        /* NOTE: Possible buffer overflow if data was not allocated correctly in the source */
+        for (i = 0; i < 10; i++)
+        {
+            data[i] = source[i];
+        }
+        printIntLine(data[0]);
+    }
+}
+
+#endif /* OMITCASE0 */
+
+#ifndef OMITCASE1
+
+/* case1V1() - use case1source and case0sink by changing the conditions on the while statements */
+static void case1V1()
+{
+    int * data;
+    data = NULL;
+    while(1)
+    {
+        /* ALT: Allocate memory using sizeof(int) */
+        data = (int *)ALLOCA(10*sizeof(int));
+        break;
+    }
+    {
+        int source[10] = {0};
+        size_t i;
+        /* NOTE: Possible buffer overflow if data was not allocated correctly in the source */
+        for (i = 0; i < 10; i++)
+        {
+            data[i] = source[i];
+        }
+        printIntLine(data[0]);
+    }
+}
+
+void CWE121_Stack_Based_Buffer_Overflow__CWE131_loop_16_case1()
+{
+    case1V1();
+}
+
+#endif /* OMITCASE1 */
+
+/* Below is the main(). It is only used when building this testcase on
+ * its own for testing or for building a binary to use in testing binary
+ * analysis tools. It is not used when compiling all the testcases as one
+ * application, which is how source code analysis tools are tested.
+ */
+
+#ifdef INCLUDEMAIN
+
+int main(int argc, char * argv[])
+{
+    /* seed randomness */
+    srand( (unsigned)time(NULL) );
+#ifndef OMITCASE1
+    printLine("Calling case1()...");
+    CWE121_Stack_Based_Buffer_Overflow__CWE131_loop_16_case1();
+    printLine("Finished case1()");
+#endif /* OMITCASE1 */
+#ifndef OMITCASE0
+    printLine("Calling case0()...");
+    CWE121_Stack_Based_Buffer_Overflow__CWE131_loop_16_case0();
+    printLine("Finished case0()");
+#endif /* OMITCASE0 */
+    return 0;
+}
+
+#endif

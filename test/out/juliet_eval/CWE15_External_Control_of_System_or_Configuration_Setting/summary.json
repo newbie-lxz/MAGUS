@@ -2,17 +2,18 @@
   "inputs": {
     "report": "/home/sq_hu/MAGUS/report/CWE15_External_Control_of_System_or_Configuration_Setting/verification.report.jsonl",
     "juliet_root": "/home/sq_hu/MAGUS/srcs/juliet-api-misuse",
+    "sanitization_map": "/home/sq_hu/MAGUS/srcs_sanitized/juliet_sanitization_map.json",
     "answer_file": "",
-    "scope_compile_commands": "srcs/compile_commands.cwe15.json",
+    "scope_compile_commands": "srcs_sanitized/compile_commands.cwe15.json",
     "scope_file_list": ""
   },
   "timing": {
-    "stage_a_start": "2026-05-21T11:19:27Z",
+    "stage_a_start": "2026-05-21T12:31:44Z",
     "stage_a_start_source": "--stage-a-start",
-    "report_generated_at": "2026-05-21T11:29:37Z",
+    "report_generated_at": "2026-05-21T12:42:41Z",
     "report_generated_source": "/home/sq_hu/MAGUS/report/CWE15_External_Control_of_System_or_Configuration_Setting/verification.report.md",
-    "elapsed_seconds": 610.0,
-    "elapsed_hms": "00:10:10",
+    "elapsed_seconds": 657.0,
+    "elapsed_hms": "00:10:57",
     "elapsed_source": "stage_a_start_to_report_generated_at",
     "warnings": []
   },

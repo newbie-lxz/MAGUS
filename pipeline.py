@@ -25,7 +25,7 @@ DEFAULT_STAGE_D_OUTPUT_DIR = STAGE_D_RUN_DIR / "output"
 DEFAULT_STAGE_A_INPUT = STAGE_A_DIR / "input/srcs.in.jsonl"
 DEFAULT_STAGE_A_OUTPUT = STAGE_A_DIR / "out/samples.raw.jsonl"
 DEFAULT_STAGE_A_GENERATED_INPUT = STAGE_A_DIR / "input/srcs.in.jsonl"
-DEFAULT_SOURCE_ROOT = REPO_ROOT / "srcs"
+DEFAULT_SOURCE_ROOT = REPO_ROOT / "srcs_sanitized"
 DEFAULT_STAGE_B_OUTPUT_DIR = STAGE_B_DIR / "b_output"
 DEFAULT_STAGE_C_OUTPUT = STAGE_C_DIR / "out/hypotheses.jsonl"
 REPORT_RUN_NAME_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
@@ -440,7 +440,7 @@ def main() -> None:
         help="compile_commands.json 路径；为空时使用 <repo-path>/compile_commands.json",
     )
     parser_gen_input.add_argument("--output", default=str(DEFAULT_STAGE_A_GENERATED_INPUT), help="输出 projects.in.jsonl")
-    parser_gen_input.add_argument("--project-id", default="srcs", help="Stage A project_id")
+    parser_gen_input.add_argument("--project-id", default="srcs_sanitized", help="Stage A project_id")
     parser_gen_input.add_argument("--language", default="c", help="Stage A language")
     parser_gen_input.add_argument("--framework", default="generic", help="Stage A framework")
     parser_gen_input.add_argument("--analyzer-jobs", type=int, default=2, help="Stage A analyzer_jobs")

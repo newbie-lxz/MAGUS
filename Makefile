@@ -1,8 +1,11 @@
-.PHONY: build-analyzer gen-srcs-compile-commands gen-input run-a run-b run-c run-d run-report run-abcd
+.PHONY: build-analyzer sanitize-srcs gen-srcs-compile-commands gen-input run-a run-b run-c run-d run-report run-abcd
 
 A_INPUT ?= a/input/srcs.in.jsonl
 A_OUTPUT ?= a/out/samples.raw.jsonl
-SRC_ROOT ?= srcs
+ORIGINAL_SRC_ROOT ?= srcs
+SRC_ROOT ?= srcs_sanitized
+SANITIZE_MAP ?= $(SRC_ROOT)/juliet_sanitization_map.json
+SANITIZE_FORCE ?= 1
 COMPILE_COMMANDS ?= $(SRC_ROOT)/compile_commands.json
 SRC_CC_OUTPUT ?= $(COMPILE_COMMANDS)
 SRC_CC ?= clang
@@ -11,7 +14,7 @@ SRC_CC_SOURCE_GLOB ?=
 SRC_CC_INCLUDE_DIR ?=
 SRC_CC_FORCE ?=
 GEN_INPUT_OUTPUT ?= a/input/srcs.in.jsonl
-GEN_PROJECT_ID ?= srcs
+GEN_PROJECT_ID ?= srcs_sanitized
 GEN_LANGUAGE ?= c
 GEN_FRAMEWORK ?= generic
 GEN_ANALYZER_JOBS ?= 2
@@ -35,7 +38,10 @@ REPORT_RUN_NAME ?=
 build-analyzer:
 	python3 pipeline.py build-analyzer
 
-gen-srcs-compile-commands:
+sanitize-srcs:
+	python3 tools/sanitize_juliet_tree.py --input $(ORIGINAL_SRC_ROOT) --output $(SRC_ROOT) $(if $(SANITIZE_FORCE),--force,)
+
+gen-srcs-compile-commands: sanitize-srcs
 	python3 tools/gen_srcs_compile_commands.py --repo-path $(SRC_ROOT) --output $(SRC_CC_OUTPUT) --cc $(SRC_CC) --cxx $(SRC_CXX) $(foreach glob,$(SRC_CC_SOURCE_GLOB),--source-glob $(glob)) $(foreach dir,$(SRC_CC_INCLUDE_DIR),--include-dir $(dir)) $(if $(SRC_CC_FORCE),--force,)
 
 gen-input:

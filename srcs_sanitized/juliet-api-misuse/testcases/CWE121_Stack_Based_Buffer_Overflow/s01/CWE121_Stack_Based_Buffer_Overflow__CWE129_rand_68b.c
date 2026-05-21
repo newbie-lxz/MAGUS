@@ -1,0 +1,103 @@
+/* TEMPLATE GENERATED TESTCASE FILE
+Filename: CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68b.c
+Label Definition File: CWE121_Stack_Based_Buffer_Overflow__CWE129.label.xml
+Template File: sources-sinks-68b.tmpl.c
+*/
+/*
+ * @description
+ * CWE: 121 Stack Based Buffer Overflow
+ * Case0Source: rand Set data to result of rand(), which may be zero
+ * Case1Source: Larger than zero but less than 10
+ * Sinks:
+ *    Case1Sink: Ensure the array index is valid
+ *    Case0Sink : Improperly check the array index by not checking the upper bound
+ * Flow Variant: 68 Data flow: data passed as a global variable from one function to another in different source files
+ *
+ * */
+
+#include "std_testcase.h"
+
+extern int CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68_case0Data;
+extern int CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68_case1V1Data;
+extern int CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68_case1V2Data;
+
+#ifndef OMITCASE0
+
+void CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68b_case0Sink()
+{
+    int data = CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68_case0Data;
+    {
+        int i;
+        int buffer[10] = { 0 };
+        /* NOTE: Attempt to write to an index of the array that is above the upper bound
+        * This code does check to see if the array index is negative */
+        if (data >= 0)
+        {
+            buffer[data] = 1;
+            /* Print the array values */
+            for(i = 0; i < 10; i++)
+            {
+                printIntLine(buffer[i]);
+            }
+        }
+        else
+        {
+            printLine("ERROR: Array index is negative.");
+        }
+    }
+}
+
+#endif /* OMITCASE0 */
+
+#ifndef OMITCASE1
+
+/* case1V1 uses the Case1Source with the Case0Sink */
+void CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68b_case1V1Sink()
+{
+    int data = CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68_case1V1Data;
+    {
+        int i;
+        int buffer[10] = { 0 };
+        /* NOTE: Attempt to write to an index of the array that is above the upper bound
+        * This code does check to see if the array index is negative */
+        if (data >= 0)
+        {
+            buffer[data] = 1;
+            /* Print the array values */
+            for(i = 0; i < 10; i++)
+            {
+                printIntLine(buffer[i]);
+            }
+        }
+        else
+        {
+            printLine("ERROR: Array index is negative.");
+        }
+    }
+}
+
+/* case1V2 uses the Case0Source with the Case1Sink */
+void CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68b_case1V2Sink()
+{
+    int data = CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_68_case1V2Data;
+    {
+        int i;
+        int buffer[10] = { 0 };
+        /* ALT: Properly validate the array index and prevent a buffer overflow */
+        if (data >= 0 && data < (10))
+        {
+            buffer[data] = 1;
+            /* Print the array values */
+            for(i = 0; i < 10; i++)
+            {
+                printIntLine(buffer[i]);
+            }
+        }
+        else
+        {
+            printLine("ERROR: Array index is out-of-bounds");
+        }
+    }
+}
+
+#endif /* OMITCASE1 */

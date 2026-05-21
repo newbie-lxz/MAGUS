@@ -32,6 +32,8 @@ DEFAULT_FAILURE_PATTERNS = [
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 JULIET_API_MISUSE_ROOT = WORKSPACE_ROOT / "srcs" / "juliet-api-misuse"
+SANITIZED_SOURCE_ROOT = WORKSPACE_ROOT / "srcs_sanitized"
+SANITIZED_JULIET_API_MISUSE_ROOT = SANITIZED_SOURCE_ROOT / "juliet-api-misuse"
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -237,6 +239,8 @@ def resolve_candidate_source_path(source_file: Any) -> Path | None:
     raw = Path(str(source_file))
     candidates = [raw] if raw.is_absolute() else [
         WORKSPACE_ROOT / raw,
+        SANITIZED_SOURCE_ROOT / raw,
+        SANITIZED_JULIET_API_MISUSE_ROOT / raw,
         JULIET_API_MISUSE_ROOT / raw,
         WORKSPACE_ROOT / "srcs" / raw,
     ]
@@ -253,11 +257,13 @@ def is_juliet_api_misuse_hypothesis(hyp: Dict[str, Any], source_file: Any) -> bo
     resolved = resolve_candidate_source_path(source_file)
     if resolved is None:
         return False
-    try:
-        resolved.relative_to(JULIET_API_MISUSE_ROOT.resolve())
-        return True
-    except ValueError:
-        return False
+    for root in (SANITIZED_JULIET_API_MISUSE_ROOT, JULIET_API_MISUSE_ROOT):
+        try:
+            resolved.relative_to(root.resolve())
+            return True
+        except ValueError:
+            continue
+    return False
 
 
 def juliet_win32_test_cmd(source_file: Any, symbol: str, route: Any) -> str:

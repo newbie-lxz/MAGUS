@@ -22,12 +22,14 @@ import pipeline as magus_pipeline  # noqa: E402
 
 REPORT_JSONL_NAME = "verification.report.jsonl"
 DEFAULT_JULIET_ROOT = REPO_ROOT / "srcs" / "juliet-api-misuse"
+DEFAULT_SANITIZATION_MAP = REPO_ROOT / "srcs_sanitized" / "juliet_sanitization_map.json"
 DEFAULT_OUT_ROOT = REPO_ROOT / "test" / "out" / "juliet_eval"
 DEFAULT_D_OUTPUT_DIR = REPO_ROOT / "d" / "memberD_verifier" / "02_run_with_C" / "output"
 DEFAULT_REPORT_ROOT = REPO_ROOT / "report"
 SOURCE_EXTENSIONS = {".c", ".cc", ".cpp", ".cxx"}
 POSITIVE_LABELS = {"1", "true", "yes", "y", "bad", "bug", "vulnerable", "vuln", "positive"}
 NEGATIVE_LABELS = {"0", "false", "no", "n", "good", "clean", "safe", "non_vulnerable", "negative"}
+JULIET_PREFIX = "juliet-api-misuse/"
 
 
 @dataclass
@@ -67,6 +69,14 @@ class TimingInfo:
     report_generated_source: str = ""
     elapsed_source: str = ""
     warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SanitizationMap:
+    path_map: dict[str, str] = field(default_factory=dict)
+    reverse_path_map: dict[str, str] = field(default_factory=dict)
+    reverse_token_map: dict[str, str] = field(default_factory=dict)
+    source: str = ""
 
 
 def read_text(path: Path) -> str:
@@ -117,6 +127,66 @@ def write_json(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def load_sanitization_map(path: Path | None) -> SanitizationMap:
+    if path is None:
+        return SanitizationMap()
+    if not path.exists():
+        return SanitizationMap(source=str(path))
+    payload = json.loads(read_text(path))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path}: expected Juliet sanitization map object")
+    path_map = payload.get("path_map") or {}
+    reverse_path_map = payload.get("reverse_path_map") or {}
+    reverse_token_map = payload.get("reverse_token_map") or {}
+    if not isinstance(path_map, dict) or not isinstance(reverse_path_map, dict) or not isinstance(reverse_token_map, dict):
+        raise ValueError(f"{path}: invalid Juliet sanitization map fields")
+    return SanitizationMap(
+        path_map={str(key): str(value) for key, value in path_map.items()},
+        reverse_path_map={str(key): str(value) for key, value in reverse_path_map.items()},
+        reverse_token_map={str(key): str(value) for key, value in reverse_token_map.items()},
+        source=str(path),
+    )
+
+
+def text_mentions_sanitized_juliet(text: str) -> bool:
+    lowered = text.lower()
+    return "srcs_sanitized" in lowered or "case0" in lowered or "case1" in lowered
+
+
+def assert_sanitization_map_available(
+    args: argparse.Namespace,
+    report_rows: list[dict[str, Any]],
+    sanitization: SanitizationMap,
+) -> None:
+    if sanitization.reverse_path_map:
+        return
+    probes = [str(args.scope_compile_commands or ""), str(args.scope_file_list or "")]
+    probes.extend(json.dumps(row, ensure_ascii=False) for row in report_rows[:20])
+    if any(text_mentions_sanitized_juliet(item) for item in probes):
+        raise ValueError(
+            "sanitized Juliet inputs require a sanitization map; "
+            f"expected mapping at {args.sanitization_map}"
+        )
+
+
+def desanitize_text(text: str, sanitization: SanitizationMap) -> str:
+    result = str(text or "")
+    replacements = sanitization.reverse_token_map or {}
+    for sanitized, original in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
+        result = result.replace(sanitized, original)
+    return result
+
+
+def desanitize_relpath(rel: str, sanitization: SanitizationMap) -> str:
+    normalized = rel.replace("\\", "/").lstrip("/")
+    mapped = sanitization.reverse_path_map.get(normalized)
+    if mapped is None and not normalized.startswith(JULIET_PREFIX):
+        mapped = sanitization.reverse_path_map.get(JULIET_PREFIX + normalized)
+    if mapped is None:
+        mapped = normalized
+    return mapped[len(JULIET_PREFIX) :] if mapped.startswith(JULIET_PREFIX) else mapped
+
+
 def scalar_list(value: Any) -> list[Any]:
     if value in (None, "", []):
         return []
@@ -157,9 +227,8 @@ def cwe_from_relpath(rel: str) -> str:
 
 def path_marker_relative(text: str) -> str | None:
     normalized = text.replace("\\", "/")
-    marker = "juliet-api-misuse/"
-    if marker in normalized:
-        return normalized.split(marker, 1)[1].lstrip("/")
+    if JULIET_PREFIX in normalized:
+        return normalized.split(JULIET_PREFIX, 1)[1].lstrip("/")
     if normalized.startswith("testcases/"):
         return normalized
     if normalized.startswith("./testcases/"):
@@ -194,6 +263,24 @@ def normalize_juliet_relpath(raw: Any, juliet_root: Path, workspace_root: Path) 
     return None
 
 
+def normalize_original_juliet_relpath(
+    raw: Any,
+    juliet_root: Path,
+    workspace_root: Path,
+    sanitization: SanitizationMap,
+) -> str | None:
+    rel = normalize_juliet_relpath(raw, juliet_root, workspace_root)
+    if rel:
+        return desanitize_relpath(rel, sanitization)
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    marker_rel = path_marker_relative(text)
+    if marker_rel:
+        return desanitize_relpath(marker_rel, sanitization)
+    return None
+
+
 def route_symbol(route: Any) -> str:
     text = str(route or "").strip()
     if "::" in text:
@@ -203,7 +290,18 @@ def route_symbol(route: Any) -> str:
 
 def canonical_stem(stem: str) -> str:
     result = stem
-    for suffix in ("_goodB2G", "_goodG2B", "_good", "_bad"):
+    for suffix in (
+        "_goodB2G",
+        "_goodG2B",
+        "_good",
+        "_bad",
+        "_case1B2G",
+        "_case1G2B",
+        "_case1V2",
+        "_case1V1",
+        "_case1",
+        "_case0",
+    ):
         if result.endswith(suffix):
             result = result[: -len(suffix)]
             break
@@ -224,7 +322,17 @@ def file_name_label(rel: str) -> str:
     stem = PurePosixPath(rel).stem.lower()
     if stem.endswith("_good") or "_goodb2g" in stem or "_goodg2b" in stem:
         return "non_vulnerable"
+    if (
+        stem.endswith("_case1")
+        or "_case1b2g" in stem
+        or "_case1g2b" in stem
+        or "_case1v2" in stem
+        or "_case1v1" in stem
+    ):
+        return "non_vulnerable"
     if stem.endswith("_bad") or "_bad_" in stem:
+        return "vulnerable"
+    if stem.endswith("_case0") or "_case0_" in stem:
         return "vulnerable"
     return "unknown"
 
@@ -366,7 +474,12 @@ def load_answer_file(path: Path, juliet_root: Path, workspace_root: Path) -> dic
     return truth
 
 
-def load_scope_compile_commands(path: Path, juliet_root: Path, workspace_root: Path) -> set[str]:
+def load_scope_compile_commands(
+    path: Path,
+    juliet_root: Path,
+    workspace_root: Path,
+    sanitization: SanitizationMap,
+) -> set[str]:
     payload = json.loads(read_text(path))
     if not isinstance(payload, list):
         raise ValueError(f"{path}: expected compile_commands.json list")
@@ -374,19 +487,24 @@ def load_scope_compile_commands(path: Path, juliet_root: Path, workspace_root: P
     for idx, entry in enumerate(payload, 1):
         if not isinstance(entry, dict):
             raise ValueError(f"{path}:{idx}: expected a compile command object")
-        rel = normalize_juliet_relpath(entry.get("file"), juliet_root, workspace_root)
+        rel = normalize_original_juliet_relpath(entry.get("file"), juliet_root, workspace_root, sanitization)
         if rel and is_juliet_testcase_source(rel):
             result.add(rel)
     return result
 
 
-def load_scope_file_list(path: Path, juliet_root: Path, workspace_root: Path) -> set[str]:
+def load_scope_file_list(
+    path: Path,
+    juliet_root: Path,
+    workspace_root: Path,
+    sanitization: SanitizationMap,
+) -> set[str]:
     result: set[str] = set()
     for line_no, line in enumerate(read_text(path).splitlines(), 1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        rel = normalize_juliet_relpath(line, juliet_root, workspace_root)
+        rel = normalize_original_juliet_relpath(line, juliet_root, workspace_root, sanitization)
         if not rel:
             raise ValueError(f"{path}:{line_no}: path is not under Juliet root: {line}")
         if is_juliet_testcase_source(rel):
@@ -419,11 +537,13 @@ def build_finding(
     truth: dict[str, TruthItem],
     juliet_root: Path,
     workspace_root: Path,
+    sanitization: SanitizationMap,
 ) -> ReportFinding:
     file_path, route = extract_report_file_and_route(row)
-    rel = normalize_juliet_relpath(file_path, juliet_root, workspace_root) or ""
+    rel = normalize_original_juliet_relpath(file_path, juliet_root, workspace_root, sanitization) or ""
     key = canonical_case_key(rel) if rel else ""
-    label = route_label(rel, route) if rel else "unknown"
+    original_route = desanitize_text(route, sanitization)
+    label = route_label(rel, original_route) if rel else "unknown"
 
     classification = "FP"
     reason = "report path is outside the Juliet benchmark"
@@ -450,7 +570,7 @@ def build_finding(
         file_path=file_path,
         juliet_file=rel,
         route=route,
-        route_symbol=route_symbol(route),
+        route_symbol=route_symbol(original_route),
         case_key=key,
         cwe=cwe_from_report(row, rel),
         route_label=label,
@@ -464,8 +584,12 @@ def classify_findings(
     truth: dict[str, TruthItem],
     juliet_root: Path,
     workspace_root: Path,
+    sanitization: SanitizationMap,
 ) -> list[ReportFinding]:
-    findings = [build_finding(row, idx, truth, juliet_root, workspace_root) for idx, row in enumerate(rows, 1)]
+    findings = [
+        build_finding(row, idx, truth, juliet_root, workspace_root, sanitization)
+        for idx, row in enumerate(rows, 1)
+    ]
     covered: set[str] = set()
     for finding in findings:
         if finding.classification != "TP":
@@ -677,6 +801,7 @@ def annotate_missing_cases(
     args: argparse.Namespace,
     juliet_root: Path,
     workspace_root: Path,
+    sanitization: SanitizationMap,
 ) -> dict[str, dict[str, Any]]:
     annotations: dict[str, dict[str, Any]] = {key: {} for key in missing_keys}
     failed_paths: list[Path] = []
@@ -689,7 +814,7 @@ def annotate_missing_cases(
     for path in failed_paths:
         for row in read_json_or_jsonl(path):
             file_path, route = extract_report_file_and_route(row)
-            rel = normalize_juliet_relpath(file_path, juliet_root, workspace_root) or ""
+            rel = normalize_original_juliet_relpath(file_path, juliet_root, workspace_root, sanitization) or ""
             key = canonical_case_key(rel) if rel else ""
             if key in annotations:
                 codes = annotations[key].setdefault("d_failure_codes", set())
@@ -703,7 +828,7 @@ def annotate_missing_cases(
     for path in args.audit_jsonl or []:
         for row in read_json_or_jsonl(path):
             file_path, route = extract_report_file_and_route(row)
-            rel = normalize_juliet_relpath(file_path, juliet_root, workspace_root) or ""
+            rel = normalize_original_juliet_relpath(file_path, juliet_root, workspace_root, sanitization) or ""
             key = canonical_case_key(rel) if rel else ""
             if key in annotations:
                 reasons = annotations[key].setdefault("audit_reasons", set())
@@ -755,6 +880,7 @@ def build_summary(
         "inputs": {
             "report": str(args.report),
             "juliet_root": str(args.juliet_root),
+            "sanitization_map": str(args.sanitization_map) if args.sanitization_map else "",
             "answer_file": str(args.answer_file) if args.answer_file else "",
             "scope_compile_commands": str(args.scope_compile_commands) if args.scope_compile_commands else "",
             "scope_file_list": str(args.scope_file_list) if args.scope_file_list else "",
@@ -943,10 +1069,11 @@ def build_false_negative_rows(
     args: argparse.Namespace,
     juliet_root: Path,
     workspace_root: Path,
+    sanitization: SanitizationMap,
 ) -> list[dict[str, Any]]:
     covered = {finding.case_key for finding in findings if finding.classification == "TP"}
     missing = {key for key, item in truth.items() if item.is_vulnerable and key not in covered}
-    annotations = annotate_missing_cases(missing, args, juliet_root, workspace_root)
+    annotations = annotate_missing_cases(missing, args, juliet_root, workspace_root, sanitization)
     rows: list[dict[str, Any]] = []
     for key in sorted(missing):
         item = truth[key]
@@ -991,6 +1118,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--juliet-root", default=DEFAULT_JULIET_ROOT, type=Path, help="Juliet API misuse root")
     parser.add_argument("--workspace-root", default=REPO_ROOT, type=Path, help="MAGUS workspace root")
+    parser.add_argument(
+        "--sanitization-map",
+        default=DEFAULT_SANITIZATION_MAP,
+        type=Path,
+        help="Juliet sanitized-to-original mapping; defaults to srcs_sanitized/juliet_sanitization_map.json",
+    )
     parser.add_argument("--answer-file", type=Path, help="Optional explicit Juliet answer file in JSONL/JSON/CSV")
     parser.add_argument(
         "--scope-compile-commands",
@@ -1035,12 +1168,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def load_scope(args: argparse.Namespace) -> set[str] | None:
+def load_scope(args: argparse.Namespace, sanitization: SanitizationMap) -> set[str] | None:
     scoped: set[str] | None = None
     if args.scope_compile_commands:
-        scoped = load_scope_compile_commands(args.scope_compile_commands, args.juliet_root, args.workspace_root)
+        scoped = load_scope_compile_commands(
+            args.scope_compile_commands,
+            args.juliet_root,
+            args.workspace_root,
+            sanitization,
+        )
     if args.scope_file_list:
-        listed = load_scope_file_list(args.scope_file_list, args.juliet_root, args.workspace_root)
+        listed = load_scope_file_list(args.scope_file_list, args.juliet_root, args.workspace_root, sanitization)
         scoped = listed if scoped is None else scoped & listed
     return scoped
 
@@ -1106,6 +1244,8 @@ def main(argv: list[str] | None = None) -> int:
     args.d_output_dir = args.d_output_dir.resolve()
     args.report_root = args.report_root.resolve()
     args.out_root = args.out_root.resolve()
+    if args.sanitization_map:
+        args.sanitization_map = args.sanitization_map.resolve()
     if args.report:
         args.report = args.report.resolve()
 
@@ -1115,7 +1255,9 @@ def main(argv: list[str] | None = None) -> int:
         report_rows = read_json_or_jsonl(args.report)
         run_name = resolve_report_run_name(args, report_rows)
         args.out_dir = resolve_output_dir(args, run_name)
-        scoped_files = load_scope(args)
+        sanitization = load_sanitization_map(args.sanitization_map)
+        assert_sanitization_map_available(args, report_rows, sanitization)
+        scoped_files = load_scope(args, sanitization)
         if args.answer_file:
             truth = load_answer_file(args.answer_file, args.juliet_root, args.workspace_root)
         else:
@@ -1123,9 +1265,16 @@ def main(argv: list[str] | None = None) -> int:
         if not truth:
             raise ValueError("Juliet answer scope is empty")
 
-        findings = classify_findings(report_rows, truth, args.juliet_root, args.workspace_root)
+        findings = classify_findings(report_rows, truth, args.juliet_root, args.workspace_root, sanitization)
         timing = resolve_timing(args, args.report)
-        false_negative_rows = build_false_negative_rows(truth, findings, args, args.juliet_root, args.workspace_root)
+        false_negative_rows = build_false_negative_rows(
+            truth,
+            findings,
+            args,
+            args.juliet_root,
+            args.workspace_root,
+            sanitization,
+        )
         summary = build_summary(findings, truth, timing, args)
         write_outputs(args.out_dir, summary, findings, truth, false_negative_rows)
     except (OSError, ValueError, json.JSONDecodeError) as exc:

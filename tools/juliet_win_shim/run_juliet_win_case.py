@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -12,10 +13,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SHIM_DIR = REPO_ROOT / "tools" / "juliet_win_shim"
-SRC_ROOT = REPO_ROOT / "srcs" / "juliet-api-misuse"
-SUPPORT_DIR = SRC_ROOT / "testcasesupport"
-SUPPORT_IO = SUPPORT_DIR / "io.c"
-SUPPORT_THREAD = SUPPORT_DIR / "std_thread.c"
+ORIGINAL_SOURCE_ROOT = REPO_ROOT / "srcs"
+SANITIZED_SOURCE_ROOT = REPO_ROOT / "srcs_sanitized"
+ORIGINAL_SRC_ROOT = ORIGINAL_SOURCE_ROOT / "juliet-api-misuse"
+SANITIZED_SRC_ROOT = SANITIZED_SOURCE_ROOT / "juliet-api-misuse"
+SANITIZATION_MAP = SANITIZED_SOURCE_ROOT / "juliet_sanitization_map.json"
 STUBS = SHIM_DIR / "winapi_runtime_stubs.c"
 
 ROUTE_EXECUTED_MARKER = "MAGUS_JULIET_ROUTE_EXECUTED"
@@ -25,6 +27,7 @@ NOT_CONFIRMED_MARKER = "MAGUS_JULIET_NOT_CONFIRMED"
 BUILD_FAILED_MARKER = "MAGUS_JULIET_BUILD_FAILED"
 RUNNER_ERROR_MARKER = "MAGUS_JULIET_RUNNER_ERROR"
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
+SCENARIO_LABELS = {"bad": "case0", "good": "case1"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,6 +41,56 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def load_sanitization_map() -> dict[str, object]:
+    if not SANITIZATION_MAP.exists():
+        return {}
+    try:
+        payload = json.loads(SANITIZATION_MAP.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def path_under(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def is_sanitized_source(source: Path) -> bool:
+    return path_under(source, SANITIZED_SOURCE_ROOT)
+
+
+def support_dir_for(source: Path) -> Path:
+    return (SANITIZED_SRC_ROOT if is_sanitized_source(source) else ORIGINAL_SRC_ROOT) / "testcasesupport"
+
+
+def require_sanitization_map_for(source: Path) -> None:
+    if is_sanitized_source(source) and not SANITIZATION_MAP.exists():
+        raise SystemExit(f"{RUNNER_ERROR_MARKER} sanitized Juliet source requires mapping: {SANITIZATION_MAP}")
+
+
+def desanitize_text(text: str) -> str:
+    mapping = load_sanitization_map()
+    reverse = mapping.get("reverse_token_map") if isinstance(mapping.get("reverse_token_map"), dict) else {}
+    replacements = reverse or {
+        "OMITCASE0": "OMITBAD",
+        "OMITCASE1": "OMITGOOD",
+        "CASE0": "BAD",
+        "Case0": "Bad",
+        "case0": "bad",
+        "CASE1": "GOOD",
+        "Case1": "Good",
+        "case1": "good",
+    }
+    result = text
+    for sanitized, original in sorted(replacements.items(), key=lambda item: len(str(item[0])), reverse=True):
+        result = result.replace(str(sanitized), str(original))
+    return result
+
+
 def resolve_source(source_file: str) -> Path:
     raw = Path(source_file)
     candidates = []
@@ -47,7 +100,10 @@ def resolve_source(source_file: str) -> Path:
         candidates.extend(
             [
                 REPO_ROOT / raw,
-                SRC_ROOT / raw,
+                SANITIZED_SOURCE_ROOT / raw,
+                SANITIZED_SRC_ROOT / raw,
+                ORIGINAL_SOURCE_ROOT / raw,
+                ORIGINAL_SRC_ROOT / raw,
                 REPO_ROOT / "srcs" / raw,
             ]
         )
@@ -69,7 +125,12 @@ def testcase_stem(source: Path) -> str | None:
     if suffix not in SOURCE_SUFFIXES:
         return None
     stem = source.stem
-    match = re.match(r"(.+_\d+)(?:[a-z]|_(?:bad|goodG2B|goodB2G|goodG2B1|goodG2B2|goodB2G1|goodB2G2))?$", stem)
+    match = re.match(
+        r"(.+_\d+)(?:[a-z]|_(?:bad|goodG2B|goodB2G|goodG2B1|goodG2B2|goodB2G1|goodB2G2|"
+        r"case0|case1G2B|case1B2G|case1G2B1|case1G2B2|case1B2G1|case1B2G2|"
+        r"case1V1|case1V2|case1V11|case1V12|case1V21|case1V22))?$",
+        stem,
+    )
     if match:
         return match.group(1)
     return stem
@@ -105,17 +166,29 @@ def main_source(companions: list[Path], source: Path) -> Path:
 
 
 def scenario_for(args: argparse.Namespace, source: Path) -> str:
-    text = f"{args.route} {args.entry_symbol}".lower()
+    text = desanitize_text(f"{args.route} {args.entry_symbol}").lower()
     if "good" in text:
         return "good"
     if "bad" in text:
         return "bad"
-    text = source.name.lower()
+    text = desanitize_text(source.name).lower()
     if "good" in text:
         return "good"
     if "bad" in text:
         return "bad"
     return "bad"
+
+
+def omit_macro_for(source: Path, scenario: str) -> str:
+    if is_sanitized_source(source):
+        return "-DOMITCASE0" if scenario == "good" else "-DOMITCASE1"
+    return "-DOMITBAD" if scenario == "good" else "-DOMITGOOD"
+
+
+def scenario_label(source: Path, scenario: str) -> str:
+    if is_sanitized_source(source):
+        return SCENARIO_LABELS[scenario]
+    return scenario
 
 
 def link_compiler(companions: list[Path], args: argparse.Namespace) -> str:
@@ -148,8 +221,12 @@ def write_runtime_files(cwd: Path, payload: str) -> None:
     for name in (
         "BadSource_fopen.txt",
         "GoodSource_fopen.txt",
+        "Case0Source_fopen.txt",
+        "Case1Source_fopen.txt",
         "BadSink_fopen.txt",
         "GoodSink_fopen.txt",
+        "Case0Sink_fopen.txt",
+        "Case1Sink_fopen.txt",
         "file.txt",
         "log.txt",
     ):
@@ -194,7 +271,10 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
     companions = companion_sources(source)
     entry_unit = main_source(companions, source)
     scenario = scenario_for(args, source)
-    omit_macro = "-DOMITBAD" if scenario == "good" else "-DOMITGOOD"
+    omit_macro = omit_macro_for(source, scenario)
+    support_dir = support_dir_for(source)
+    support_io = support_dir / "io.c"
+    support_thread = support_dir / "std_thread.c"
 
     objects: list[Path] = []
     for index, unit in enumerate(companions):
@@ -209,7 +289,7 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
             "-I",
             str(SHIM_DIR),
             "-I",
-            str(SUPPORT_DIR),
+            str(support_dir),
             str(unit),
             "-o",
             str(obj),
@@ -219,8 +299,8 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
         objects.append(obj)
 
     support_units = [
-        (tmp_path / "io.o", SUPPORT_IO, args.cc, ["-DglobalReturnsTrueOrFalse=magus_unused_globalReturnsTrueOrFalse"]),
-        (tmp_path / "std_thread.o", SUPPORT_THREAD, args.cc, []),
+        (tmp_path / "io.o", support_io, args.cc, ["-DglobalReturnsTrueOrFalse=magus_unused_globalReturnsTrueOrFalse"]),
+        (tmp_path / "std_thread.o", support_thread, args.cc, []),
         (tmp_path / "winapi_runtime_stubs.o", STUBS, args.cc, ["-DMAGUS_WINAPI_RUNTIME_STUBS"]),
     ]
     for obj, unit, compiler, extra_macros in support_units:
@@ -232,7 +312,7 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
             "-I",
             str(SHIM_DIR),
             "-I",
-            str(SUPPORT_DIR),
+            str(support_dir),
             str(unit),
             "-o",
             str(obj),
@@ -248,10 +328,12 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
     return binary, entry_unit
 
 
-def route_was_executed(stdout: str, scenario: str) -> bool:
-    expected_call = f"Calling {scenario}()..."
-    expected_finish = f"Finished {scenario}()"
-    unexpected_call = "Calling good()..." if scenario == "bad" else "Calling bad()..."
+def route_was_executed(stdout: str, source: Path, scenario: str) -> bool:
+    label = scenario_label(source, scenario)
+    other_label = scenario_label(source, "good" if scenario == "bad" else "bad")
+    expected_call = f"Calling {label}()..."
+    expected_finish = f"Finished {label}()"
+    unexpected_call = f"Calling {other_label}()..."
     return expected_call in stdout and expected_finish in stdout and unexpected_call not in stdout
 
 
@@ -267,6 +349,7 @@ def oracle_confirmed(stdout: str, scenario: str) -> bool:
 def main() -> int:
     args = parse_args()
     source = resolve_source(args.source_file)
+    require_sanitization_map_for(source)
     scenario = scenario_for(args, source)
 
     for compiler in {args.cc, args.cxx}:
@@ -294,7 +377,7 @@ def main() -> int:
         print(raw_stdout, end="")
         print(raw_stderr, end="", file=sys.stderr)
 
-        route_executed = route_was_executed(raw_stdout, scenario)
+        route_executed = route_was_executed(raw_stdout, source, scenario)
         confirmed = oracle_confirmed(raw_stdout, scenario)
 
         if route_executed:

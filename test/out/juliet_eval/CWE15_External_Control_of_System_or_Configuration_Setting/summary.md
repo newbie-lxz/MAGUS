@@ -23,12 +23,12 @@
 
 | Metric | Value |
 | --- | --- |
-| Stage A start | 2026-05-21T11:19:27Z |
+| Stage A start | 2026-05-21T12:31:44Z |
 | Stage A start source | --stage-a-start |
-| Report generated at | 2026-05-21T11:29:37Z |
+| Report generated at | 2026-05-21T12:42:41Z |
 | Report generated source | /home/sq_hu/MAGUS/report/CWE15_External_Control_of_System_or_Configuration_Setting/verification.report.md |
-| Elapsed seconds | 610.000000 |
-| Elapsed hms | 00:10:10 |
+| Elapsed seconds | 657.000000 |
+| Elapsed hms | 00:10:57 |
 
 ## False Positives Preview
 

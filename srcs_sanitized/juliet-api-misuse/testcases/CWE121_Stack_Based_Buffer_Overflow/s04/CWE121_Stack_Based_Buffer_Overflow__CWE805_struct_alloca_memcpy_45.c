@@ -1,0 +1,123 @@
+/* TEMPLATE GENERATED TESTCASE FILE
+Filename: CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45.c
+Label Definition File: CWE121_Stack_Based_Buffer_Overflow__CWE805.label.xml
+Template File: sources-sink-45.tmpl.c
+*/
+/*
+ * @description
+ * CWE: 121 Stack Based Buffer Overflow
+ * Case0Source:  Set data pointer to the case0 buffer
+ * Case1Source: Set data pointer to the case1 buffer
+ * Sinks: memcpy
+ *    Case0Sink : Copy twoIntsStruct array to data using memcpy
+ * Flow Variant: 45 Data flow: data passed as a static global variable from one function to another in the same source file
+ *
+ * */
+
+#include "std_testcase.h"
+
+static twoIntsStruct * CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case0Data;
+static twoIntsStruct * CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case1V1Data;
+
+#ifndef OMITCASE0
+
+static void case0Sink()
+{
+    twoIntsStruct * data = CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case0Data;
+    {
+        twoIntsStruct source[100];
+        {
+            size_t i;
+            /* Initialize array */
+            for (i = 0; i < 100; i++)
+            {
+                source[i].intOne = 0;
+                source[i].intTwo = 0;
+            }
+        }
+        /* NOTE: Possible buffer overflow if data < 100 */
+        memcpy(data, source, 100*sizeof(twoIntsStruct));
+        printStructLine(&data[0]);
+    }
+}
+
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case0()
+{
+    twoIntsStruct * data;
+    twoIntsStruct * dataCase0Buffer = (twoIntsStruct *)ALLOCA(50*sizeof(twoIntsStruct));
+    twoIntsStruct * dataCase1Buffer = (twoIntsStruct *)ALLOCA(100*sizeof(twoIntsStruct));
+    /* NOTE: Set a pointer to a "small" buffer. This buffer will be used in the sinks as a destination
+     * buffer in various memory copying functions using a "large" source buffer. */
+    data = dataCase0Buffer;
+    CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case0Data = data;
+    case0Sink();
+}
+
+#endif /* OMITCASE0 */
+
+#ifndef OMITCASE1
+
+/* case1V1() uses the Case1Source with the Case0Sink */
+static void case1V1Sink()
+{
+    twoIntsStruct * data = CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case1V1Data;
+    {
+        twoIntsStruct source[100];
+        {
+            size_t i;
+            /* Initialize array */
+            for (i = 0; i < 100; i++)
+            {
+                source[i].intOne = 0;
+                source[i].intTwo = 0;
+            }
+        }
+        /* NOTE: Possible buffer overflow if data < 100 */
+        memcpy(data, source, 100*sizeof(twoIntsStruct));
+        printStructLine(&data[0]);
+    }
+}
+
+static void case1V1()
+{
+    twoIntsStruct * data;
+    twoIntsStruct * dataCase0Buffer = (twoIntsStruct *)ALLOCA(50*sizeof(twoIntsStruct));
+    twoIntsStruct * dataCase1Buffer = (twoIntsStruct *)ALLOCA(100*sizeof(twoIntsStruct));
+    /* ALT: Set a pointer to a "large" buffer, thus avoiding buffer overflows in the sinks. */
+    data = dataCase1Buffer;
+    CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case1V1Data = data;
+    case1V1Sink();
+}
+
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case1()
+{
+    case1V1();
+}
+
+#endif /* OMITCASE1 */
+
+/* Below is the main(). It is only used when building this testcase on
+ * its own for testing or for building a binary to use in testing binary
+ * analysis tools. It is not used when compiling all the testcases as one
+ * application, which is how source code analysis tools are tested.
+ */
+#ifdef INCLUDEMAIN
+
+int main(int argc, char * argv[])
+{
+    /* seed randomness */
+    srand( (unsigned)time(NULL) );
+#ifndef OMITCASE1
+    printLine("Calling case1()...");
+    CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case1();
+    printLine("Finished case1()");
+#endif /* OMITCASE1 */
+#ifndef OMITCASE0
+    printLine("Calling case0()...");
+    CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memcpy_45_case0();
+    printLine("Finished case0()");
+#endif /* OMITCASE0 */
+    return 0;
+}
+
+#endif

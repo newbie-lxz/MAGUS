@@ -80,7 +80,7 @@ python3 a/cmd/miner.py --input a/input/xxx.in.jsonl --output a/out/samples.raw.j
 ```json
 {
   "project_id": "juliet_api_misuse",
-  "repo_path": "srcs/juliet-api-misuse",
+  "repo_path": "srcs_sanitized/juliet-api-misuse",
   "language": "c",
   "framework": "juliet",
   "default_branch": "",
@@ -129,8 +129,8 @@ python3 a/cmd/miner.py --input a/input/xxx.in.jsonl --output a/out/samples.raw.j
 
 ```bash
 python3 pipeline.py gen-input \
-  --repo-path ./srcs \
-  --compile-commands ./srcs/compile_commands.json \
+  --repo-path ./srcs_sanitized \
+  --compile-commands ./srcs_sanitized/compile_commands.json \
   --output ./a/input/srcs.in.jsonl
 ```
 
@@ -1102,7 +1102,7 @@ make run-abcd
 
 ```bash
 python3 pipeline.py build-analyzer
-python3 pipeline.py gen-input --repo-path ./srcs --compile-commands ./srcs/compile_commands.json --output ./a/input/srcs.in.jsonl
+python3 pipeline.py gen-input --repo-path ./srcs_sanitized --compile-commands ./srcs_sanitized/compile_commands.json --output ./a/input/srcs.in.jsonl
 python3 pipeline.py a --input a/input/xxx.in.jsonl --output a/out/samples.raw.jsonl
 python3 pipeline.py b --input a/out/samples.stats.jsonl --llm-input a/out/samples.llm.jsonl --output-dir b/b_output
 python3 pipeline.py c --candidates b/b_output/candidates.for_c.jsonl --output c/out/hypotheses.jsonl
@@ -1694,4 +1694,4 @@ miner.py
   -> samples.raw.jsonl + samples.stats.jsonl
 ```
 
-对 `srcs/juliet-api-misuse`，`tools/gen_srcs_compile_commands.py` 只是生成 checked-in Juliet sample tree compile database 的专用 helper；它不属于 Stage A 通用输入合同。对 Linux kernel 这类项目，应先用 kernel 构建系统或未来专用工具生成真实 `compile_commands.json`，再进入 `gen_input.py`。
+对默认 Juliet 实验，`tools/sanitize_juliet_tree.py` 先从原始 `srcs/` 生成 `srcs_sanitized/` 和映射，`tools/gen_srcs_compile_commands.py` 再为 sanitized tree 生成 compile database；这些 helper 不属于 Stage A 通用输入合同。对 Linux kernel 这类项目，应先用 kernel 构建系统或未来专用工具生成真实 `compile_commands.json`，再进入 `gen_input.py`。

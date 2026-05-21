@@ -61,6 +61,44 @@ class ReportRunNameTests(unittest.TestCase):
                 out_root / "CWE15",
             )
 
+    def test_juliet_eval_maps_sanitized_report_paths_to_original_truth(self):
+        original_rel = (
+            "testcases/CWE15_Example/"
+            "CWE15_Example__w32_01_bad.c"
+        )
+        sanitized_rel = (
+            "testcases/CWE15_Example/"
+            "CWE15_Example__w32_01_case0.c"
+        )
+        truth = {
+            "CWE-15/CWE15_Example__w32_01": evaluate_juliet_report.TruthItem(
+                key="CWE-15/CWE15_Example__w32_01",
+                is_vulnerable=True,
+                cwe="CWE-15",
+                files={original_rel},
+            )
+        }
+        sanitization = evaluate_juliet_report.SanitizationMap(
+            reverse_path_map={sanitized_rel: original_rel},
+            reverse_token_map={"case0": "bad", "Case0": "Bad", "CASE0": "BAD"},
+        )
+        findings = evaluate_juliet_report.classify_findings(
+            [
+                {
+                    "file": "juliet-api-misuse/" + sanitized_rel,
+                    "route": "juliet-api-misuse/" + sanitized_rel + "::CWE15_Example__w32_01_case0",
+                }
+            ],
+            truth,
+            Path("/original/srcs/juliet-api-misuse"),
+            Path("/workspace"),
+            sanitization,
+        )
+
+        self.assertEqual(findings[0].classification, "TP")
+        self.assertEqual(findings[0].juliet_file, original_rel)
+        self.assertEqual(findings[0].route_symbol, "CWE15_Example__w32_01_bad")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,59 @@
+/* TEMPLATE GENERATED TESTCASE FILE
+Filename: CWE121_Stack_Based_Buffer_Overflow__src_char_alloca_cpy_74b.cpp
+Label Definition File: CWE121_Stack_Based_Buffer_Overflow__src.label.xml
+Template File: sources-sink-74b.tmpl.cpp
+*/
+/*
+ * @description
+ * CWE: 121 Stack Based Buffer Overflow
+ * Case0Source:  Initialize data as a large string
+ * Case1Source: Initialize data as a small string
+ * Sinks: cpy
+ *    Case0Sink : Copy data to string using strcpy
+ * Flow Variant: 74 Data flow: data passed in a map from one function to another in different source files
+ *
+ * */
+
+#include "std_testcase.h"
+#include <map>
+
+#include <wchar.h>
+
+using namespace std;
+
+namespace CWE121_Stack_Based_Buffer_Overflow__src_char_alloca_cpy_74
+{
+
+#ifndef OMITCASE0
+
+void case0Sink(map<int, char *> dataMap)
+{
+    /* copy data out of dataMap */
+    char * data = dataMap[2];
+    {
+        char dest[50] = "";
+        /* NOTE: Possible buffer overflow if data is larger than dest */
+        strcpy(dest, data);
+        printLine(data);
+    }
+}
+
+#endif /* OMITCASE0 */
+
+#ifndef OMITCASE1
+
+/* case1V1 uses the Case1Source with the Case0Sink */
+void case1V1Sink(map<int, char *> dataMap)
+{
+    char * data = dataMap[2];
+    {
+        char dest[50] = "";
+        /* NOTE: Possible buffer overflow if data is larger than dest */
+        strcpy(dest, data);
+        printLine(data);
+    }
+}
+
+#endif /* OMITCASE1 */
+
+} /* close namespace */

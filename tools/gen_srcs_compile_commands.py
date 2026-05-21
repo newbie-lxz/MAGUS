@@ -12,7 +12,7 @@ DEFAULT_INCLUDE_DIRS = ("juliet-api-misuse/testcasesupport",)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate compile_commands.json for the checked-in srcs Juliet sample tree."
+        description="Generate compile_commands.json for a Juliet sample tree, usually srcs_sanitized."
     )
     parser.add_argument("--repo-path", default="srcs", help="source tree root")
     parser.add_argument("--output", default="", help="output path; defaults to <repo-path>/compile_commands.json")
