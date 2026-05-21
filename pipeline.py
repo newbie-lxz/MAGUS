@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -21,16 +22,36 @@ REPORT_DIR = REPO_ROOT / "report"
 REPORT_GENERATOR = REPORT_DIR / "code/generate_report.py"
 REPORT_VALIDATOR = REPORT_DIR / "code/validate_report.py"
 DEFAULT_STAGE_D_OUTPUT_DIR = STAGE_D_RUN_DIR / "output"
-DEFAULT_STAGE_A_INPUT = STAGE_A_DIR / "input/zlib.in.jsonl"
+DEFAULT_STAGE_A_INPUT = STAGE_A_DIR / "input/srcs.in.jsonl"
 DEFAULT_STAGE_A_OUTPUT = STAGE_A_DIR / "out/samples.raw.jsonl"
 DEFAULT_STAGE_A_GENERATED_INPUT = STAGE_A_DIR / "input/srcs.in.jsonl"
 DEFAULT_SOURCE_ROOT = REPO_ROOT / "srcs"
 DEFAULT_STAGE_B_OUTPUT_DIR = STAGE_B_DIR / "b_output"
 DEFAULT_STAGE_C_OUTPUT = STAGE_C_DIR / "out/hypotheses.jsonl"
+REPORT_RUN_NAME_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
+JULIET_CWE_FOLDER_PATTERN = re.compile(r"^CWE\d+(?:_.+)?$", re.IGNORECASE)
+CWE_PROJECT_PATTERN = re.compile(r"^cwe(\d+)(.*)$", re.IGNORECASE)
 
 
 def resolve_path(raw: str) -> Path:
     return Path(raw).expanduser().resolve()
+
+
+def normalize_report_run_name(raw: str) -> str:
+    name = raw.strip()
+    if not name:
+        raise ValueError("report run name is empty")
+    if "/" in name or "\\" in name:
+        raise ValueError(f"report run name must be a folder name, not a path: {raw}")
+    normalized = REPORT_RUN_NAME_PATTERN.sub("_", name).strip("._-")
+    match = CWE_PROJECT_PATTERN.fullmatch(normalized)
+    if match:
+        normalized = f"CWE{match.group(1)}{match.group(2)}"
+    if not normalized:
+        raise ValueError(f"report run name has no filesystem-safe characters: {raw}")
+    if normalized in {".", ".."}:
+        raise ValueError(f"report run name is not allowed: {raw}")
+    return normalized
 
 
 def derived_stats_path(raw_output_path: Path) -> Path:
@@ -43,6 +64,87 @@ def derived_llm_path(raw_output_path: Path) -> Path:
 
 def b_c_ready_path(output_dir: Path) -> Path:
     return output_dir / "candidates.for_c.jsonl"
+
+
+def read_jsonl_objects(path: Path) -> list[dict]:
+    if not path.exists():
+        raise ValueError(f"required input is missing: {path}")
+    rows: list[dict] = []
+    with path.open("r", encoding="utf-8-sig") as handle:
+        for line_number, line in enumerate(handle, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{path}:{line_number}: invalid json: {exc}") from exc
+            if not isinstance(row, dict):
+                raise ValueError(f"{path}:{line_number}: expected a JSON object")
+            rows.append(row)
+    return rows
+
+
+def juliet_cwe_folder_from_path(raw: object) -> str:
+    text = str(raw or "").replace("\\", "/").strip()
+    if not text:
+        return ""
+    for part in text.split("/"):
+        if JULIET_CWE_FOLDER_PATTERN.fullmatch(part):
+            return normalize_report_run_name(part)
+    return ""
+
+
+def report_run_name_from_rows(rows: list[dict], context: str) -> str:
+    cwe_folders: set[str] = set()
+    project_ids: set[str] = set()
+    for row in rows:
+        location = row.get("location") if isinstance(row.get("location"), dict) else {}
+        cwe_folder = (
+            juliet_cwe_folder_from_path(row.get("file"))
+            or juliet_cwe_folder_from_path(row.get("file_path"))
+            or juliet_cwe_folder_from_path(location.get("file_path"))
+            or juliet_cwe_folder_from_path(row.get("route"))
+        )
+        if cwe_folder:
+            cwe_folders.add(cwe_folder)
+        project_id = str(row.get("project_id") or "").strip()
+        if project_id:
+            project_ids.add(normalize_report_run_name(project_id))
+
+    if len(cwe_folders) == 1:
+        return next(iter(cwe_folders))
+    if len(project_ids) == 1:
+        return next(iter(project_ids))
+    if len(cwe_folders) > 1:
+        joined = ", ".join(sorted(cwe_folders))
+        raise ValueError(f"cannot derive one report run name from multiple CWE source folders in {context}: {joined}")
+    if len(project_ids) > 1:
+        joined = ", ".join(sorted(project_ids))
+        raise ValueError(f"cannot derive one report run name from multiple project_id values in {context}: {joined}")
+    raise ValueError(f"cannot derive report run name from {context}; pass --run-name or --report-run-name")
+
+
+def report_run_name_from_stage_a_input(input_path: Path) -> str:
+    rows = read_jsonl_objects(input_path)
+    if not rows:
+        raise ValueError(f"Stage A input has no project records: {input_path}")
+    return report_run_name_from_rows(rows, str(input_path))
+
+
+def report_run_name_from_stage_d_output(d_output_dir: Path, allow_empty: bool = False) -> str:
+    rows: list[dict] = []
+    rows.extend(read_jsonl_objects(d_output_dir / "verification.jsonl"))
+    rows.extend(read_jsonl_objects(d_output_dir / "verification.failed.jsonl"))
+    if not rows:
+        if allow_empty:
+            return ""
+        raise ValueError(f"Stage D output has no verification records: {d_output_dir}")
+    return report_run_name_from_rows(rows, str(d_output_dir))
+
+
+def report_output_dir(report_root: Path, run_name: str) -> Path:
+    return report_root / normalize_report_run_name(run_name)
 
 
 def run_command(command: list[str], cwd: Path) -> None:
@@ -212,6 +314,12 @@ def run_report(d_output_dir: Path, output_dir: Path) -> None:
     )
 
 
+def run_named_report(d_output_dir: Path, report_root: Path, run_name: str) -> None:
+    output_dir = report_output_dir(report_root, run_name)
+    print(f"[pipeline] final report output={output_dir}", flush=True)
+    run_report(d_output_dir, output_dir)
+
+
 def ensure_stage_d_python() -> None:
     if not STAGE_D_PYTHON.exists() or not os.access(STAGE_D_PYTHON, os.X_OK):
         raise SystemExit(
@@ -237,6 +345,9 @@ def run_stage_c_with_streaming_d(
     candidates_path: Path,
     output_path: Path,
     time_limit_seconds: float | None,
+    report_root: Path,
+    report_run_name: str,
+    default_report_run_name: str,
 ) -> None:
     ensure_stage_d_python()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -296,7 +407,13 @@ def run_stage_c_with_streaming_d(
             raise SystemExit(c_returncode)
         if d_returncode != 0:
             raise SystemExit(d_returncode)
-        run_report(DEFAULT_STAGE_D_OUTPUT_DIR, REPORT_DIR)
+        final_report_run_name = report_run_name or report_run_name_from_stage_d_output(
+            DEFAULT_STAGE_D_OUTPUT_DIR,
+            allow_empty=True,
+        )
+        if not final_report_run_name:
+            final_report_run_name = default_report_run_name
+        run_named_report(DEFAULT_STAGE_D_OUTPUT_DIR, report_root, final_report_run_name)
 
 
 def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_flag: str) -> None:
@@ -396,9 +513,14 @@ def main() -> None:
         help="Stage D verification 输出目录",
     )
     parser_report.add_argument(
-        "--out-dir",
+        "--report-root",
         default=str(REPORT_DIR),
-        help="最终报告输出目录",
+        help="最终报告根目录；报告写入 <report-root>/<run-name>/",
+    )
+    parser_report.add_argument(
+        "--run-name",
+        default="",
+        help="报告运行目录名；为空时从 Stage D 输出中的 CWE 源码目录或 project_id 推导",
     )
 
     parser_abcd = subparsers.add_parser("abcd", help="串联运行 Stage A、Stage B，并流式运行 Stage C -> Stage D -> Report")
@@ -424,6 +546,16 @@ def main() -> None:
         type=float,
         default=None,
         help="Stage C 可选候选提交时间预算，默认不限制",
+    )
+    parser_abcd.add_argument(
+        "--report-root",
+        default=str(REPORT_DIR),
+        help="最终报告根目录；报告写入 <report-root>/<run-name>/",
+    )
+    parser_abcd.add_argument(
+        "--report-run-name",
+        default="",
+        help="报告运行目录名；为空时从 D 输出的 CWE 源码目录推导，D 无记录时使用 Stage A 输入 project_id",
     )
     args = parser.parse_args()
 
@@ -480,7 +612,13 @@ def main() -> None:
         return
 
     if args.command == "report":
-        run_report(resolve_path(args.d_output_dir), resolve_path(args.out_dir))
+        d_output_dir = resolve_path(args.d_output_dir)
+        run_name = (
+            normalize_report_run_name(args.run_name)
+            if args.run_name.strip()
+            else report_run_name_from_stage_d_output(d_output_dir)
+        )
+        run_named_report(d_output_dir, resolve_path(args.report_root), run_name)
         return
 
     if args.command == "abcd":
@@ -488,6 +626,9 @@ def main() -> None:
         a_output = resolve_path(args.a_output)
         b_output_dir = resolve_path(args.b_output_dir)
         c_output = resolve_path(args.c_output)
+        report_root = resolve_path(args.report_root)
+        report_run_name = normalize_report_run_name(args.report_run_name) if args.report_run_name.strip() else ""
+        default_report_run_name = report_run_name_from_stage_a_input(a_input)
 
         run_stage_a(a_input, a_output)
 
@@ -500,7 +641,14 @@ def main() -> None:
 
         candidates_path = b_c_ready_path(b_output_dir)
         print(f"[pipeline] derived Stage C candidates input={candidates_path}", flush=True)
-        run_stage_c_with_streaming_d(candidates_path, c_output, args.c_time_limit_seconds)
+        run_stage_c_with_streaming_d(
+            candidates_path,
+            c_output,
+            args.c_time_limit_seconds,
+            report_root,
+            report_run_name,
+            default_report_run_name,
+        )
         return
 
 

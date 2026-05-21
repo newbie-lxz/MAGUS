@@ -1,0 +1,41 @@
+{
+  "inputs": {
+    "report": "/home/sq_hu/MAGUS/report/CWE15_External_Control_of_System_or_Configuration_Setting/verification.report.jsonl",
+    "juliet_root": "/home/sq_hu/MAGUS/srcs/juliet-api-misuse",
+    "answer_file": "",
+    "scope_compile_commands": "srcs/compile_commands.cwe15.json",
+    "scope_file_list": ""
+  },
+  "timing": {
+    "stage_a_start": "2026-05-21T11:19:27Z",
+    "stage_a_start_source": "--stage-a-start",
+    "report_generated_at": "2026-05-21T11:29:37Z",
+    "report_generated_source": "/home/sq_hu/MAGUS/report/CWE15_External_Control_of_System_or_Configuration_Setting/verification.report.md",
+    "elapsed_seconds": 610.0,
+    "elapsed_hms": "00:10:10",
+    "elapsed_source": "stage_a_start_to_report_generated_at",
+    "warnings": []
+  },
+  "counts": {
+    "report_rows": 69,
+    "truth_cases": 48,
+    "truth_source_files": 78,
+    "truth_positive_cases": 48,
+    "truth_negative_cases": 0,
+    "tp_report_rows": 69,
+    "tp_unique_cases": 48,
+    "duplicate_tp_report_rows": 21,
+    "fp_report_rows": 0,
+    "fp_unique_units": 0,
+    "fn_cases": 0
+  },
+  "metrics": {
+    "precision_report_rows": 1.0,
+    "precision_unique_cases": 1.0,
+    "recall_unique_cases": 1.0,
+    "f1": 1.0,
+    "false_discovery_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "false_positive_rate_unique_negative_cases": null
+  }
+}

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-# agent1.py - C阶段：双Agent对抗审计，输出符合新D阶段格式
-# 优化点：并发处理、流式写入、证据精简、verification_context自动推断、结果缓存
+# agent1.py - C阶段：双Agent对抗审计，输出给D阶段验证的漏洞假设和路由
+# 优化点：并发处理、流式写入、证据精简、结果缓存
 
 import argparse
-import functools
 import json
 import multiprocessing as mp
 import os
@@ -120,69 +119,6 @@ def load_candidates(path):
     for index, cand in enumerate(candidates, 1):
         validate_candidate(cand, path, index)
     return candidates
-
-
-# ==================== verification_context 自动推断模块 ====================
-@functools.lru_cache(maxsize=128)
-def infer_verification_context(repo_path: str) -> dict:
-    """
-    根据代码仓库根目录自动推断编译运行环境。
-    优化点：使用缓存避免重复扫描同一仓库；只检查少量常见文件名，速度极快。
-    返回D阶段所需的verification_context字典。
-    """
-    ctx = {
-        "repo_path": repo_path,
-        "config_cmd": "",
-        "build_cmd": "",
-        "run_cmd": "",
-        "oracle": {
-            "failure_patterns": ["Segmentation fault", "AddressSanitizer", "null pointer", "core dumped"],
-            "expect_nonzero_exit": True
-        },
-        "input_source": "unknown",
-        "seed_inputs": []
-    }
-    if not repo_path or not os.path.isdir(repo_path):
-        return ctx
-
-    # 检测构建系统（只检查根目录固定文件名）
-    if os.path.exists(os.path.join(repo_path, "Makefile")):
-        ctx["build_cmd"] = "make -j4"
-        if os.path.exists(os.path.join(repo_path, "configure")):
-            ctx["config_cmd"] = "./configure"
-        elif os.path.exists(os.path.join(repo_path, "CMakeLists.txt")):
-            ctx["config_cmd"] = "cmake ."
-    elif os.path.exists(os.path.join(repo_path, "pom.xml")):
-        ctx["build_cmd"] = "mvn compile"
-    elif os.path.exists(os.path.join(repo_path, "package.json")):
-        ctx["build_cmd"] = "npm install"
-    elif os.path.exists(os.path.join(repo_path, "setup.py")) or os.path.exists(os.path.join(repo_path, "requirements.txt")):
-        ctx["build_cmd"] = "pip install -r requirements.txt"
-
-    # 检测常见测试脚本/PoC入口
-    common_scripts = ["poc.py", "test.py", "run_test.sh", "fuzz.py", "exploit.py", "run.sh"]
-    for script in common_scripts:
-        script_path = os.path.join(repo_path, script)
-        if os.path.exists(script_path):
-            ctx["run_cmd"] = f"python3 {script}" if script.endswith(".py") else f"./{script}"
-            break
-    else:
-        ctx["run_cmd"] = "AUTO_DETECT_FAILED"
-
-    # 根据常见文件推断输入来源
-    if os.path.exists(os.path.join(repo_path, "pom.xml")):
-        ctx["input_source"] = "Java HTTP endpoint"
-    elif os.path.exists(os.path.join(repo_path, "requirements.txt")):
-        ctx["input_source"] = "Python script stdin"
-    elif os.path.exists(os.path.join(repo_path, "Cargo.toml")):
-        ctx["input_source"] = "Rust binary"
-    elif os.path.exists(os.path.join(repo_path, "go.mod")):
-        ctx["input_source"] = "Go binary"
-    else:
-        ctx["input_source"] = "unknown"
-
-    ctx["seed_inputs"] = ["empty", "malformed", "large"]
-    return ctx
 
 
 # ==================== 证据文本构建模块（精简版） ====================
@@ -640,7 +576,7 @@ def route_record(cand, responses):
     return selected, "P2", "candidate_for_d", "red_team_vulnerability_once", contradictions
 
 
-def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, contradictions, red_team_rounds, repo_path):
+def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, contradictions, red_team_rounds):
     attack_path = attack_path_strings(selected, cand)
     confidence = response_confidence(selected)
     record = {
@@ -662,7 +598,6 @@ def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, co
         "file": cand.get("file", ""),
         "line": cand.get("line", 0),
         "evidence_slice": cand.get("evidence_slice", ""),
-        "verification_context": infer_verification_context(repo_path),
         "timestamps": {"routed_at": utc_now()},
     }
     if priority == "P0":
@@ -731,7 +666,6 @@ def audit_one(cand, deadline=None):
     """
     sample_id = cand["sample_id"]
     brief = build_evidence_brief(cand)
-    repo_path = cand.get("llm_evidence", {}).get("repo_path", "")
     red_team_rounds = []
 
     if not has_time_remaining(deadline):
@@ -771,7 +705,7 @@ def audit_one(cand, deadline=None):
     red_team_rounds.append({"round": 3, "role": "red_final", "response": final_resp})
     responses = [prop_resp, review_resp, final_resp]
     selected, priority, decision, reason, contradictions = route_record(cand, responses)
-    return build_hypothesis(cand, selected, priority, decision, reason, contradictions, red_team_rounds, repo_path)
+    return build_hypothesis(cand, selected, priority, decision, reason, contradictions, red_team_rounds)
 
 
 # ==================== 主程序（并发 + 即时分流写入）====================

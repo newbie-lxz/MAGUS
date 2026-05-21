@@ -1,6 +1,6 @@
 .PHONY: build-analyzer run-a clean-out
 
-INPUT ?= input/zlib.in.jsonl
+INPUT ?= input/srcs.in.jsonl
 OUTPUT ?= out/samples.raw.jsonl
 
 build-analyzer:

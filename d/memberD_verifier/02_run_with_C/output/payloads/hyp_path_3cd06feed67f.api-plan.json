@@ -1,0 +1,79 @@
+{
+  "kind": "source_api_misuse_plan",
+  "project_id": "cwe15",
+  "sample_id": "path_3cd06feed67f",
+  "hypothesis_id": "hyp_path_3cd06feed67f",
+  "claim": "外部控制系统或配置设置漏洞：从网络接收的数据（data）可能被用于后续系统配置调用，攻击者可通过控制网络输入影响系统设置。",
+  "cwe_candidates": [
+    "CWE-15"
+  ],
+  "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp",
+  "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8469CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_badC2EPc",
+  "api_sequence": [
+    "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp:63-67",
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); /* FLAW: read the new hostname from a network socket */ @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp:80-84",
+    "假设存在系统配置调用，如 system(data); 或类似函数使用data。 @ 后续未显示的代码行"
+  ],
+  "payload": {
+    "marker": "memberD_source_api_probe_hyp_path_3cd06feed67f",
+    "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8469CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_badC2EPc",
+    "input_source": null,
+    "seed_inputs": [
+      "boundary-sized input",
+      "null/zero/negative argument where type permits",
+      "malformed serialized bytes",
+      "state-transition sequence that violates inferred API pattern"
+    ]
+  },
+  "poc_plan": [
+    "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp",
+    "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8469CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_badC2EPc",
+    "Drive the API sequence with misuse-oriented inputs for CWE-15",
+    "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+  ],
+  "oracle": {
+    "accepted_evidence": [
+      "Juliet bad/good main banner proves the selected route executed",
+      "MAGUS_JULIET_ROUTE_CONFIRMED proves a tainted Win32/API sink or point-flaw marker was reached"
+    ],
+    "failure_patterns": [
+      "MAGUS_JULIET_ROUTE_CONFIRMED"
+    ],
+    "required_patterns": [
+      "MAGUS_JULIET_ROUTE_EXECUTED"
+    ],
+    "failure_code_patterns": {
+      "NOT_ROUTE_BOUND": [
+        "MAGUS_JULIET_NOT_ROUTE_BOUND"
+      ],
+      "ENV_MISSING": [
+        "MAGUS_JULIET_BUILD_FAILED",
+        "MAGUS_JULIET_RUNNER_ERROR"
+      ],
+      "NOT_EXPLOITABLE": [
+        "MAGUS_JULIET_NOT_CONFIRMED"
+      ]
+    },
+    "expect_nonzero_exit": false
+  },
+  "build": {
+    "env_profile": "source_repository",
+    "repo_path": "/home/sq_hu/MAGUS",
+    "config_cmd": null,
+    "build_cmd": null,
+    "run_cmd": null,
+    "poc_cmd": null,
+    "test_cmd": "${PYTHON} tools/juliet_win_shim/run_juliet_win_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8469CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_badC2EPc --route juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8469CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_badC2EPc",
+    "docker_image": null,
+    "timeout_sec": null
+  },
+  "evidence": {
+    "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_8469CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_badC2EPc",
+    "file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_84_bad.cpp",
+    "line": 48,
+    "evidence_slice": "acceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;"
+  },
+  "timestamps": {
+    "generated_at": "2026-05-21T11:23:00Z"
+  }
+}

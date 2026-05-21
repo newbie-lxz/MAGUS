@@ -8,8 +8,7 @@ PYTHON="$ROOT/.venv/bin/python"
 C_OUT_DIR="$WORKSPACE/c/out"
 TARGET_FILE="$FLOW/targets.manual.json"
 OUT_DIR="$FLOW/output_manual"
-REPORT_DIR="$WORKSPACE/report"
-REPORT_CODE_DIR="$REPORT_DIR/code"
+REPORT_ROOT="$WORKSPACE/report"
 
 if [[ ! -d "$C_OUT_DIR" ]]; then
   echo "[ERROR] Cannot find C output directory: $C_OUT_DIR"
@@ -34,7 +33,9 @@ fi
 
 "$PYTHON" "$ROOT/00_core/verifier.py" --hypotheses "$C_OUT_DIR" --targets "$TARGET_FILE" --out-dir "$OUT_DIR"
 "$PYTHON" "$ROOT/03_tools/validate_outputs.py" --out-dir "$OUT_DIR"
-"$PYTHON" "$REPORT_CODE_DIR/generate_report.py" --confirmed "$OUT_DIR/verification.jsonl" --failed "$OUT_DIR/verification.failed.jsonl" --out-dir "$REPORT_DIR"
-"$PYTHON" "$REPORT_CODE_DIR/validate_report.py" --confirmed "$OUT_DIR/verification.jsonl" --report-dir "$REPORT_DIR"
+REPORT_COMMAND=("$PYTHON" "$WORKSPACE/pipeline.py" report --d-output-dir "$OUT_DIR" --report-root "$REPORT_ROOT")
+if [[ -n "${REPORT_RUN_NAME:-}" ]]; then
+  REPORT_COMMAND+=(--run-name "$REPORT_RUN_NAME")
+fi
+"${REPORT_COMMAND[@]}"
 echo "[OK] Manual target verification finished."
-echo "[OK] Final report: $REPORT_DIR/verification.report.md"

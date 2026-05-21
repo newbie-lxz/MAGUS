@@ -8,7 +8,7 @@ from typing import Any
 
 
 SUPPORTED_SUFFIXES = {".c", ".cc", ".cpp", ".cxx"}
-DEFAULT_INCLUDE_DIRS = ("juliet-small/testcasesupport",)
+DEFAULT_INCLUDE_DIRS = ("juliet-api-misuse/testcasesupport",)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -55,10 +55,10 @@ def source_globs(args: argparse.Namespace) -> list[str]:
     if explicit:
         return explicit
     return [
-        "juliet-small/testcases/**/*.c",
-        "juliet-small/testcases/**/*.cc",
-        "juliet-small/testcases/**/*.cpp",
-        "juliet-small/testcases/**/*.cxx",
+        "juliet-api-misuse/testcases/**/*.c",
+        "juliet-api-misuse/testcases/**/*.cc",
+        "juliet-api-misuse/testcases/**/*.cpp",
+        "juliet-api-misuse/testcases/**/*.cxx",
     ]
 
 

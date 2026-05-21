@@ -46,8 +46,8 @@ verification.summary.md
 最终漏洞报告由仓库根目录的 Report 阶段生成：
 
 ```text
-report/verification.report.jsonl
-report/verification.report.md
+report/<run-name>/verification.report.jsonl
+report/<run-name>/verification.report.md
 ```
 
 ## 汇报说法

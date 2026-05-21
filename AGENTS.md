@@ -55,19 +55,21 @@
 - Stage `C` expects Stage `B` `candidates.for_c.jsonl`; it must not read Stage `A` outputs directly, and it uses `stage_b` threshold/missing-feature/seed-token/reference-sample/static-confirmation evidence as anti-hallucination constraints rather than vulnerability conclusions. Stage `C` validates `stage_b.static_confirmation_support` and does not allow P0 static confirmation when B marks static confirmation unsupported; such vulnerability findings stay in the dynamic-verification path.
 - Stage `C` uses a process-based time budget when requested and does not expose a candidate-count limit; after the deadline plus grace, unfinished workers are terminated and their candidates are written as `P3` `stage_c_time_budget_exhausted` audit records.
 - Stage `C` writes `P1`/`P2` dynamic-verification candidates to `c/out/*.jsonl`. Completed `P0` static confirmations are also written to `c/out/*.jsonl` so Stage `D` can route-bound verify them; Stage `C` time budgets only affect candidate submission and unfinished workers, not whether a completed P0 is handed to D. `P3` audit-only records go to `c/audit/audit.jsonl`; debated records enter `P3` only when every red-team round returns no vulnerability, while any round that reports a vulnerability keeps the record in the dynamic-verification path even if later rounds mark hard contradictions or incomplete evidence.
+- Stage `C` outputs hypothesis and routing evidence only. It must not infer or emit D verifier configuration, `verification_context`, or oracle rules; Stage `D` owns verifier/oracle generation.
 - Stage `C` uses the DeepSeek-compatible OpenAI Python SDK client configured in `c/agent1.py`; `make run-abcd` reaches this networked LLM call.
 - Stage `D` batch mode expects Stage `C` dynamic-verification candidates under `c/out/*.jsonl`; it reads those files in filename order, trusts Stage `C` routing instead of re-checking `P1`/`P2` or `agent_verdict`, rejects duplicate `project_id + hypothesis_id` records, and must not read Stage `A` or Stage `B` outputs directly. Stage `D` applies a 10-second execution timeout only to `P0`; `P1`/`P2` records are not D-time-limited.
 - Stage `D` streaming mode is used by root `abcd`; it follows the current Stage `C --output` JSONL file, processes only complete newline-terminated records, rejects duplicate `project_id + hypothesis_id` records, and exits after the root pipeline marks Stage `C` done.
 - Stage `D` batch and streaming modes share an output lock under `d/memberD_verifier/02_run_with_C/.stage_d_output.lock`; do not run another D writer against the same output directory while one mode is active.
 - Stage `D` verifies C/C++ source/API misuse hypotheses and does not generate HTTP requests, `base_url` payloads, or `*.http` files.
-- Stage `D` auto-detects checked-in `srcs/juliet-api-misuse` hypotheses and generates an executable Linux Juliet Win32 shim runner plus route-bound oracle for batch and streaming modes; those records do not need `verification_contexts.jsonl` unless an explicit override is required.
+- Stage `D` auto-detects checked-in `srcs/juliet-api-misuse` hypotheses and generates an executable Linux Juliet Win32 shim runner plus route-bound oracle for batch and streaming modes; those records do not need `verification_contexts.jsonl` unless an explicit D-side override is required.
 - Stage `D` confirmed output requires route-bound dynamic evidence. The executable harness can run the full source project/testcase, but its oracle must prove the candidate route or source/API sequence was reached; otherwise the record stays in failed output, using `NOT_ROUTE_BOUND` when route attribution cannot be proven.
-- Report writes final report artifacts `report/verification.report.jsonl` and `report/verification.report.md` from Stage `D` `verification.jsonl` and `verification.failed.jsonl`. Each confirmed vulnerability report row must include location (`file_path`, `line`, `route`), vulnerability type, risk level, and trigger condition. The Report validator checks that the report has one row per confirmed record.
-- `test/evaluate_juliet_report.py` compares `report/verification.report.jsonl` with Juliet answers for paper testing. By default it infers Juliet truth from bad/good testcase paths under `srcs/juliet-api-misuse`; it can also consume an explicit JSONL/JSON/CSV answer file. It reports false positives, false negatives, duplicate true positives, precision/recall/F1, and elapsed time from Stage `A` start to final report generation when `--stage-a-start`, `--timing-json`, or `--run-command` is supplied.
+- Report writes final report artifacts `report/<run-name>/verification.report.jsonl` and `report/<run-name>/verification.report.md` from Stage `D` `verification.jsonl` and `verification.failed.jsonl`. The root pipeline derives `<run-name>` from the unique CWE source folder in D output, or from the unique `project_id` when no single CWE folder is present; `REPORT_RUN_NAME` / `--run-name` overrides it. Each confirmed vulnerability report row must include location (`file_path`, `line`, `route`), vulnerability type, risk level, and trigger condition. The Report validator checks that the report has one row per confirmed record.
+- `test/evaluate_juliet_report.py` compares `report/<run-name>/verification.report.jsonl` with Juliet answers for paper testing. By default it infers Juliet truth from bad/good testcase paths under `srcs/juliet-api-misuse`; it can also consume an explicit JSONL/JSON/CSV answer file. It writes evaluation artifacts under `test/out/juliet_eval/<run-name>/` unless `--out-dir` is supplied, and reports false positives, false negatives, duplicate true positives, precision/recall/F1, and elapsed time from Stage `A` start to final report generation when `--stage-a-start`, `--timing-json`, or `--run-command` is supplied.
 - The root pipeline does not currently expose a Stage `B` worker-count flag.
 
 ## Commands
 
+- `export LLVM_HOME=/usr/lib/llvm-20 && export PATH="$LLVM_HOME/bin:$PATH"`
 - `make build-analyzer`
 - `make gen-srcs-compile-commands`
 - `make gen-input GEN_CLANG=/usr/bin/clang-20 GEN_CLANGXX=/usr/bin/clang++-20 GEN_FORCE=1`
@@ -82,11 +84,11 @@
 - `make run-abcd C_TIME_LIMIT_SECONDS=600`
 - `(cd d/memberD_verifier/01_demo_test && ./01_setup_linux.sh)`
 - `(cd d/memberD_verifier/02_run_with_C && ./01_auto_attack_from_C_linux.sh)`
-- `python3 pipeline.py report --d-output-dir d/memberD_verifier/02_run_with_C/output --out-dir report`
+- `python3 pipeline.py report --d-output-dir d/memberD_verifier/02_run_with_C/output --report-root report`
 - `python3 pipeline.py stats-path --raw-output a/out/samples.raw.jsonl`
 - `python3 pipeline.py llm-path --raw-output a/out/samples.raw.jsonl`
 - `python3 pipeline.py gen-input --repo-path srcs --compile-commands srcs/compile_commands.json --output a/input/srcs.in.jsonl`
-- `python3 test/evaluate_juliet_report.py --report report/verification.report.jsonl --scope-compile-commands srcs/compile_commands.cwe15.json --stage-a-start 2026-05-20T10:00:00Z`
+- `python3 test/evaluate_juliet_report.py --report report/CWE15_External_Control_of_System_or_Configuration_Setting/verification.report.jsonl --scope-compile-commands srcs/compile_commands.cwe15.json --stage-a-start 2026-05-20T10:00:00Z`
 - `python3 test/evaluate_juliet_report.py --run-command "python3 pipeline.py abcd" --scope-compile-commands srcs/compile_commands.cwe15.json`
 
 ## Sync Rules

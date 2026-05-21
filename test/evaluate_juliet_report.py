@@ -16,10 +16,15 @@ from typing import Any, Iterable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REPORT = REPO_ROOT / "report" / "verification.report.jsonl"
+sys.path.insert(0, str(REPO_ROOT))
+
+import pipeline as magus_pipeline  # noqa: E402
+
+REPORT_JSONL_NAME = "verification.report.jsonl"
 DEFAULT_JULIET_ROOT = REPO_ROOT / "srcs" / "juliet-api-misuse"
-DEFAULT_OUT_DIR = REPO_ROOT / "test" / "out" / "juliet_eval"
+DEFAULT_OUT_ROOT = REPO_ROOT / "test" / "out" / "juliet_eval"
 DEFAULT_D_OUTPUT_DIR = REPO_ROOT / "d" / "memberD_verifier" / "02_run_with_C" / "output"
+DEFAULT_REPORT_ROOT = REPO_ROOT / "report"
 SOURCE_EXTENSIONS = {".c", ".cc", ".cpp", ".cxx"}
 POSITIVE_LABELS = {"1", "true", "yes", "y", "bad", "bug", "vulnerable", "vuln", "positive"}
 NEGATIVE_LABELS = {"0", "false", "no", "n", "good", "clean", "safe", "non_vulnerable", "negative"}
@@ -968,7 +973,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "false-positive, false-negative, and timing artifacts."
         )
     )
-    parser.add_argument("--report", default=DEFAULT_REPORT, type=Path, help="MAGUS final report JSONL")
+    parser.add_argument(
+        "--report",
+        type=Path,
+        help="MAGUS final report JSONL; defaults to report/<run-name>/verification.report.jsonl",
+    )
+    parser.add_argument(
+        "--report-root",
+        default=DEFAULT_REPORT_ROOT,
+        type=Path,
+        help="Report root used when --report is omitted",
+    )
+    parser.add_argument(
+        "--report-run-name",
+        default="",
+        help="Report run directory name used when --report is omitted; defaults from Stage D output",
+    )
     parser.add_argument("--juliet-root", default=DEFAULT_JULIET_ROOT, type=Path, help="Juliet API misuse root")
     parser.add_argument("--workspace-root", default=REPO_ROOT, type=Path, help="MAGUS workspace root")
     parser.add_argument("--answer-file", type=Path, help="Optional explicit Juliet answer file in JSONL/JSON/CSV")
@@ -978,7 +998,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Restrict truth cases to files listed in this compile_commands.json",
     )
     parser.add_argument("--scope-file-list", type=Path, help="Restrict truth cases to newline-delimited Juliet files")
-    parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR, type=Path, help="Directory for evaluation artifacts")
+    parser.add_argument(
+        "--out-root",
+        default=DEFAULT_OUT_ROOT,
+        type=Path,
+        help="Evaluation output root used when --out-dir is omitted",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        help="Directory for evaluation artifacts; defaults to <out-root>/<run-name>",
+    )
     parser.add_argument("--d-output-dir", default=DEFAULT_D_OUTPUT_DIR, type=Path, help="Stage D output directory")
     parser.add_argument("--d-failed", type=Path, help="Optional Stage D verification.failed.jsonl for FN annotation")
     parser.add_argument(
@@ -1028,23 +1058,63 @@ def maybe_run_pipeline_command(args: argparse.Namespace) -> None:
         raise SystemExit(completed.returncode)
     if not args.stage_a_start:
         args.stage_a_start = isoformat_z(stage_a_start)
-    if not args.report_generated_at:
+    if not args.report_generated_at and args.report:
         report_md = args.report_md or args.report.with_name("verification.report.md")
         if not report_md.exists():
             args.report_generated_at = isoformat_z(datetime.now(timezone.utc))
 
 
+def report_parent_run_name(args: argparse.Namespace) -> str:
+    if not args.report or args.report.name != REPORT_JSONL_NAME:
+        return ""
+    if args.report.parent == args.report_root:
+        return ""
+    return magus_pipeline.normalize_report_run_name(args.report.parent.name)
+
+
+def resolve_report_run_name(args: argparse.Namespace, report_rows: list[dict[str, Any]] | None = None) -> str:
+    if args.report_run_name.strip():
+        return magus_pipeline.normalize_report_run_name(args.report_run_name)
+    if report_rows:
+        try:
+            return magus_pipeline.report_run_name_from_rows(report_rows, str(args.report))
+        except ValueError:
+            pass
+    parent_run_name = report_parent_run_name(args)
+    if parent_run_name:
+        return parent_run_name
+    return magus_pipeline.report_run_name_from_stage_d_output(args.d_output_dir)
+
+
+def resolve_report_path(args: argparse.Namespace) -> Path:
+    if args.report:
+        return args.report.resolve()
+    run_name = resolve_report_run_name(args)
+    return (args.report_root / run_name / REPORT_JSONL_NAME).resolve()
+
+
+def resolve_output_dir(args: argparse.Namespace, run_name: str) -> Path:
+    if args.out_dir:
+        return args.out_dir.resolve()
+    return (args.out_root / run_name).resolve()
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    args.report = args.report.resolve()
     args.juliet_root = args.juliet_root.resolve()
     args.workspace_root = args.workspace_root.resolve()
-    args.out_dir = args.out_dir.resolve()
     args.d_output_dir = args.d_output_dir.resolve()
+    args.report_root = args.report_root.resolve()
+    args.out_root = args.out_root.resolve()
+    if args.report:
+        args.report = args.report.resolve()
 
     try:
         maybe_run_pipeline_command(args)
+        args.report = resolve_report_path(args)
         report_rows = read_json_or_jsonl(args.report)
+        run_name = resolve_report_run_name(args, report_rows)
+        args.out_dir = resolve_output_dir(args, run_name)
         scoped_files = load_scope(args)
         if args.answer_file:
             truth = load_answer_file(args.answer_file, args.juliet_root, args.workspace_root)

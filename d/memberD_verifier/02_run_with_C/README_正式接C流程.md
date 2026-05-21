@@ -49,11 +49,11 @@ line
 evidence_slice
 ```
 
-D 信任 `c/out` 的分流结果，不再根据 `agent_verdict` 或 `priority` 做准入判断；CWE 字段可以是 Stage C 当前的 `CWE_candidates`，也可以是 `cwe_candidates`。
+D 信任 `c/out` 的分流结果，不再根据 `agent_verdict` 或 `priority` 做准入判断；CWE 字段可以是 Stage C 当前的 `CWE_candidates`，也可以是 `cwe_candidates`。Stage C 只输出漏洞假设、代码位置和 `route`，不输出 D verifier/oracle 配置；这些由 Stage D 生成或由本目录 sidecar 提供。
 
 ## 2. 可选执行上下文
 
-如果 C 输出没有 `verification_context`，不要改 C 核心逻辑。可以在本目录放一个 sidecar：
+需要为非 Juliet 项目提供执行上下文时，不要改 C 核心逻辑。在本目录放一个 D 侧 sidecar：
 
 ```text
 verification_contexts.jsonl
@@ -68,7 +68,7 @@ hypothesis_id > route > project_id
 示例：
 
 ```json
-{"project_id":"juliet_small_c","repo_path":"srcs/juliet-small","test_cmd":"./repros/run_juliet_case.sh ${file} ${entry_symbol}","oracle":{"failure_patterns":["AddressSanitizer","Segmentation fault"],"expect_nonzero_exit":false}}
+{"project_id":"custom_source_api","repo_path":"/datasets/custom-source-api","test_cmd":"./repros/run_case.sh ${file} ${entry_symbol}","oracle":{"failure_patterns":["AddressSanitizer","Segmentation fault"],"expect_nonzero_exit":false}}
 ```
 
 当前仓库的 `srcs/juliet-api-misuse` 不需要项目级 sidecar。`gen_targets_from_hypotheses.py`
@@ -138,11 +138,11 @@ output/verification.failed.jsonl
 output/verification.summary.md
 ```
 
-`validate_outputs.py` 只校验 D 输出。自动脚本在 D 校验通过后调用 `report/code/generate_report.py`，最终漏洞报告写到仓库根目录：
+`validate_outputs.py` 只校验 D 输出。自动脚本在 D 校验通过后调用根目录 `pipeline.py report`，再由它调用 `report/code/generate_report.py`。最终漏洞报告写到 `report/<run-name>/`，`<run-name>` 优先取 D 输出中唯一的 Juliet CWE 源码目录名，例如 `CWE15_External_Control_of_System_or_Configuration_Setting`；没有唯一 CWE 目录时取唯一 `project_id`。需要手工指定目录名时设置 `REPORT_RUN_NAME=<name>`。
 
 ```text
-report/verification.report.jsonl
-report/verification.report.md
+report/<run-name>/verification.report.jsonl
+report/<run-name>/verification.report.md
 ```
 
 报告只从 D confirmed 记录生成。报告的每条 confirmed 漏洞必须包含：漏洞位置（文件路径、行号、route）、漏洞类型、风险等级、触发条件、运行证据和 payload/plan 引用。`report/code/validate_report.py` 会校验报告文件存在，并要求报告行数与 `verification.jsonl` confirmed 行数一致。
@@ -151,12 +151,12 @@ report/verification.report.md
 
 ## 4. 什么时候能执行
 
-最小可执行字段是：
+非 Juliet 项目的 sidecar 最小可执行字段是：
 
 ```text
-verification_context.repo_path
-verification_context.run_cmd 或 poc_cmd 或 test_cmd
-verification_context.oracle
+repo_path
+run_cmd 或 poc_cmd 或 test_cmd
+oracle
 ```
 
 `config_cmd` 和 `build_cmd` 可选，用来准备源码项目。

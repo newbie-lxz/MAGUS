@@ -1,6 +1,6 @@
 .PHONY: build-analyzer gen-srcs-compile-commands gen-input run-a run-b run-c run-d run-report run-abcd
 
-A_INPUT ?= a/input/zlib.in.jsonl
+A_INPUT ?= a/input/srcs.in.jsonl
 A_OUTPUT ?= a/out/samples.raw.jsonl
 SRC_ROOT ?= srcs
 COMPILE_COMMANDS ?= $(SRC_ROOT)/compile_commands.json
@@ -29,7 +29,8 @@ C_OUTPUT ?= c/out/hypotheses.jsonl
 C_TIME_LIMIT_SECONDS ?=
 MIN_SUPPORT ?= 3
 D_OUTPUT_DIR ?= d/memberD_verifier/02_run_with_C/output
-REPORT_OUTPUT_DIR ?= report
+REPORT_ROOT ?= report
+REPORT_RUN_NAME ?=
 
 build-analyzer:
 	python3 pipeline.py build-analyzer
@@ -53,7 +54,7 @@ run-d:
 	python3 pipeline.py d
 
 run-report:
-	python3 pipeline.py report --d-output-dir $(D_OUTPUT_DIR) --out-dir $(REPORT_OUTPUT_DIR)
+	python3 pipeline.py report --d-output-dir $(D_OUTPUT_DIR) --report-root $(REPORT_ROOT) $(if $(REPORT_RUN_NAME),--run-name $(REPORT_RUN_NAME),)
 
 run-abcd:
-	python3 pipeline.py abcd --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) $(if $(C_TIME_LIMIT_SECONDS),--c-time-limit-seconds $(C_TIME_LIMIT_SECONDS),)
+	python3 pipeline.py abcd --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) --report-root $(REPORT_ROOT) $(if $(REPORT_RUN_NAME),--report-run-name $(REPORT_RUN_NAME),) $(if $(C_TIME_LIMIT_SECONDS),--c-time-limit-seconds $(C_TIME_LIMIT_SECONDS),)

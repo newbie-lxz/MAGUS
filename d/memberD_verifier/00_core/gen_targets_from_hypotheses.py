@@ -30,7 +30,6 @@ DEFAULT_FAILURE_PATTERNS = [
     "double-free",
 ]
 
-UNRESOLVED_VALUES = {"AUTO_DETECT_FAILED", "TODO", "待填写", "真实"}
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 JULIET_API_MISUSE_ROOT = WORKSPACE_ROOT / "srcs" / "juliet-api-misuse"
 
@@ -188,13 +187,6 @@ def normalize_entry_symbol(raw: Any) -> str:
 
 
 def entry_symbol(hyp: Dict[str, Any]) -> str:
-    verification_context = hyp.get("verification_context")
-    if isinstance(verification_context, dict):
-        for key in ("entry_function", "entrypoint", "func_name", "function"):
-            value = verification_context.get(key)
-            if isinstance(value, str) and value:
-                return normalize_entry_symbol(value)
-
     for key in ("func_name", "entry_function", "entrypoint", "function", "api"):
         value = hyp.get(key)
         if isinstance(value, str) and value:
@@ -237,14 +229,6 @@ def infer_poc_language(hyp: Dict[str, Any]) -> str:
     if text.endswith(".py") or "python" in text:
         return "python"
     return "unknown"
-
-
-def first_value(source: Dict[str, Any], keys: Iterable[str]) -> Any:
-    for key in keys:
-        value = source.get(key)
-        if value not in (None, "", []):
-            return value
-    return None
 
 
 def resolve_candidate_source_path(source_file: Any) -> Path | None:
@@ -315,39 +299,6 @@ def juliet_win32_oracle() -> Dict[str, Any]:
     }
 
 
-def has_unresolved_marker(value: Any) -> bool:
-    if value in (None, "", []):
-        return False
-    text = as_text(value)
-    return any(marker.lower() in text.lower() for marker in UNRESOLVED_VALUES)
-
-
-def collect_execution(hyp: Dict[str, Any]) -> Dict[str, Any]:
-    execution: Dict[str, Any] = {}
-    sources: List[Dict[str, Any]] = [hyp]
-    verification_context = hyp.get("verification_context")
-    if isinstance(verification_context, dict):
-        sources.insert(0, verification_context)
-
-    key_map = {
-        "repo_path": ("repo_path", "repository_path", "source_root", "project_root"),
-        "config_cmd": ("config_cmd", "configure_cmd"),
-        "build_cmd": ("build_cmd", "compile_cmd"),
-        "run_cmd": ("run_cmd", "harness_cmd", "trigger_cmd"),
-        "poc_cmd": ("poc_cmd",),
-        "test_cmd": ("test_cmd",),
-        "docker_image": ("docker_image", "container_image"),
-        "timeout_sec": ("timeout_sec", "timeout"),
-    }
-    for out_key, in_keys in key_map.items():
-        for source in sources:
-            value = first_value(source, in_keys)
-            if value not in (None, "", []) and not has_unresolved_marker(value):
-                execution[out_key] = value
-                break
-    return execution
-
-
 def seed_inputs_for_attack(attack_type: str) -> List[str]:
     if attack_type == "null_deref":
         return ["empty input", "malformed serialized bytes", "allocation failure path"]
@@ -378,19 +329,8 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
     source_file = hyp.get("file") or hyp.get("filepath")
     cwe = hyp.get("cwe_candidates") or hyp.get("CWE_candidates") or hyp.get("cwe_list") or []
 
-    verification_context = hyp.get("verification_context")
     seed_inputs = seed_inputs_for_attack(attack_type)
     input_source = None
-    if isinstance(verification_context, dict):
-        if isinstance(verification_context.get("seed_inputs"), list) and verification_context.get("seed_inputs"):
-            seed_inputs = verification_context["seed_inputs"]
-        input_source = verification_context.get("input_source")
-
-    explicit_oracle: Dict[str, Any] = {}
-    if isinstance(hyp.get("oracle"), dict):
-        explicit_oracle.update(hyp["oracle"])
-    if isinstance(verification_context, dict) and isinstance(verification_context.get("oracle"), dict):
-        explicit_oracle.update(verification_context["oracle"])
 
     case: Dict[str, Any] = {
         "name": f"auto_{attack_type}" if auto_fill else "source_api_misuse",
@@ -426,20 +366,13 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
         },
     }
 
-    execution = collect_execution(hyp)
-    if execution:
-        case["execution"] = execution
     if hyp.get("poc_code") or hyp.get("harness_code"):
         case["harness_code"] = hyp.get("poc_code") or hyp.get("harness_code")
-    case["oracle"].update(explicit_oracle)
     if auto_fill and is_juliet_api_misuse_hypothesis(hyp, source_file):
         case["name"] = "juliet_win32_source_api"
         case["payload_kind"] = "juliet_win32_dynamic_case"
         case["execution"] = juliet_win32_execution_context(source_file, symbol, hyp.get("route"))
-        if execution:
-            case["execution"].update(execution)
         case["oracle"] = juliet_win32_oracle()
-        case["oracle"].update(explicit_oracle)
     return case
 
 

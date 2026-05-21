@@ -23,7 +23,7 @@ D 按文件名排序读取并检查重复 project_id + hypothesis_id
         ↓
 运行 validate_outputs.py 校验门禁字段
         ↓
-Report 读取 D 输出生成 report/verification.report.jsonl / verification.report.md
+Report 读取 D 输出生成 report/<run-name>/verification.report.jsonl / verification.report.md
         ↓
 运行 report/code/validate_report.py 校验最终报告
         ↓

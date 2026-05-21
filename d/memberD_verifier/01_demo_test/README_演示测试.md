@@ -23,8 +23,8 @@
 out_source_api/payloads/*.api-plan.json
 out_source_api/payloads/*.payload.py
 out_source_api/verification.failed.jsonl
-report/verification.report.jsonl
-report/verification.report.md
+report/repo_source_api_xxx/verification.report.jsonl
+report/repo_source_api_xxx/verification.report.md
 ```
 
 该样例缺少真实仓库构建/运行命令，所以会进入 failed 回流。
@@ -41,8 +41,8 @@ report/verification.report.md
 
 ```text
 out_source_api_executable/verification.jsonl
-report/verification.report.jsonl
-report/verification.report.md
+report/repo_source_api_exec/verification.report.jsonl
+report/repo_source_api_exec/verification.report.md
 ```
 
 ## 文件说明
