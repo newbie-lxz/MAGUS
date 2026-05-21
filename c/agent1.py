@@ -106,6 +106,13 @@ def validate_candidate(cand, path, index):
         )
     if not isinstance(cand.get("stage_b"), dict):
         raise ValueError(f"{path}: candidate #{index} stage_b must be an object")
+    static_support = cand["stage_b"].get("static_confirmation_support")
+    if not isinstance(static_support, dict):
+        raise ValueError(f"{path}: candidate #{index} stage_b.static_confirmation_support must be an object")
+    if not isinstance(static_support.get("supported"), bool):
+        raise ValueError(
+            f"{path}: candidate #{index} stage_b.static_confirmation_support.supported must be a boolean"
+        )
 
 
 def load_candidates(path):
@@ -250,6 +257,14 @@ def build_evidence_brief(cand):
         f" sink={cand.get('sink_score',0.0):.2f}"
         f" deviation={cand.get('pattern_deviation_score',0.0):.2f}"
     )
+    static_support = stage_b.get("static_confirmation_support", {})
+    if static_support:
+        lines.append(
+            "B阶段P0静态确认支持:"
+            f" supported={bool_text(static_support.get('supported'))}"
+            f" reason={static_support.get('reason','?')}"
+            f" guidance={static_support.get('guidance','?')}"
+        )
     seed_tokens = stage_b.get("seed_tokens", [])
     if seed_tokens:
         lines.append(f"B阶段route内API种子:{', '.join(str(item) for item in seed_tokens[:MAX_CALL_CHAIN])}")
@@ -322,6 +337,7 @@ PROPOSER_PROMPT = """你是一位红队安全审计专家。基于以下代码�
 - 如果确定没有任何漏洞，输出 "NO_VULNERABILITY_FOUND"。
 - B阶段门禁和缺失feature是审计优先级/反幻觉约束，不是漏洞结论。必须用代码证据证明source、sink和可达路径；不得仅凭risk_score、threshold_pass或文件名推断漏洞。
 - 如果threshold_pass=false或缺失feature为空，仍可报告漏洞，但必须有更强的A阶段代码证据；否则倾向输出NO_VULNERABILITY_FOUND或低置信度假设。
+- 如果B阶段P0静态确认支持为supported=false，不要给出可触发P0静态强确认的高置信结论；除非A阶段代码证据直接闭合攻击者可控source到安全敏感sink的同一路由，否则应降低confidence或标记evidence_complete=false。
 
 **输出格式（严格JSON）**：
 {{
@@ -352,6 +368,7 @@ RED_REVIEW_PROMPT = """你仍然是红队安全审计专家，不是蓝队。请
 - 如果第一轮判断为 NO_VULNERABILITY_FOUND，但证据中存在具体可验证漏洞路径，必须纠正为漏洞。
 - 只有发现硬矛盾（路径不可达、sink不存在、source和sink不连通、把good路径当bad路径等）时，才列入 hard_contradictions。
 - 使用B阶段门禁、缺失feature和参考样本约束第一轮判断：这些信号只能说明优先级或异常模式，不能替代真实代码路径。
+- 如果B阶段P0静态确认支持为supported=false，必须复查是否只是把good路径、固定字符串、错误处理或注释文字当成外部可控漏洞路径；代码证据不闭合时降低confidence或标记evidence_complete=false。
 
 **输出格式（严格JSON）**：
 {{
@@ -384,6 +401,7 @@ RED_FINAL_PROMPT = """你是红队最终整理者。请汇总前两轮结果，�
 - 如果发现硬矛盾，写入 hard_contradictions。
 - 不要输出 HTTP/base_url/token/*.http 等Web验证内容；这里的API指C/C++函数调用接口或调用序列。
 - 最终结论必须说明得通A阶段代码证据和B阶段结构信号；当代码证据不闭合但仍有漏洞可能时，保留漏洞假设并标记 evidence_complete=false，不要把不确定性伪装成已确认无漏洞。
+- 如果B阶段P0静态确认支持为supported=false，最终结果不得伪装成静态强确认；只有A阶段代码证据明确证明同一路由source到sink闭合时才可保持高置信，否则输出动态验证候选所需的不完整证据状态。
 
 **输出格式（严格JSON）**：
 {{
@@ -589,6 +607,11 @@ def selected_vulnerability_response(responses):
     return responses[-1] if responses else {}
 
 
+def stage_b_static_confirmation_supported(cand):
+    support = cand.get("stage_b", {}).get("static_confirmation_support", {})
+    return bool(support.get("supported"))
+
+
 def route_record(cand, responses):
     first_is_vuln = is_vulnerability_response(responses[0]) if responses else False
     vuln_flags = [is_vulnerability_response(resp) for resp in responses]
@@ -607,6 +630,8 @@ def route_record(cand, responses):
     has_cwe = bool(response_cwes(selected))
     selected_evidence_complete = evidence_complete(selected, cand)
     if all_vuln and selected_evidence_complete and confidence >= STATIC_CONFIDENCE_THRESHOLD and has_cwe:
+        if not stage_b_static_confirmation_supported(cand):
+            return selected, "P1", "candidate_for_d", "stage_b_static_confirmation_unsupported", contradictions
         return selected, "P0", "static_confirmed", "red_team_static_strong", contradictions
 
     if not first_is_vuln and any_vuln:

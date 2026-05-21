@@ -33,6 +33,13 @@ def _candidate():
         "file": "file.c",
         "line": 10,
         "evidence_slice": "call:sink",
+        "stage_b": {
+            "static_confirmation_support": {
+                "supported": True,
+                "reason": "high_risk_sink",
+                "guidance": "allow_p0_if_a_evidence_proves_source_sink_route",
+            }
+        },
     }
 
 
@@ -88,6 +95,18 @@ class RouteRecordTests(unittest.TestCase):
             _candidate(), [_vuln(0.95), _vuln(0.95), _vuln(0.95)]
         )
         self.assertEqual((priority, verdict, reason), ("P0", "static_confirmed", "red_team_static_strong"))
+
+    def test_stage_b_static_confirmation_block_routes_to_d_candidate(self):
+        cand = _candidate()
+        cand["stage_b"]["static_confirmation_support"]["supported"] = False
+        cand["stage_b"]["static_confirmation_support"]["reason"] = "no_missing_feature_no_deviation_low_sink"
+        _, priority, verdict, reason, _ = agent1.route_record(
+            cand, [_vuln(0.95), _vuln(0.95), _vuln(0.95)]
+        )
+        self.assertEqual(
+            (priority, verdict, reason),
+            ("P1", "candidate_for_d", "stage_b_static_confirmation_unsupported"),
+        )
 
 
 class OutputRoutingTests(unittest.TestCase):

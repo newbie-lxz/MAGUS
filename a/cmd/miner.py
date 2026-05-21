@@ -1872,6 +1872,31 @@ def write_outputs(output_path: Path, samples: list[dict[str, Any]]) -> None:
     write_stats_output(output_path, samples)
 
 
+def bitcode_output_dirs(project: ProjectInput) -> list[Path]:
+    """Derive repo-local bitcode output directories from bitcode globs."""
+    repo_path = Path(project.repo_path).resolve()
+    dirs: list[Path] = []
+    seen: set[Path] = set()
+    for pattern in project.bitcode_globs():
+        prefix_parts: list[str] = []
+        for part in Path(pattern).parts:
+            if any(ch in part for ch in "*?["):
+                break
+            prefix_parts.append(part)
+        if not prefix_parts:
+            continue
+        candidate = repo_path.joinpath(*prefix_parts).resolve()
+        try:
+            candidate.relative_to(repo_path)
+        except ValueError:
+            continue
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        dirs.append(candidate)
+    return dirs
+
+
 def cleanup_successful_artifacts(output_path: Path, projects: list[ProjectInput]) -> None:
     """Delete per-project artifacts after raw/stats outputs are durable."""
     artifacts_root = output_path.parent / "a.artifacts"
@@ -1890,6 +1915,20 @@ def cleanup_successful_artifacts(output_path: Path, projects: list[ProjectInput]
 
     if removed:
         print(f"removed artifacts for {removed} successful projects", file=sys.stderr)
+
+
+def cleanup_successful_bitcode(projects: list[ProjectInput]) -> None:
+    """Delete generated source-tree bitcode directories after a successful run."""
+    removed = 0
+    for project in projects:
+        for bitcode_dir in bitcode_output_dirs(project):
+            if not bitcode_dir.exists() or not bitcode_dir.is_dir():
+                continue
+            shutil.rmtree(bitcode_dir)
+            removed += 1
+
+    if removed:
+        print(f"removed {removed} generated bitcode dirs", file=sys.stderr)
 
 
 def main() -> None:
@@ -1922,6 +1961,7 @@ def main() -> None:
     try:
         write_outputs(output_path, all_samples)
         cleanup_successful_artifacts(output_path, successful_projects)
+        cleanup_successful_bitcode(successful_projects)
     except Exception as exc:
         print(f"write output failed: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc

@@ -89,6 +89,12 @@ FEATURE_WEIGHTS = {
     "check": 0.55,
 }
 
+RISK_RARITY_WEIGHT = 0.10
+RISK_SINK_WEIGHT = 0.45
+RISK_DEVIATION_WEIGHT = 0.45
+STATIC_CONFIRMATION_MIN_SINK_SCORE = 0.70
+STATIC_CONFIRMATION_MIN_DEVIATION_SCORE = 0.40
+
 
 @dataclass
 class StageAStatsSample:
@@ -458,6 +464,23 @@ def compute_deviation_score(missing: list[str], expected: list[str], model: Grou
     return round(min(max(numerator / denominator, 0.0), 1.0), 4)
 
 
+def risk_score_weights() -> dict[str, float]:
+    return {
+        "rarity": RISK_RARITY_WEIGHT,
+        "sink": RISK_SINK_WEIGHT,
+        "pattern_deviation": RISK_DEVIATION_WEIGHT,
+    }
+
+
+def compute_risk_score(rarity: float, sink: float, deviation: float) -> float:
+    return round(
+        RISK_RARITY_WEIGHT * rarity
+        + RISK_SINK_WEIGHT * sink
+        + RISK_DEVIATION_WEIGHT * deviation,
+        4,
+    )
+
+
 def reason_tags(sample: StageAStatsSample, missing: list[str], sink_score: float, deviation: float) -> list[str]:
     tags: list[str] = []
     if missing:
@@ -524,7 +547,7 @@ def score_candidates(
             rarity = compute_rarity_score(sample, model)
             sink = sample.sink_score()
             deviation = compute_deviation_score(missing, expected, model)
-            risk = round(0.25 * rarity + 0.25 * sink + 0.50 * deviation, 4)
+            risk = compute_risk_score(rarity, sink, deviation)
             refs = reference_samples_for_missing(model, missing, sample.sample_id)
 
             candidate = ScoredCandidate(
@@ -742,6 +765,11 @@ def stage_b_route_payload(candidates: list[ScoredCandidate], risk_threshold: flo
             if token and token not in missing_by_token:
                 missing_by_token[token] = feature
     threshold_pass = any(candidate.threshold_pass for candidate in candidates)
+    max_risk_score = round(max(candidate.risk_score for candidate in candidates), 4)
+    max_rarity_score = round(max(candidate.rarity_score for candidate in candidates), 4)
+    max_sink_score = round(max(candidate.sink_score for candidate in candidates), 4)
+    max_pattern_deviation_score = round(max(candidate.pattern_deviation_score for candidate in candidates), 4)
+    missing_features = list(missing_by_token.values())
     summaries = [candidate_summary(candidate) for candidate in candidates[:C_READY_MAX_STAGE_B_CANDIDATES]]
     return {
         "schema_version": "stageb.c_ready_route_augmentation.v1",
@@ -751,11 +779,18 @@ def stage_b_route_payload(candidates: list[ScoredCandidate], risk_threshold: flo
         "primary_sample_id": candidates[0].sample_id,
         "threshold_pass": threshold_pass,
         "risk_threshold": risk_threshold,
-        "max_risk_score": round(max(candidate.risk_score for candidate in candidates), 4),
-        "max_rarity_score": round(max(candidate.rarity_score for candidate in candidates), 4),
-        "max_sink_score": round(max(candidate.sink_score for candidate in candidates), 4),
-        "max_pattern_deviation_score": round(max(candidate.pattern_deviation_score for candidate in candidates), 4),
-        "missing_features": list(missing_by_token.values()),
+        "risk_score_weights": risk_score_weights(),
+        "max_risk_score": max_risk_score,
+        "max_rarity_score": max_rarity_score,
+        "max_sink_score": max_sink_score,
+        "max_pattern_deviation_score": max_pattern_deviation_score,
+        "static_confirmation_support": static_confirmation_support_payload(
+            threshold_pass=threshold_pass,
+            missing_feature_count=len(missing_features),
+            max_sink_score=max_sink_score,
+            max_pattern_deviation_score=max_pattern_deviation_score,
+        ),
+        "missing_features": missing_features,
         "reference_sample_ids": sorted(reference_ids)[:10],
         "reason_tags": sorted(reason_tags),
         "source_kinds": sorted(source_kinds),
@@ -763,6 +798,47 @@ def stage_b_route_payload(candidates: list[ScoredCandidate], risk_threshold: flo
         "api_groups": sorted(api_groups),
         "seed_tokens": sorted(seed_tokens, key=lambda token: (-token_interest_score(token), token)),
         "top_candidates": summaries,
+    }
+
+
+def static_confirmation_support_payload(
+    threshold_pass: bool,
+    missing_feature_count: int,
+    max_sink_score: float,
+    max_pattern_deviation_score: float,
+) -> dict[str, Any]:
+    signals = {
+        "threshold_pass": threshold_pass,
+        "missing_feature_count": missing_feature_count,
+        "max_sink_score": round(max_sink_score, 4),
+        "max_pattern_deviation_score": round(max_pattern_deviation_score, 4),
+    }
+    if threshold_pass:
+        return {
+            "supported": True,
+            "reason": "threshold_pass",
+            "guidance": "allow_p0_if_a_evidence_proves_source_sink_route",
+            "signals": signals,
+        }
+    if max_pattern_deviation_score >= STATIC_CONFIRMATION_MIN_DEVIATION_SCORE:
+        return {
+            "supported": True,
+            "reason": "strong_pattern_deviation",
+            "guidance": "allow_p0_if_a_evidence_proves_source_sink_route",
+            "signals": signals,
+        }
+    if max_sink_score >= STATIC_CONFIRMATION_MIN_SINK_SCORE:
+        return {
+            "supported": True,
+            "reason": "high_risk_sink",
+            "guidance": "allow_p0_if_a_evidence_proves_source_sink_route",
+            "signals": signals,
+        }
+    return {
+        "supported": False,
+        "reason": "no_missing_feature_no_deviation_low_sink",
+        "guidance": "prefer_dynamic_or_audit_until_a_evidence_closes_source_sink_route",
+        "signals": signals,
     }
 
 
@@ -826,6 +902,11 @@ def stats_payload(
         "total_candidates": len(candidates),
         "c_ready_candidates": c_ready_count,
         "risk_threshold": risk_threshold,
+        "risk_score_weights": risk_score_weights(),
+        "static_confirmation_support_policy": {
+            "min_sink_score": STATIC_CONFIRMATION_MIN_SINK_SCORE,
+            "min_pattern_deviation_score": STATIC_CONFIRMATION_MIN_DEVIATION_SCORE,
+        },
         "candidate_sort_order": [
             "threshold_pass_desc",
             "rarity_score_desc",
