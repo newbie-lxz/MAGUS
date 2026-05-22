@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_7d5b28c07ad9",
   "hypothesis_id": "hyp_path_7d5b28c07ad9",
-  "claim": "外部控制系统设置：攻击者可通过控制`data`参数调用`SetComputerNameA`设置系统主机名，存在配置篡改风险。",
+  "claim": "存在外部控制系统配置漏洞：攻击者可通过外部输入控制计算机名设置，可能影响系统安全。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -72,6 +72,6 @@
     "evidence_slice": "{\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:38:54Z"
+    "generated_at": "2026-05-21T16:34:52Z"
   }
 }

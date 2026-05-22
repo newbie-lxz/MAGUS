@@ -3,15 +3,15 @@
   "project_id": "cwe15",
   "sample_id": "path_7cc0bb7ca9cb",
   "hypothesis_id": "hyp_path_7cc0bb7ca9cb",
-  "claim": "External control of system configuration via SetComputerNameA with potentially external source",
+  "claim": "外部控制主机名设置：case1V1Source从外部获取数据后，直接传递给SetComputerNameA，导致攻击者可能控制系统主机名配置。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_case1",
   "api_sequence": [
-    "data = case1V1Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:131",
-    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:135"
+    "data = case1V1Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:133",
+    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:138"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_7cc0bb7ca9cb",
@@ -73,6 +73,6 @@
     "evidence_slice": "void CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_case1()\n{\n    case1V1();\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:41:17Z"
+    "generated_at": "2026-05-21T16:37:05Z"
   }
 }

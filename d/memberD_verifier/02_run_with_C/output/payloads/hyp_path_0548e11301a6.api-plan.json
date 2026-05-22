@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_0548e11301a6",
   "hypothesis_id": "hyp_path_0548e11301a6",
-  "claim": "代码使用外部可控数据设置计算机名，攻击者可控制计算机名配置，导致系统配置被外部控制。",
+  "claim": "外部可控数据直接用于设置系统主机名，可能导致系统配置被恶意修改（CWE-15：外部控制系统或配置设置）。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -72,6 +72,6 @@
     "evidence_slice": "{\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:38:24Z"
+    "generated_at": "2026-05-21T16:34:12Z"
   }
 }

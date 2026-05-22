@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_3ee462db32e4",
   "hypothesis_id": "hyp_path_3ee462db32e4",
-  "claim": "外部可控数据传递给SetComputerNameA函数，可能导致系统配置被未授权修改，属于外部控制系统或配置设置漏洞。",
+  "claim": "外部可控数据直接用于设置系统计算机名，可能导致系统不稳定或权限提升（CWE-15）。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "char * data = *dataPtr;\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:39:20Z"
+    "generated_at": "2026-05-21T16:35:11Z"
   }
 }

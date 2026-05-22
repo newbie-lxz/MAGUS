@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_b3ce3470f997",
   "hypothesis_id": "hyp_path_b3ce3470f997",
-  "claim": "通过recv从网络接收外部数据，并传递到action函数，该函数可能将数据用于系统配置设置，导致外部控制配置设置漏洞。",
+  "claim": "外部控制下的系统配置设置漏洞：从网络套接字接收的数据直接传递给系统配置设置函数（action），攻击者可以通过发送恶意数据操控系统配置。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -64,7 +64,7 @@
     "poc_cmd": null,
     "test_cmd": "${PYTHON} tools/juliet_win_shim/run_juliet_win_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_81a.cpp --entry-symbol _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_815case0Ev --route juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_81a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_815case0Ev",
     "docker_image": null,
-    "timeout_sec": null
+    "timeout_sec": 10.0
   },
   "evidence": {
     "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_81a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_815case0Ev",
@@ -73,6 +73,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\n}\n    }\n    const CWE15_External_Control_of_System_or_Configuration_Setting__w32_81_base& baseObject = CWE15_External_Control_of_System_or_Configuration_Setting__w32_81_case0();\n    baseObject.action(data);\n}\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:34:21Z"
+    "generated_at": "2026-05-21T16:30:09Z"
   }
 }

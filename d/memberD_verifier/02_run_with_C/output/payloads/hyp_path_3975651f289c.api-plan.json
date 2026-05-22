@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_3975651f289c",
   "hypothesis_id": "hyp_path_3975651f289c",
-  "claim": "通过外部可控数据设置计算机名称，可能导致系统配置被外部控制。",
+  "claim": "外部可控数据用于设置系统计算机名，但数据来源函数的具体实现未提供，无法确认外部可控性。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1V12Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\ndata = dataBuffer;\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1V12Global = 1; /* true */\n    data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1V12Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:36:20Z"
+    "generated_at": "2026-05-21T16:32:18Z"
   }
 }

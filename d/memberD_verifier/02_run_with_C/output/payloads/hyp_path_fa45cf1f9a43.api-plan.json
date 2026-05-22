@@ -3,14 +3,15 @@
   "project_id": "cwe15",
   "sample_id": "path_fa45cf1f9a43",
   "hypothesis_id": "hyp_path_fa45cf1f9a43",
-  "claim": "外部可控数据直接传递给SetComputerNameA函数设置系统主机名，攻击者可控制系统配置，导致CWE-15外部控制系统或配置设置漏洞。",
+  "claim": "函数case1V1Sink从外部可控的dataMap中获取数据并直接传递给SetComputerNameA设置计算机名，攻击者可利用此漏洞控制系统配置。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74b.cpp",
   "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_7411case1V1SinkESt3mapIiPcSt4lessIiESaISt4pairIKiS1_EEE",
   "api_sequence": [
-    "char * data = dataMap[2];\nif (!SetComputerNameA(data)) { @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74b.cpp:48-50"
+    "char * data = dataMap[2]; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74b.cpp:48",
+    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74b.cpp:50"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_fa45cf1f9a43",
@@ -72,6 +73,6 @@
     "evidence_slice": "char * data = dataMap[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\nvoid case1V1Sink(map<int, char *> dataMap)\n{\n    char * data = dataMap[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:35:27Z"
+    "generated_at": "2026-05-21T16:31:11Z"
   }
 }

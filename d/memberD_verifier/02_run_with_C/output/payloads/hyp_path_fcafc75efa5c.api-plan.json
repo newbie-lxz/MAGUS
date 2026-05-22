@@ -3,15 +3,15 @@
   "project_id": "cwe15",
   "sample_id": "path_fcafc75efa5c",
   "hypothesis_id": "hyp_path_fcafc75efa5c",
-  "claim": "代码通过recv从网络接收数据，并将数据传递给外部控制系统或配置设置的sink函数，导致攻击者能够控制系统配置。",
+  "claim": "通过recv从网络接收数据，然后传递给CWE15_External_Control_of_System_or_Configuration_Setting__w32_64b_case0Sink函数，该函数可能使用外部可控数据修改系统或配置设置，导致外部控制配置设置漏洞。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_64_case0",
   "api_sequence": [
-    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:83",
-    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_64b_case0Sink(&data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:93"
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:85",
+    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_64b_case0Sink(&data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_64a.c:90"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_fcafc75efa5c",
@@ -73,6 +73,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\n}\n    }\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_64b_case0Sink(&data);\n}\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:32:59Z"
+    "generated_at": "2026-05-21T16:30:10Z"
   }
 }

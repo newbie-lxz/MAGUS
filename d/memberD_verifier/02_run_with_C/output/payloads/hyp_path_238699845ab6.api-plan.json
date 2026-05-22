@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_238699845ab6",
   "hypothesis_id": "hyp_path_238699845ab6",
-  "claim": "程序从外部源获取数据并直接用于设置系统主机名（SetComputerNameA），攻击者可控制该数据修改系统配置，导致外部控制系统设置漏洞。",
+  "claim": "外部控制计算机名设置：从外部来源获取的数据直接用于SetComputerNameA，攻击者可通过控制dataArray[2]将计算机名设置为任意值，导致系统配置被外部控制。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "char * data = dataArray[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:39:44Z"
+    "generated_at": "2026-05-21T16:35:34Z"
   }
 }

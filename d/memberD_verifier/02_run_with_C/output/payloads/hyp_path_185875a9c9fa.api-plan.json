@@ -3,14 +3,14 @@
   "project_id": "cwe15",
   "sample_id": "path_185875a9c9fa",
   "hypothesis_id": "hyp_path_185875a9c9fa",
-  "claim": "代码使用case0Source获取潜在外部可控数据，并直接调用SetComputerNameA设置计算机名，可能导致外部控制系统配置。但case0Source实现未知，且B阶段静态分析未通过，风险评分低。",
+  "claim": "外部输入数据可能通过case0Source函数传入，并直接用于SetComputerNameA设置系统主机名，若未验证则可能导致系统配置被攻击者控制。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp",
   "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_625case0Ev",
   "api_sequence": [
-    "char dataBuffer[100] = \"\"; data = dataBuffer; case0Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:32-36",
+    "case0Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:34",
     "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:36"
   ],
   "payload": {
@@ -73,6 +73,6 @@
     "evidence_slice": "case0Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nchar dataBuffer[100] = \"\";\n    data = dataBuffer;\n    case0Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:36:45Z"
+    "generated_at": "2026-05-21T16:32:32Z"
   }
 }

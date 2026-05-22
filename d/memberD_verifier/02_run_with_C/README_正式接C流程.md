@@ -13,7 +13,7 @@ c/out/
 
 D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按文件名排序合并。D 不直接接 A 的输出；A 的输出已经被 B/C 加工，D 只收 C 放入 `c/out/*.jsonl` 的动态验证候选。
 
-根目录 `make run-abcd` 使用流式接入：`pipeline.py` 先启动本目录的 `stream_from_C.py`，让它监听当前 `C_OUTPUT` 文件；随后启动 C。C 每写入一条完整 JSONL 记录，D 就生成 target、绑定可选 sidecar、执行 verifier，并追加 confirmed/failed 输出。C 结束后 pipeline 写 done 文件，D 读完剩余完整行再退出，然后 Report 从 D 输出生成最终报告。这个模式只消费本次 `C_OUTPUT` 文件；本目录的 `01_auto_attack_from_C_linux.sh` 仍是独立批处理入口，读取所有 `c/out/*.jsonl`，并在 D 校验通过后运行 Report。
+根目录 `make run-abcd` 使用流式接入：`pipeline.py` 先启动本目录的 `stream_from_C.py`，让它监听当前 `C_OUTPUT` 文件；随后启动 C。C 每写入一条完整 JSONL 记录，D 就生成 target、绑定可选 sidecar、执行 verifier，并追加 confirmed/failed 输出。C 结束后 pipeline 写 done 文件，D 读完剩余完整行再退出，然后 Report 从 D 输出生成最终报告。这个模式只消费本次 `C_OUTPUT` 文件，并把 D 输出写到 `output/<run-name>/`；`<run-name>` 来自 `REPORT_RUN_NAME` / `--report-run-name`，未提供时使用 Stage A 输入的 `project_id`。本目录的 `01_auto_attack_from_C_linux.sh` 仍是独立批处理入口，读取所有 `c/out/*.jsonl`，写入固定 `output/`，并在 D 校验通过后运行 Report。
 
 C 的分流约定是：
 
@@ -75,7 +75,7 @@ hypothesis_id > route > project_id
 会自动绑定到 `tools/juliet_win_shim/run_juliet_win_case.py`，在 Linux 下编译单个
 Juliet Win32 testcase，并链接本仓库的 Win32 API shim。runner 会通过
 `srcs_sanitized/juliet_sanitization_map.json` 把 `${route}` / `${entry_symbol}` 的
-中性化 `case0` / `case1` / `V1` / `V2` 标签映射回原始 Juliet 场景；遇到 `*_case0.cpp`、
+中性化 `case0` / `case1` / `V1` / `V2` 标签映射回原始 Juliet bad/good 场景；遇到 `*_case0.cpp`、
 `*_case1V1.cpp`、`*b.c` 这类 helper 文件时，会回到同组主文件完整编译运行，不抽取
 C 的 evidence slice。只有当前场景被执行且外部 payload 到达对应 source/API sink，
 或坏路径触发了点缺陷 API 标记，才输出 `MAGUS_JULIET_ROUTE_CONFIRMED`；仅能证明同文件
@@ -123,7 +123,7 @@ D 的批处理和流式模式共用输出锁：
 .stage_d_output.lock
 ```
 
-锁存在时，另一个写同一 `output` 目录的 D 进程会直接失败，避免 `verification*.jsonl` 和 `payloads/` 被并发写入。
+锁存在时，另一个 D 写进程会直接失败，避免 `verification*.jsonl` 和 `payloads/` 被并发写入。
 
 D 当前只使用 Python 标准库；`../01_demo_test/01_setup_linux.sh` 在没有真实 requirements 依赖时会创建不带 pip 的 `.venv`。
 
@@ -139,7 +139,9 @@ output/verification.failed.jsonl
 output/verification.summary.md
 ```
 
-`validate_outputs.py` 只校验 D 输出。自动脚本在 D 校验通过后调用根目录 `pipeline.py report`，再由它调用 `report/code/generate_report.py`。最终漏洞报告写到 `report/<run-name>/`，`<run-name>` 优先取 D 输出中唯一的 Juliet CWE 源码目录名，例如 `CWE15_External_Control_of_System_or_Configuration_Setting`；没有唯一 CWE 目录时取唯一 `project_id`。需要手工指定目录名时设置 `REPORT_RUN_NAME=<name>`。
+`run-abcd` 流式模式使用同样的文件名，但放在 `output/<run-name>/` 下。
+
+`validate_outputs.py` 只校验 D 输出。自动脚本在 D 校验通过后调用根目录 `pipeline.py report`，再由它调用 `report/code/generate_report.py`。`run-abcd` 的最终漏洞报告写到 `report/<run-name>/`，并和 D 的 `output/<run-name>/` 使用同一个名字；需要手工指定目录名时设置 `REPORT_RUN_NAME=<name>`。独立批处理脚本的 Report 目录仍由根 `pipeline.py report` 从 D 输出中的唯一 Juliet CWE 源码目录或唯一 `project_id` 推导，也可用 `REPORT_RUN_NAME=<name>` 覆盖。
 
 ```text
 report/<run-name>/verification.report.jsonl

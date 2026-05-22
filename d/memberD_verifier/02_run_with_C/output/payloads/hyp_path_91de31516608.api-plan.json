@@ -3,15 +3,14 @@
   "project_id": "cwe15",
   "sample_id": "path_91de31516608",
   "hypothesis_id": "hyp_path_91de31516608",
-  "claim": "外部控制系统配置：通过SetComputerNameA设置计算机名为外部可控数据，构成CWE-15漏洞",
+  "claim": "外部可控数据用于设置系统主机名，可能导致系统配置被非法修改。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_61a.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_61_case1",
   "api_sequence": [
-    "data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b_case1V1Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_61a.c:61",
-    "if (!SetComputerNameA(data)) { ... } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_61a.c:63"
+    "static void case1V1() { char * data; char dataBuffer[100] = \"\"; data = dataBuffer; data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b_case1V1Source(data); if (!SetComputerNameA(data)) { ... } } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_61a.c:53-65"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_91de31516608",
@@ -73,6 +72,6 @@
     "evidence_slice": "void CWE15_External_Control_of_System_or_Configuration_Setting__w32_61_case1()\n{\n    case1V1();\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:42:16Z"
+    "generated_at": "2026-05-21T16:37:58Z"
   }
 }

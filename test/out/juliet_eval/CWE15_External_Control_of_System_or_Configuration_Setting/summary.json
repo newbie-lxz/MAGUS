@@ -8,24 +8,24 @@
     "scope_file_list": ""
   },
   "timing": {
-    "stage_a_start": "2026-05-21T12:31:44Z",
+    "stage_a_start": "2026-05-21T16:27:21Z",
     "stage_a_start_source": "--stage-a-start",
-    "report_generated_at": "2026-05-21T12:42:41Z",
+    "report_generated_at": "2026-05-21T16:38:41Z",
     "report_generated_source": "/home/sq_hu/MAGUS/report/CWE15_External_Control_of_System_or_Configuration_Setting/verification.report.md",
-    "elapsed_seconds": 657.0,
-    "elapsed_hms": "00:10:57",
+    "elapsed_seconds": 680.0,
+    "elapsed_hms": "00:11:20",
     "elapsed_source": "stage_a_start_to_report_generated_at",
     "warnings": []
   },
   "counts": {
-    "report_rows": 69,
+    "report_rows": 72,
     "truth_cases": 48,
     "truth_source_files": 78,
     "truth_positive_cases": 48,
     "truth_negative_cases": 0,
-    "tp_report_rows": 69,
+    "tp_report_rows": 72,
     "tp_unique_cases": 48,
-    "duplicate_tp_report_rows": 21,
+    "duplicate_tp_report_rows": 24,
     "fp_report_rows": 0,
     "fp_unique_units": 0,
     "fn_cases": 0

@@ -3,15 +3,15 @@
   "project_id": "cwe15",
   "sample_id": "path_10572e5e7dc0",
   "hypothesis_id": "hyp_path_10572e5e7dc0",
-  "claim": "在CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c中，case1V12函数通过case1V12Source获取数据并调用SetComputerNameA设置主机名，若case1V12Source实际从外部可控源（如环境变量、注册表或网络）获取数据，则存在CWE-15漏洞。",
+  "claim": "SetComputerNameA 使用来自外部源的数据，可能导致系统配置被攻击者控制。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_21_case1",
   "api_sequence": [
-    "data = case1V12Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c:180",
-    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c:182"
+    "data = case1V12Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c:176",
+    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_21.c:181"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_10572e5e7dc0",
@@ -73,6 +73,6 @@
     "evidence_slice": "void CWE15_External_Control_of_System_or_Configuration_Setting__w32_21_case1()\n{\n    case1V11();\n    case1V12();\n}\n...\n{\n    case1V11();\n    case1V12();\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:40:51Z"
+    "generated_at": "2026-05-21T16:36:32Z"
   }
 }

@@ -3,15 +3,15 @@
   "project_id": "cwe15",
   "sample_id": "path_b8344fe7fba4",
   "hypothesis_id": "hyp_path_b8344fe7fba4",
-  "claim": "存在外部控制系统配置漏洞：使用可能外部可控的data参数调用SetComputerNameA，可能允许攻击者修改系统主机名。",
+  "claim": "外部控制的系统或配置设置漏洞：程序使用来自潜在外部源的数据调用SetComputerNameA，可能允许攻击者修改系统主机名，导致系统配置被外部控制。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d_case1V1Sink",
   "api_sequence": [
-    "入口点：接收data参数 @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d.c:46",
-    "if (!SetComputerNameA(data)) { ... } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d.c:49"
+    "void CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d_case1V1Sink(char * data) @ 入口函数CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d_case1V1Sink",
+    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_53d.c:49"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_b8344fe7fba4",
@@ -73,6 +73,6 @@
     "evidence_slice": "{\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:39:08Z"
+    "generated_at": "2026-05-21T16:34:57Z"
   }
 }

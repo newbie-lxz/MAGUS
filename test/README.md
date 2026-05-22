@@ -2,6 +2,8 @@
 
 `evaluate_juliet_report.py` compares the MAGUS final report with Juliet ground truth and writes paper-ready evaluation artifacts.
 
+`run_lazy_batch.py` is the monitored batch wrapper for Juliet source/API misuse folders that are already adapted to the Stage D marker/oracle model. It reads the ordered queue in `test/lazy.md`, runs one CWE folder at a time, stops after a completed folder when the configured mismatch threshold is exceeded, and writes logs plus per-folder metrics under `test/out/lazy_batch/<run-id>/`.
+
 Default inputs:
 
 - report: `report/<run-name>/verification.report.jsonl`, derived from Stage D output when `--report` is omitted
@@ -70,7 +72,9 @@ Then run the full MAGUS pipeline over only that CWE15 Stage A input and evaluate
 
 ```bash
 python3 test/evaluate_juliet_report.py \
-  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.cwe15.in.jsonl --a-output a/out/srcs.cwe15.raw.jsonl --b-output-dir b/b_output_cwe15 --c-output c/out/cwe15.hypotheses.jsonl" \
+  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.cwe15.in.jsonl --a-output a/out/srcs.cwe15.raw.jsonl --b-output-dir b/b_output_cwe15 --c-output c/out/cwe15.hypotheses.jsonl --report-run-name CWE15_External_Control_of_System_or_Configuration_Setting" \
+  --d-output-dir d/memberD_verifier/02_run_with_C/output/CWE15_External_Control_of_System_or_Configuration_Setting \
+  --report-run-name CWE15_External_Control_of_System_or_Configuration_Setting \
   --scope-compile-commands srcs_sanitized/compile_commands.cwe15.json
 ```
 
@@ -105,7 +109,9 @@ Then run the full MAGUS pipeline and evaluate it:
 
 ```bash
 python3 test/evaluate_juliet_report.py \
-  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.in.jsonl --a-output a/out/srcs.raw.jsonl" \
+  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.in.jsonl --a-output a/out/srcs.raw.jsonl --report-run-name srcs_sanitized" \
+  --d-output-dir d/memberD_verifier/02_run_with_C/output/srcs_sanitized \
+  --report-run-name srcs_sanitized \
   --scope-compile-commands srcs_sanitized/compile_commands.json
 ```
 

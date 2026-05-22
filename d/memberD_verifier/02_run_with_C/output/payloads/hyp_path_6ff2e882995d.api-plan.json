@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_6ff2e882995d",
   "hypothesis_id": "hyp_path_6ff2e882995d",
-  "claim": "外部控制的系统或配置设置漏洞：攻击者可以通过控制CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b_case0Source返回的数据来设置系统计算机名，可能导致系统行为异常或拒绝服务。",
+  "claim": "代码中外部可控数据直接传递给SetComputerNameA设置计算机名，攻击者可控制计算机名，属于系统配置外部控制漏洞。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b_case0Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nchar dataBuffer[100] = \"\";\n    data = dataBuffer;\n    data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b_case0Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:36:27Z"
+    "generated_at": "2026-05-21T16:32:20Z"
   }
 }

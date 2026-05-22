@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_566fa029149e",
   "hypothesis_id": "hyp_path_566fa029149e",
-  "claim": "函数 case1V1Sink 从外部可控的数据源 dataVector 中取出元素，并直接传递给 SetComputerNameA 系统调用，可能设置任意计算机名，属于外部控制系统或配置设置漏洞。",
+  "claim": "函数case1V1Sink从vector中取出data并直接传递给SetComputerNameA，data可能来自外部控制（如环境变量或用户输入），攻击者可利用此设置任意计算机名，达到控制系统配置的目的。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "void case1V1Sink(vector<char *> dataVector)\n{\n    char * data = dataVector[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\nchar * data = dataVector[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:38:00Z"
+    "generated_at": "2026-05-21T16:33:48Z"
   }
 }

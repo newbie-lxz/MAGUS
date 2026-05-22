@@ -3,14 +3,14 @@
   "project_id": "cwe15",
   "sample_id": "path_9c098d105ad6",
   "hypothesis_id": "hyp_path_9c098d105ad6",
-  "claim": "外部数据控制系统配置：SetComputerNameA函数使用来自外部源的数据，攻击者可设置任意主机名，导致系统配置被恶意控制。",
+  "claim": "函数SetComputerNameA被调用时使用的参数data来源于myStruct.structFirst，但当前证据未明确structFirst的外部输入来源，路径不完整。假设攻击者能够控制myStruct.structFirst，则可能导致系统计算机名称被恶意篡改。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b_case0Sink",
   "api_sequence": [
-    "char * data = myStruct.structFirst; /* NOTE: set the hostname to data obtained from a potentially external source */ @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b.c:36",
+    "char * data = myStruct.structFirst; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b.c:36",
     "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b.c:38"
   ],
   "payload": {
@@ -73,6 +73,6 @@
     "evidence_slice": "char * data = myStruct.structFirst;\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:39:40Z"
+    "generated_at": "2026-05-21T16:35:35Z"
   }
 }

@@ -3,17 +3,16 @@
   "project_id": "cwe15",
   "sample_id": "path_3839c3213121",
   "hypothesis_id": "hyp_path_3839c3213121",
-  "claim": "外部攻击者通过网络发送恶意数据，该数据被接收并直接用于系统配置设置，可导致未经授权的配置更改。",
+  "claim": "程序通过socket接收外部数据并直接用于系统配置设置（如主机名），攻击者可控制该数据并修改系统配置，造成外部控制系统或配置设置漏洞。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67a.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_67_case0",
   "api_sequence": [
-    "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67a.c:72-73",
-    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67a.c:91",
-    "myStruct.structFirst = data; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67a.c:96",
-    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b_case0Sink(myStruct); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67a.c:97"
+    "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67a.c:72-76",
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67a.c:89-93",
+    "myStruct.structFirst = data; CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b_case0Sink(myStruct); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b.c (sink function)"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_3839c3213121",
@@ -75,6 +74,6 @@
     "evidence_slice": "acceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\n}\n    myStruct.structFirst = data;\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_67b_case0Sink(myStruct);\n}\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:34:58Z"
+    "generated_at": "2026-05-21T16:30:43Z"
   }
 }

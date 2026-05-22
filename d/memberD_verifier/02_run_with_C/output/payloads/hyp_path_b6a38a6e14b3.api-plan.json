@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_b6a38a6e14b3",
   "hypothesis_id": "hyp_path_b6a38a6e14b3",
-  "claim": "外部输入控制系统设置：攻击者可能通过控制dataMap中索引2的数据，传递给SetComputerNameA API，从而修改系统主机名，造成配置篡改或潜在的安全风险。",
+  "claim": "外部控制的系统或配置设置漏洞：来自外部可能源的数据通过dataMap[2]传递给SetComputerNameA，攻击者可控制主机名，导致系统配置被篡改。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "char * data = dataMap[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\n{\n    /* copy data out of dataMap */\n    char * data = dataMap[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:35:34Z"
+    "generated_at": "2026-05-21T16:31:20Z"
   }
 }

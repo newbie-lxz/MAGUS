@@ -3,15 +3,14 @@
   "project_id": "cwe15",
   "sample_id": "path_9cf4eea89eaa",
   "hypothesis_id": "hyp_path_9cf4eea89eaa",
-  "claim": "外部控制的系统配置设置：程序从网络套接字接收数据，并可能将其用于系统配置，但未对输入进行验证，攻击者可以通过发送恶意数据操控系统配置。",
+  "claim": "潜在的外部控制的系统或配置设置漏洞：通过recv从网络接收数据，但代码中未直接展示数据被用于系统配置操作。假设后续存在未在片段中展示的sink（如System或SetComputerName），当前证据仅显示网络接收和错误检查后关闭socket，路径不完整。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b_case0Source",
   "api_sequence": [
-    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b.c:79",
-    "假设将 data 用于系统配置 API，如 SetComputerName(data) 或类似操作。 @ 未知（后续调用位置）"
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_61b.c:79"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_9cf4eea89eaa",
@@ -73,6 +72,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:34:35Z"
+    "generated_at": "2026-05-21T16:30:36Z"
   }
 }

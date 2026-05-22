@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_624f30805d08",
   "hypothesis_id": "hyp_path_624f30805d08",
-  "claim": "网络接收的数据（data）直接传递到CWE15_External_Control_of_System_or_Configuration_Setting__w32_54b_case0Sink函数，该函数可能将该数据用于系统配置设置（如主机名），导致外部控制系统或配置设置漏洞。攻击者可以通过网络发送恶意数据，影响系统配置。",
+  "claim": "程序通过recv()从网络socket接收外部数据，并将该数据直接传递给外部系统或配置设置sink函数，未进行充分的验证或清理，导致攻击者可能控制系统或配置设置。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -11,7 +11,7 @@
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_54_case0",
   "api_sequence": [
     "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54a.c:85",
-    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_54b_case0Sink(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54a.c:93"
+    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_54b_case0Sink(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54a.c:93-97（sink调用处）"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_624f30805d08",
@@ -73,6 +73,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\n}\n    }\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_54b_case0Sink(data);\n}\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:32:53Z"
+    "generated_at": "2026-05-21T16:29:54Z"
   }
 }

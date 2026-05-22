@@ -3,16 +3,15 @@
   "project_id": "cwe15",
   "sample_id": "path_f35e5ff8eca5",
   "hypothesis_id": "hyp_path_f35e5ff8eca5",
-  "claim": "程序通过recv从网络接收数据，并将该数据直接作为参数传递给SetComputerNameA函数，导致攻击者能够控制系统主机名，属于外部控制系统或配置设置漏洞。",
+  "claim": "外部控制系统配置：程序通过recv从网络接收数据，并将该数据直接传递给SetComputerNameA设置计算机名，未经过任何清洗或验证，攻击者可利用此漏洞篡改系统计算机名。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_15.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_15_case0",
   "api_sequence": [
-    "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_15.c:60",
     "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_15.c:85",
-    "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_15.c:93（近似）"
+    "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_15.c (SetComputerNameA调用行)"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_f35e5ff8eca5",
@@ -74,6 +73,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\n}\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:33:54Z"
+    "generated_at": "2026-05-21T16:29:14Z"
   }
 }

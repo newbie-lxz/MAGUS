@@ -183,6 +183,30 @@ static void flaw_marker_w(const char *name, const wchar_t *value, const char *re
     flaw_marker(name, buffer, reason);
 }
 
+static int is_relative_library_path(const char *value)
+{
+    if (value == NULL || value[0] == '\0')
+    {
+        return 0;
+    }
+    if (value[0] == '/' || value[0] == '\\')
+    {
+        return 0;
+    }
+    if (strlen(value) >= 2 && value[1] == ':')
+    {
+        return 0;
+    }
+    return 1;
+}
+
+static int is_relative_library_path_w(const wchar_t *value)
+{
+    char buffer[512];
+    wide_to_narrow(value, buffer, sizeof(buffer));
+    return is_relative_library_path(buffer);
+}
+
 static void append_narrow_arg(char *buffer, size_t buffer_size, const char *value)
 {
     size_t used;
@@ -497,6 +521,24 @@ int recv(SOCKET s, char *buf, int len, int flags)
         return SOCKET_ERROR;
     }
 
+    if (env_enabled("MAGUS_JULIET_SOCKET_WIDE"))
+    {
+        wchar_t *wide_buf = (wchar_t *)buf;
+        size_t max_chars = (size_t)len / sizeof(wchar_t);
+        size_t i;
+        if (max_chars == 0)
+        {
+            return SOCKET_ERROR;
+        }
+        payload_len = strlen(payload);
+        copy_len = payload_len < max_chars ? payload_len : max_chars;
+        for (i = 0; i < copy_len; i++)
+        {
+            wide_buf[i] = (wchar_t)(unsigned char)payload[i];
+        }
+        return (int)(copy_len * sizeof(wchar_t));
+    }
+
     payload_len = strlen(payload);
     copy_len = payload_len < (size_t)len ? payload_len : (size_t)len;
     memcpy(buf, payload, copy_len);
@@ -610,12 +652,20 @@ DWORD WINAPI GetLastError(void)
 HMODULE WINAPI LoadLibraryA(LPCSTR lpLibFileName)
 {
     sink_marker("LoadLibraryA", lpLibFileName);
+    if (is_relative_library_path(lpLibFileName))
+    {
+        flaw_marker("LoadLibraryA", lpLibFileName, "relative_library_path");
+    }
     return fake_handle();
 }
 
 HMODULE WINAPI LoadLibraryW(LPCWSTR lpLibFileName)
 {
     sink_marker_w("LoadLibraryW", lpLibFileName);
+    if (is_relative_library_path_w(lpLibFileName))
+    {
+        flaw_marker_w("LoadLibraryW", lpLibFileName, "relative_library_path");
+    }
     return fake_handle();
 }
 

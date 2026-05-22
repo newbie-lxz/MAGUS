@@ -3,19 +3,16 @@
   "project_id": "cwe15",
   "sample_id": "path_815010b21448",
   "hypothesis_id": "hyp_path_815010b21448",
-  "claim": "远程攻击者可通过网络发送恶意数据，利用外部控制系统配置漏洞（CWE-15），调用SetComputerNameA设置任意计算机名，影响系统配置。",
+  "claim": "外部可控数据通过网络接收后，未经验证直接用于设置计算机名（SetComputerNameA），攻击者可控制系统配置。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_16_case0",
   "api_sequence": [
-    "listenSocket = socket(PF_INET, SOCK_STREAM, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c:50",
-    "bind(listenSocket, (struct sockaddr*)&service, sizeof(service)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c:59",
-    "listen(listenSocket, LISTEN_BACKLOG); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c:59",
     "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c:59",
     "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c:84",
-    "if (recvResult != SOCKET_ERROR && recvResult != 0) { if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c:92-96"
+    "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_16.c:96附近"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_815010b21448",
@@ -77,6 +74,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n            {\n                WSACleanup();\n            }\n        }\n...\n}\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\ndo\n            {\n                if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n                {\n                    break;\n...\nservice.sin_family = AF_INET;\n                service.sin_addr.s_addr = INADDR_ANY;\n                service.sin_port = htons(LISTEN_PORT);\n                if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n                {\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:34:00Z"
+    "generated_at": "2026-05-21T16:29:31Z"
   }
 }

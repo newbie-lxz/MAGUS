@@ -3,14 +3,15 @@
   "project_id": "cwe15",
   "sample_id": "path_29fefba3bde0",
   "hypothesis_id": "hyp_path_29fefba3bde0",
-  "claim": "外部可控制的输入被直接传递给SetComputerNameA函数，可能导致系统配置被未授权修改（CWE-15）。",
+  "claim": "外部控制的系统或配置设置漏洞：通过可能来自外部的源设置计算机主机名，攻击者可以控制系统配置。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54e.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_54e_case0Sink",
   "api_sequence": [
-    "if (!SetComputerNameA(data)) { @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_54e.c:34"
+    "调用SetComputerNameA(data) @ 入口函数CWE15_External_Control_of_System_or_Configuration_Setting__w32_54e_case0Sink",
+    "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } @ CWE15_External_Control_of_System_or_Configuration_Setting__w32_54e.c:34"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_29fefba3bde0",
@@ -72,6 +73,6 @@
     "evidence_slice": "{\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:39:10Z"
+    "generated_at": "2026-05-21T16:34:58Z"
   }
 }

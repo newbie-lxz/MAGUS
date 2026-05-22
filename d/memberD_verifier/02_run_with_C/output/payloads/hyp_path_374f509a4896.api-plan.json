@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_374f509a4896",
   "hypothesis_id": "hyp_path_374f509a4896",
-  "claim": "外部可控数据可能直接传入SetComputerNameA设置系统主机名，但缺乏上游source证据，无法完全确认漏洞路径闭合。",
+  "claim": "函数case1V1Sink从外部可控的列表（dataList）中获取数据并直接传递给SetComputerNameA设置计算机名，攻击者可能通过控制列表内容修改系统配置，导致CWE-15外部控制系统或配置设置漏洞。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "void case1V1Sink(list<char *> dataList)\n{\n    char * data = dataList.back();\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\nchar * data = dataList.back();\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:38:03Z"
+    "generated_at": "2026-05-21T16:33:55Z"
   }
 }

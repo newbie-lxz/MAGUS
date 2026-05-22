@@ -3,16 +3,17 @@
   "project_id": "cwe15",
   "sample_id": "path_2dc371166a8c",
   "hypothesis_id": "hyp_path_2dc371166a8c",
-  "claim": "外部控制系统配置设置：攻击者可通过网络socket向SetComputerNameA函数提供任意字符串，从而控制主机名设置，可能导致系统配置被篡改。",
+  "claim": "外部控制的系统或配置设置漏洞：程序从网络套接字接收数据，并直接将其作为参数调用SetComputerNameA设置计算机名。攻击者可通过发送恶意数据篡改系统主机名，导致系统配置被外部控制。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_42_case0",
   "api_sequence": [
-    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:77-81",
-    "data[recvResult] = '\\0'; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:79",
-    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_42.c:110-111"
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ case0Source函数内，line ~70-80",
+    "data[recvResult] = '\\0'; @ same function, line after recv",
+    "data = case0Source(data); @ main函数中 line 108-112",
+    "if (!SetComputerNameA(data)) @ main函数中 line 110-114"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_2dc371166a8c",
@@ -74,6 +75,6 @@
     "evidence_slice": "data = case0Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nchar dataBuffer[100] = \"\";\n    data = dataBuffer;\n    data = case0Source(data);\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:32:26Z"
+    "generated_at": "2026-05-21T16:38:41Z"
   }
 }

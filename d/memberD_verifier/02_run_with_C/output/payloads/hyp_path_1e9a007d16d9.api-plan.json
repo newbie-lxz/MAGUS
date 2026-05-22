@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_1e9a007d16d9",
   "hypothesis_id": "hyp_path_1e9a007d16d9",
-  "claim": "外部控制的系统配置设置：从数据向量中获取外部可控的数据，直接用于设置计算机名称，未进行有效验证或限制，攻击者可能通过控制该数据修改系统主机名，影响系统安全或稳定性。",
+  "claim": "外部控制的系统或配置设置：从外部来源获取的数据通过dataVector传递并直接作为参数调用SetComputerNameA，攻击者可能控制dataVector中的内容以设置恶意主机名，导致系统配置被未授权修改。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "{\n    /* copy data out of dataVector */\n    char * data = dataVector[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\nchar * data = dataVector[2];\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:38:09Z"
+    "generated_at": "2026-05-21T16:33:54Z"
   }
 }

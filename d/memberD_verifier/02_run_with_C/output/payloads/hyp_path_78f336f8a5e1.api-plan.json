@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_78f336f8a5e1",
   "hypothesis_id": "hyp_path_78f336f8a5e1",
-  "claim": "函数 SetComputerNameA 使用来自外部源的数据设置计算机名称，攻击者可能通过控制输入修改系统主机名，导致系统配置被篡改，影响系统安全。",
+  "claim": "外部可控数据被用于设置计算机名，攻击者可更改系统配置。但data的来源未明确，外部可控性未确认。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -72,6 +72,6 @@
     "evidence_slice": "{\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:39:04Z"
+    "generated_at": "2026-05-21T16:34:52Z"
   }
 }

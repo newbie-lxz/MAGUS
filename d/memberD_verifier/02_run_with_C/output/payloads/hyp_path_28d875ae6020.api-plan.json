@@ -3,16 +3,14 @@
   "project_id": "cwe15",
   "sample_id": "path_28d875ae6020",
   "hypothesis_id": "hyp_path_28d875ae6020",
-  "claim": "存在外部控制系统或配置设置漏洞，攻击者通过控制数据源可设置计算机名称，导致系统配置被篡改。",
+  "claim": "函数case1V12通过外部可控数据设置计算机名，构成外部控制系统配置漏洞，但source函数实现缺失，证据不完整。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1",
   "api_sequence": [
-    "case1V12(); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c:90",
-    "data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1V12Source(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c:82",
-    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c:83"
+    "static void case1V12() { char * data; char dataBuffer[100] = \"\"; data = dataBuffer; CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1V12Global = 1; /* true */ data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1V12Source(data); if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_22a.c:72-85"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_28d875ae6020",
@@ -74,6 +72,6 @@
     "evidence_slice": "void CWE15_External_Control_of_System_or_Configuration_Setting__w32_22_case1()\n{\n    case1V11();\n    case1V12();\n}\n...\n{\n    case1V11();\n    case1V12();\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:40:53Z"
+    "generated_at": "2026-05-21T16:36:35Z"
   }
 }

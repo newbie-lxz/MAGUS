@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_67f2b4e402bd",
   "hypothesis_id": "hyp_path_67f2b4e402bd",
-  "claim": "外部控制的系统或配置设置漏洞：攻击者可以通过控制dataList中的数据（来自外部来源）来设置计算机名，从而影响系统配置。",
+  "claim": "外部可控的数据通过SetComputerNameA设置系统主机名，导致系统配置被篡改，但数据源未在代码中明确追踪。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "{\n    /* copy data out of dataList */\n    char * data = dataList.back();\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n...\nchar * data = dataList.back();\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:38:14Z"
+    "generated_at": "2026-05-21T16:34:01Z"
   }
 }

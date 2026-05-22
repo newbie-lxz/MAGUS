@@ -147,6 +147,10 @@ def report_output_dir(report_root: Path, run_name: str) -> Path:
     return report_root / normalize_report_run_name(run_name)
 
 
+def stage_d_output_dir_for_run(run_name: str) -> Path:
+    return DEFAULT_STAGE_D_OUTPUT_DIR / normalize_report_run_name(run_name)
+
+
 def run_command(command: list[str], cwd: Path) -> None:
     print(f"[pipeline] cwd={cwd}", flush=True)
     print(f"[pipeline] cmd={shlex.join(command)}", flush=True)
@@ -345,9 +349,9 @@ def run_stage_c_with_streaming_d(
     candidates_path: Path,
     output_path: Path,
     time_limit_seconds: float | None,
+    stage_d_output_dir: Path,
     report_root: Path,
     report_run_name: str,
-    default_report_run_name: str,
 ) -> None:
     ensure_stage_d_python()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -363,7 +367,7 @@ def run_stage_c_with_streaming_d(
             "--done-file",
             str(done_file),
             "--out-dir",
-            "output",
+            str(stage_d_output_dir),
         ]
 
         print("[pipeline] streaming Stage C output into Stage D", flush=True)
@@ -407,13 +411,7 @@ def run_stage_c_with_streaming_d(
             raise SystemExit(c_returncode)
         if d_returncode != 0:
             raise SystemExit(d_returncode)
-        final_report_run_name = report_run_name or report_run_name_from_stage_d_output(
-            DEFAULT_STAGE_D_OUTPUT_DIR,
-            allow_empty=True,
-        )
-        if not final_report_run_name:
-            final_report_run_name = default_report_run_name
-        run_named_report(DEFAULT_STAGE_D_OUTPUT_DIR, report_root, final_report_run_name)
+        run_named_report(stage_d_output_dir, report_root, report_run_name)
 
 
 def add_stage_a_args(parser: argparse.ArgumentParser, input_flag: str, output_flag: str) -> None:
@@ -555,7 +553,7 @@ def main() -> None:
     parser_abcd.add_argument(
         "--report-run-name",
         default="",
-        help="报告运行目录名；为空时从 D 输出的 CWE 源码目录推导，D 无记录时使用 Stage A 输入 project_id",
+        help="报告运行目录名，并用于 Stage D 输出子目录 output/<run-name>；为空时使用 Stage A 输入 project_id",
     )
     args = parser.parse_args()
 
@@ -627,8 +625,12 @@ def main() -> None:
         b_output_dir = resolve_path(args.b_output_dir)
         c_output = resolve_path(args.c_output)
         report_root = resolve_path(args.report_root)
-        report_run_name = normalize_report_run_name(args.report_run_name) if args.report_run_name.strip() else ""
+        explicit_report_run_name = normalize_report_run_name(args.report_run_name) if args.report_run_name.strip() else ""
         default_report_run_name = report_run_name_from_stage_a_input(a_input)
+        report_run_name = explicit_report_run_name or default_report_run_name
+        stage_d_output_dir = stage_d_output_dir_for_run(report_run_name)
+        print(f"[pipeline] report run name={report_run_name}", flush=True)
+        print(f"[pipeline] Stage D output dir={stage_d_output_dir}", flush=True)
 
         run_stage_a(a_input, a_output)
 
@@ -645,9 +647,9 @@ def main() -> None:
             candidates_path,
             c_output,
             args.c_time_limit_seconds,
+            stage_d_output_dir,
             report_root,
             report_run_name,
-            default_report_run_name,
         )
         return
 

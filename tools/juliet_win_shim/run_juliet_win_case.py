@@ -220,6 +220,7 @@ def write_runtime_files(cwd: Path, payload: str) -> None:
     repeated = (payload + "\n") * 128
     binary_payload = (payload.encode("utf-8", errors="ignore") + b"\n") * 128
     for name in (
+        r"C:\temp\file.txt",
         "BadSource_fopen.txt",
         "GoodSource_fopen.txt",
         "Case0Source_fopen.txt",
@@ -239,6 +240,8 @@ def write_runtime_files(cwd: Path, payload: str) -> None:
 def configure_failure_environment(env: dict[str, str], source: Path) -> None:
     source_text = str(source)
     source_name = source.name
+    if "wchar_t" in source_name and ("connect_socket" in source_name or "listen_socket" in source_name):
+        env["MAGUS_JULIET_SOCKET_WIDE"] = "1"
     if "CWE252_Unchecked_Return_Value" in source_text or "CWE253_Incorrect_Check_of_Function_Return_Value" in source_text:
         if "CreateMutex" in source_name:
             env["MAGUS_JULIET_FAIL_CREATE_MUTEX"] = "1"

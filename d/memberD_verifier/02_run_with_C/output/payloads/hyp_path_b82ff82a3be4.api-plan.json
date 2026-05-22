@@ -3,15 +3,16 @@
   "project_id": "cwe15",
   "sample_id": "path_b82ff82a3be4",
   "hypothesis_id": "hyp_path_b82ff82a3be4",
-  "claim": "函数case1V1通过case1V1Source获取外部数据，并直接传递给SetComputerNameA设置系统主机名，攻击者可控数据可导致系统配置被外部控制。但case1V1Source函数实现未提供，无法确认外部可控性。",
+  "claim": "外部控制计算机名称设置：SetComputerNameA 使用来自外部源的数据，攻击者可能将计算机名设置为恶意值，导致系统配置被篡改。但 source 函数具体实现未提供，外部可控性未完全证实。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp",
   "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_625case1Ev",
   "api_sequence": [
-    "void case1() { case1V1(); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:64-68",
-    "static void case1V1() { char * data; char dataBuffer[100] = \"\"; data = dataBuffer; case1V1Source(data); if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:50-62"
+    "void case1() { case1V1(); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:64",
+    "static void case1V1() { char * data; char dataBuffer[100] = \"\"; data = dataBuffer; case1V1Source(data); ... @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:50-53",
+    "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_62a.cpp:56"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_b82ff82a3be4",
@@ -73,6 +74,6 @@
     "evidence_slice": "void case1()\n{\n    case1V1();\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:42:21Z"
+    "generated_at": "2026-05-21T16:38:07Z"
   }
 }

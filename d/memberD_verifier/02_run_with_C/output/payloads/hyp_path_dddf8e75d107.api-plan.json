@@ -3,15 +3,16 @@
   "project_id": "cwe15",
   "sample_id": "path_dddf8e75d107",
   "hypothesis_id": "hyp_path_dddf8e75d107",
-  "claim": "存在外部控制系统或配置设置漏洞，攻击者可通过网络连接发送恶意数据，该数据被用作系统或配置设置的输入，可能导致系统被篡改。",
+  "claim": "存在外部控制系统或配置设置漏洞（CWE-15）。从网络socket接收的数据直接传递给sink函数，攻击者可以控制配置设置。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0",
   "api_sequence": [
+    "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:60",
     "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:85",
-    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51b_case0Sink(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:93-97 (调用sink)"
+    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51b_case0Sink(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:93-97（调用sink处）"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_dddf8e75d107",
@@ -64,7 +65,7 @@
     "poc_cmd": null,
     "test_cmd": "${PYTHON} tools/juliet_win_shim/run_juliet_win_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0 --route juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0",
     "docker_image": null,
-    "timeout_sec": null
+    "timeout_sec": 10.0
   },
   "evidence": {
     "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0",
@@ -73,6 +74,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\n}\n    }\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_51b_case0Sink(data);\n}\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:32:40Z"
+    "generated_at": "2026-05-21T16:29:40Z"
   }
 }

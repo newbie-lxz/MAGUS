@@ -3,15 +3,16 @@
   "project_id": "cwe15",
   "sample_id": "path_d35498857816",
   "hypothesis_id": "hyp_path_d35498857816",
-  "claim": "从网络socket接收外部可控数据，未经验证直接用于SetComputerNameA设置系统主机名，可能导致系统配置被外部控制。",
+  "claim": "函数SetComputerNameA使用了从网络socket接收的外部数据，攻击者可以控制计算机名设置，造成外部控制系统配置的安全漏洞。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_31_case0",
   "api_sequence": [
-    "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c:82",
-    "if (!SetComputerNameA(data)) @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c:95"
+    "listenSocket = socket(PF_INET, SOCK_STREAM, 0); bind(listenSocket, ...); listen(listenSocket, 5); acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c:46-57",
+    "recvResult = recv(acceptSocket, data, 100 - 1, 0); if (recvResult == SOCKET_ERROR || recvResult == 0) { break; } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c:81-85",
+    "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c:90-94"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_d35498857816",
@@ -64,7 +65,7 @@
     "poc_cmd": null,
     "test_cmd": "${PYTHON} tools/juliet_win_shim/run_juliet_win_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_31_case0 --route juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_31_case0",
     "docker_image": null,
-    "timeout_sec": null
+    "timeout_sec": 10.0
   },
   "evidence": {
     "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_31.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_31_case0",
@@ -73,6 +74,6 @@
     "evidence_slice": "recvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nacceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {\n...\nchar * data = dataCopy;\n        /* NOTE: set the hostname to data obtained from a potentially external source */\n        if (!SetComputerNameA(data))\n        {\n            printLine(\"Failure setting computer name\");\n...\nif (!SetComputerNameA(data))\n        {\n            printLine(\"Failure setting computer name\");\n            exit(1);\n        }\n...\n{\n            printLine(\"Failure setting computer name\");\n            exit(1);\n        }\n    }"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:34:30Z"
+    "generated_at": "2026-05-21T16:29:24Z"
   }
 }

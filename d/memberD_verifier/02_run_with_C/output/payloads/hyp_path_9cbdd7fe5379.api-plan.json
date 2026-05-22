@@ -3,7 +3,7 @@
   "project_id": "cwe15",
   "sample_id": "path_9cbdd7fe5379",
   "hypothesis_id": "hyp_path_9cbdd7fe5379",
-  "claim": "函数case0Sink从全局变量获取数据，并直接作为参数调用SetComputerNameA，可能导致系统配置被外部控制，但全局变量的外部来源未在本代码片段中直接证明。",
+  "claim": "存在外部控制系统或配置设置漏洞：未经验证的外部数据直接作为参数传递给SetComputerNameA，攻击者可控制主机名设置，可能导致系统配置被恶意篡改，但source端外部性未在可见代码中明确，B阶段证据支持度低。",
   "cwe_candidates": [
     "CWE-15"
   ],
@@ -73,6 +73,6 @@
     "evidence_slice": "char * data = CWE15_External_Control_of_System_or_Configuration_Setting__w32_45_case0Data;\n    /* NOTE: set the hostname to data obtained from a potentially external source */\n    if (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n...\nif (!SetComputerNameA(data))\n    {\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n...\n{\n        printLine(\"Failure setting computer name\");\n        exit(1);\n    }\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:38:42Z"
+    "generated_at": "2026-05-21T16:34:35Z"
   }
 }

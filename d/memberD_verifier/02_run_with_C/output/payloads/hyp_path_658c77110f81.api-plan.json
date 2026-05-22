@@ -3,17 +3,17 @@
   "project_id": "cwe15",
   "sample_id": "path_658c77110f81",
   "hypothesis_id": "hyp_path_658c77110f81",
-  "claim": "存在外部控制系统或配置设置的漏洞，攻击者可通过网络连接发送恶意数据，导致系统配置被篡改或命令执行。",
+  "claim": "外部控制配置设置漏洞：程序从网络socket接收数据作为主机名，并可能将其用于系统配置设置，攻击者可通过发送恶意数据控制配置。",
   "cwe_candidates": [
     "CWE-15"
   ],
   "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c",
   "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_68_case0",
   "api_sequence": [
-    "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c:63",
+    "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c:69-70",
     "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c:88",
-    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_68_case0Data = data; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c:93",
-    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_68b_case0Sink(); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c:95"
+    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_68_order0Data = data; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c:63",
+    "CWE15_External_Control_of_System_or_Configuration_Setting__w32_68b_case0Sink(); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c:83"
   ],
   "payload": {
     "marker": "memberD_source_api_probe_hyp_path_658c77110f81",
@@ -66,7 +66,7 @@
     "poc_cmd": null,
     "test_cmd": "${PYTHON} tools/juliet_win_shim/run_juliet_win_case.py --source-file juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c --entry-symbol CWE15_External_Control_of_System_or_Configuration_Setting__w32_68_case0 --route juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_68_case0",
     "docker_image": null,
-    "timeout_sec": null
+    "timeout_sec": 10.0
   },
   "evidence": {
     "route": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_68a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_68_case0",
@@ -75,6 +75,6 @@
     "evidence_slice": "acceptSocket = accept(listenSocket, NULL, NULL);\nif (acceptSocket == INVALID_SOCKET)\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\n...\nrecvResult = recv(acceptSocket, data, 100 - 1, 0);\nif (recvResult == SOCKET_ERROR || recvResult == 0)\nif (acceptSocket != INVALID_SOCKET)\nclosesocket(acceptSocket);\n...\nif (wsaDataInit)\n        {\n            WSACleanup();\n        }\n    }\n...\ndo\n        {\n            if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR)\n            {\n                break;\n...\nservice.sin_family = AF_INET;\n            service.sin_addr.s_addr = INADDR_ANY;\n            service.sin_port = htons(LISTEN_PORT);\n            if (SOCKET_ERROR == bind(listenSocket, (struct sockaddr*)&service, sizeof(service)))\n            {\n...\n}\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_68_case0Data = data;\n    CWE15_External_Control_of_System_or_Configuration_Setting__w32_68b_case0Sink();\n}"
   },
   "timestamps": {
-    "generated_at": "2026-05-21T12:35:02Z"
+    "generated_at": "2026-05-21T16:30:46Z"
   }
 }
