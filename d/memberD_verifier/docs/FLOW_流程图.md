@@ -19,7 +19,7 @@ D 按文件名排序读取并检查重复 project_id + hypothesis_id
         ↓
 如果有 repo_path + run_cmd/poc_cmd/test_cmd，则执行源码/API runner
         ↓
-按 oracle 输出 verification.jsonl 或 verification.failed.jsonl
+按 oracle 输出 verification.jsonl（confirmed 或 stage_c_preserved）或 verification.failed.jsonl
         ↓
 运行 validate_outputs.py 校验门禁字段
         ↓

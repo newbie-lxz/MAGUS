@@ -13,7 +13,7 @@ c/out/
 
 D 的正式脚本直接读取这个目录下的所有 `*.jsonl` 文件，并按文件名排序合并。D 不直接接 A 的输出；A 的输出已经被 B/C 加工，D 只收 C 放入 `c/out/*.jsonl` 的动态验证候选。
 
-根目录 `make run-abcd` 使用流式接入：`pipeline.py` 先启动本目录的 `stream_from_C.py`，让它监听当前 `C_OUTPUT` 文件；随后启动 C。C 每写入一条完整 JSONL 记录，D 就生成 target、绑定可选 sidecar、执行 verifier，并追加 confirmed/failed 输出。C 结束后 pipeline 写 done 文件，D 读完剩余完整行再退出，然后 Report 从 D 输出生成最终报告。这个模式只消费本次 `C_OUTPUT` 文件，并把 D 输出写到 `output/<run-name>/`；`<run-name>` 来自 `REPORT_RUN_NAME` / `--report-run-name`，未提供时使用 Stage A 输入的 `project_id`。本目录的 `01_auto_attack_from_C_linux.sh` 仍是独立批处理入口，读取所有 `c/out/*.jsonl`，写入固定 `output/`，并在 D 校验通过后运行 Report。
+根目录 `make run-abcd` 使用流式接入：`pipeline.py` 先启动本目录的 `stream_from_C.py`，让它监听当前 `C_OUTPUT` 文件；随后启动 C。C 每写入一条完整 JSONL 记录，D 就生成 target、绑定可选 sidecar、执行 verifier，并追加 reportable/failed 输出。reportable 包括 D confirmed，以及 D 明确返回 `UNSUPPORTED_ORACLE` 时保留的 Stage C 判断。C 结束后 pipeline 写 done 文件，D 读完剩余完整行再退出，然后 Report 从 D 输出生成最终报告。这个模式只消费本次 `C_OUTPUT` 文件，并把 D 输出写到 `output/<run-name>/`；`<run-name>` 来自 `REPORT_RUN_NAME` / `--report-run-name`，未提供时使用 Stage A 输入的 `project_id`。本目录的 `01_auto_attack_from_C_linux.sh` 仍是独立批处理入口，读取所有 `c/out/*.jsonl`，写入固定 `output/`，并在 D 校验通过后运行 Report。
 
 C 的分流约定是：
 
@@ -37,7 +37,7 @@ hypothesis_id
 route
 ```
 
-`verifier.py` 写 confirmed/failed 记录时要求每条假设至少有：
+`verifier.py` 写 reportable/failed 记录时要求每条假设至少有：
 
 ```text
 project_id
@@ -79,7 +79,8 @@ Juliet Win32 testcase，并链接本仓库的 Win32 API shim。runner 会通过
 `*_case1V1.cpp`、`*b.c` 这类 helper 文件时，会回到同组主文件完整编译运行，不抽取
 C 的 evidence slice。只有当前场景被执行且外部 payload 到达对应 source/API sink，
 或坏路径触发了点缺陷 API 标记，才输出 `MAGUS_JULIET_ROUTE_CONFIRMED`；仅能证明同文件
-其他路径触发时不会 confirmed。
+其他路径触发时不会 confirmed。当前 route 已执行但 D 缺少对应漏洞语义 oracle 时，runner 输出
+`MAGUS_JULIET_ORACLE_UNSUPPORTED`，D 会写 `stage_c_preserved` 以保留 Stage C 判断。
 
 内置 shim 覆盖 WinSock、WinLDAP、WinCrypt、进程/命令执行、注册表/路径、管道/权限、
 句柄生命周期、临时文件、弱 PRNG、VirtualLock 等 Juliet Win32 API misuse 场景。
@@ -90,6 +91,7 @@ sidecar 的 oracle 支持：
 failure_patterns         # confirmed 模式
 required_patterns        # confirmed 前必须同时存在的 route-bound 模式
 failure_code_patterns    # 把输出模式映射为 NOT_ROUTE_BOUND / NOT_EXPLOITABLE 等失败码
+unsupported_patterns     # route 已执行但 D oracle 不支持当前漏洞语义时保留 C 判断
 ```
 
 自动脚本会先生成 `targets.auto.json`；`srcs_sanitized/juliet-api-misuse` 记录在这一步已经带有可执行 runner/oracle。如果发现 `verification_contexts.jsonl`，再通过 `bind_verification_contexts.py` 输出 `targets.executable.json` 给原 verifier 执行。
@@ -148,9 +150,10 @@ report/<run-name>/verification.report.jsonl
 report/<run-name>/verification.report.md
 ```
 
-报告只从 D confirmed 记录生成。报告的每条 confirmed 漏洞必须包含：漏洞位置（文件路径、行号、route）、漏洞类型、风险等级、触发条件、运行证据和 payload/plan 引用。`report/code/validate_report.py` 会校验报告文件存在，并要求报告行数与 `verification.jsonl` confirmed 行数一致。
+报告从 D `verification.jsonl` 的 reportable 记录生成。报告的每条漏洞必须包含：漏洞位置（文件路径、行号、route）、漏洞类型、风险等级、触发条件、运行证据和 payload/plan 引用。`report/code/validate_report.py` 会校验报告文件存在，并要求报告行数与 `verification.jsonl` reportable 行数一致；报告状态可以是 `confirmed` 或 `stage_c_preserved`。
 
 `verification.failed.jsonl` 中的 `NOT_ROUTE_BOUND` 表示执行成功但不能把证据归因到当前候选 route。
+`NOT_EXPLOITABLE` 只表示支持的 oracle 已运行且未确认漏洞；如果 D 没有能力验证当前漏洞语义，应使用 `UNSUPPORTED_ORACLE` 并保留 C 判断。
 
 ## 4. 什么时候能执行
 

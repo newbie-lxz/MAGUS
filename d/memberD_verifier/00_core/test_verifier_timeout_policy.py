@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,6 +56,62 @@ class TimeoutPolicyTests(unittest.TestCase):
                 hyp = _hyp(priority)
                 self.assertIsNone(verifier.timeout_for_hypothesis(hyp))
                 self.assertIsNone(self._plan_for(hyp)["build"]["timeout_sec"])
+
+
+class UnsupportedOracleTests(unittest.TestCase):
+    def test_run_one_preserves_stage_c_verdict_on_unsupported_oracle(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hyp = _hyp("P1")
+            hyp.update({"routing_decision": "dynamic_verification", "agent_verdict": "vulnerability"})
+            target = {
+                "project_id": "p",
+                "target_type": "source_api",
+                "cases": {
+                    "hyp_p1": {
+                        "target_type": "source_api",
+                        "attack_type": "generic",
+                        "execution": {
+                            "repo_path": temp_dir,
+                            "test_cmd": (
+                                f"{sys.executable} -c "
+                                "\"print('MAGUS_JULIET_ROUTE_EXECUTED'); "
+                                "print('MAGUS_JULIET_ORACLE_UNSUPPORTED')\""
+                            ),
+                        },
+                        "oracle": {
+                            "required_patterns": ["MAGUS_JULIET_ROUTE_EXECUTED"],
+                            "unsupported_patterns": ["MAGUS_JULIET_ORACLE_UNSUPPORTED"],
+                            "failure_code_patterns": {"NOT_EXPLOITABLE": ["MAGUS_JULIET_NOT_CONFIRMED"]},
+                            "expect_nonzero_exit": False,
+                        },
+                    }
+                },
+            }
+
+            success, failed = verifier.run_one(hyp, target, Path(temp_dir) / "out", dry_run=False)
+
+        self.assertIsNone(failed)
+        self.assertIsNotNone(success)
+        assert success is not None
+        self.assertEqual(success["status"], "stage_c_preserved")
+        self.assertEqual(success["failure_code"], "UNSUPPORTED_ORACLE")
+        self.assertEqual(success["stage_c_verdict"]["agent_verdict"], "vulnerability")
+
+    def test_preserved_record_carries_stage_c_verdict(self):
+        hyp = _hyp("P1")
+        hyp.update({"routing_decision": "dynamic_verification", "agent_verdict": "vulnerability"})
+        record = verifier.preserved_record(
+            hyp,
+            {"attack_type": "generic"},
+            {"observations": ["unsupported oracle matched patterns: MAGUS_JULIET_ORACLE_UNSUPPORTED"]},
+            Path("payloads/hyp_p1.payload.py"),
+            Path("payloads/hyp_p1.api-plan.json"),
+        )
+
+        self.assertEqual(record["status"], "stage_c_preserved")
+        self.assertEqual(record["failure_code"], "UNSUPPORTED_ORACLE")
+        self.assertEqual(record["severity"], "P1")
+        self.assertEqual(record["stage_c_verdict"]["agent_verdict"], "vulnerability")
 
 
 if __name__ == "__main__":

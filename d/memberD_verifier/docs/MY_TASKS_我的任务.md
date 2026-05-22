@@ -3,7 +3,7 @@
 D 不负责 A/B/C 的挖掘和审计。D 只负责最后一段源码/API 动态验证：
 
 ```text
-C 的源码/API 假设 -> payload / PoC runner -> 动态验证 -> confirmed/failed 回流
+C 的源码/API 假设 -> payload / PoC runner -> 动态验证 -> reportable/failed 回流
 Report 读取 D 输出 -> 最终漏洞报告
 ```
 
@@ -29,9 +29,9 @@ D 信任这个目录只包含 C 分流出的动态验证候选：`P1`/`P2`，以
 2. 根据 `route`、`attack_path`、`file`、`evidence_slice` 生成 `*.api-plan.json`。
 3. 生成可执行 `*.payload.py` runner。
 4. 如果 C 或 sidecar 提供 `repo_path` 加 `run_cmd` / `poc_cmd` / `test_cmd`，执行 runner。
-5. 按 oracle 判断 confirmed 或 failed；confirmed 必须有 route-bound 动态证据，否则输出 failed，例如 `NOT_ROUTE_BOUND`。
+5. 按 oracle 判断 reportable 或 failed；confirmed 必须有 route-bound 动态证据，否则输出 failed，例如 `NOT_ROUTE_BOUND`。如果 route 已执行但 D 明确缺少 oracle 能力，输出 `stage_c_preserved` 保留 C 判断，不能写成 `NOT_EXPLOITABLE`。
 6. 输出 runtime trace、失败原因和回流建议。
-7. 外层脚本在 D 结束后把 confirmed/failed 结果交给 Report 阶段生成最终漏洞报告。
+7. 外层脚本在 D 结束后把 reportable/failed 结果交给 Report 阶段生成最终漏洞报告。
 
 ## 输出
 

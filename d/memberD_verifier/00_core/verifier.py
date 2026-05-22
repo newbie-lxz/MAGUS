@@ -26,7 +26,9 @@ FAILURE_CODES = {
     "HYPOTHESIS_WRONG",
     "TIMEOUT",
     "NON_DETERMINISTIC",
+    "UNSUPPORTED_ORACLE",
 }
+REPORTABLE_STATUSES = {"confirmed", "stage_c_preserved"}
 
 MIN_EVIDENCE_FIELDS = ["project_id", "sample_id", "hypothesis_id", "route", "file", "line", "evidence_slice"]
 UNRESOLVED_VALUES = ("AUTO_DETECT_FAILED", "TODO", "replace with", "真实", "待填写")
@@ -137,6 +139,7 @@ def run_command(cmd: Any, cwd: Path, timeout: float | None) -> dict[str, Any]:
 def decide(run_results: list[dict[str, Any]], oracle: dict[str, Any]) -> tuple[str, str, list[str]]:
     patterns = oracle.get("failure_patterns") or DEFAULT_FAILURE_PATTERNS
     required_patterns = pattern_list(oracle.get("required_patterns"))
+    unsupported_patterns = pattern_list(oracle.get("unsupported_patterns"))
     code_patterns = failure_code_patterns(oracle)
     expect_nonzero = bool(oracle.get("expect_nonzero_exit", True))
     observations: list[str] = []
@@ -147,6 +150,13 @@ def decide(run_results: list[dict[str, Any]], oracle: dict[str, Any]) -> tuple[s
             return "failed", "TIMEOUT", observations
         matched = [str(pattern) for pattern in patterns if str(pattern) and str(pattern) in output]
         missing_required = [pattern for pattern in required_patterns if pattern not in output]
+        matched_unsupported = [pattern for pattern in unsupported_patterns if pattern and pattern in output]
+        if matched_unsupported:
+            if missing_required:
+                observations.append(f"unsupported oracle marker observed without route-bound patterns: {', '.join(missing_required)}")
+                return "failed", "NOT_ROUTE_BOUND", observations
+            observations.append(f"unsupported oracle matched patterns: {', '.join(matched_unsupported)}")
+            return "unsupported", "UNSUPPORTED_ORACLE", observations
         for code, code_pattern_values in code_patterns.items():
             matched_code_patterns = [pattern for pattern in code_pattern_values if pattern in output]
             if matched_code_patterns:
@@ -246,14 +256,20 @@ def main() -> int:
     result = {
         "status": status,
         "reason": reason,
-        "failure_code": reason if status == "failed" else None,
-        "failure_note": "payload did not satisfy oracle" if status == "failed" else None,
+        "failure_code": reason if status in {"failed", "unsupported"} else None,
+        "failure_note": (
+            "payload did not satisfy oracle"
+            if status == "failed"
+            else "Stage D oracle does not support this hypothesis; preserving Stage C verdict"
+            if status == "unsupported"
+            else None
+        ),
         "observations": observations,
         "runtime_trace": setup_results + run_results,
         "timestamps": {"finished_at": utc_now()},
     }
     result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return 0 if status == "confirmed" else 1
+    return 0 if status in {"confirmed", "unsupported"} else 1
 
 
 if __name__ == "__main__":
@@ -451,6 +467,53 @@ def failed_record(hyp: Dict[str, Any], code: str, note: str, suggested_action: s
         "failure_note": note,
         "suggested_action": suggested_action,
         "timestamps": {"failed_at": utc_now()},
+    }
+    record.update(evidence_fields(hyp))
+    record.update(hypothesis_context_fields(hyp))
+    record.update(routing_fields(hyp))
+    return record
+
+
+def stage_c_verdict_fields(hyp: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        key: hyp.get(key)
+        for key in ("priority", "routing_decision", "suspicion_reason", "agent_verdict")
+        if hyp.get(key) not in (None, "", [])
+    }
+
+
+def preserved_record(
+    hyp: Dict[str, Any],
+    case: Dict[str, Any],
+    result: Dict[str, Any],
+    runner_rel: Path,
+    plan_rel: Path,
+) -> Dict[str, Any]:
+    record = {
+        "verify_id": stable_verify_id(str(hyp.get("hypothesis_id", "unknown"))),
+        "project_id": hyp.get("project_id"),
+        "sample_id": hyp.get("sample_id"),
+        "hypothesis_id": hyp.get("hypothesis_id"),
+        "status": "stage_c_preserved",
+        "severity": hyp.get("priority") or "P0",
+        "target_type": "source_api",
+        "attack_type": case.get("attack_type"),
+        "payload_ref": runner_rel.as_posix(),
+        "plan_ref": plan_rel.as_posix(),
+        "oracle_status": "unsupported",
+        "preservation_reason": "UNSUPPORTED_ORACLE",
+        "failure_code": "UNSUPPORTED_ORACLE",
+        "failure_note": result.get("failure_note")
+        or "Stage D oracle cannot prove or disprove this route; preserving Stage C judgment",
+        "stage_c_verdict": stage_c_verdict_fields(hyp),
+        "repro_steps": [
+            f"run generated payload runner {runner_rel.as_posix()}",
+            "execute configured config/build commands if present",
+            "preserve the Stage C vulnerability judgment because Stage D reported UNSUPPORTED_ORACLE",
+        ],
+        "observations": result.get("observations") or [],
+        "runtime_trace": result.get("runtime_trace") or [],
+        "timestamps": {"preserved_at": utc_now()},
     }
     record.update(evidence_fields(hyp))
     record.update(hypothesis_context_fields(hyp))
@@ -707,6 +770,9 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
         record.update(routing_fields(hyp))
         return record, None
 
+    if result.get("status") == "unsupported":
+        return preserved_record(hyp, case, result, runner_rel, plan_rel), None
+
     record = failed_record(
         hyp,
         result.get("failure_code") or "NOT_EXPLOITABLE",
@@ -724,21 +790,32 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
 
 
 def write_summary(out_dir: Path, success_rows: List[Dict[str, Any]], failed_rows: List[Dict[str, Any]]) -> None:
+    confirmed_rows = [row for row in success_rows if row.get("status") == "confirmed"]
+    preserved_rows = [row for row in success_rows if row.get("status") == "stage_c_preserved"]
     lines = [
         "# Member D Verification Summary",
         "",
         f"- generated_at: {utc_now()}",
         f"- target_type: source_api",
-        f"- confirmed: {len(success_rows)}",
+        f"- reportable: {len(success_rows)}",
+        f"- confirmed: {len(confirmed_rows)}",
+        f"- stage_c_preserved: {len(preserved_rows)}",
         f"- failed: {len(failed_rows)}",
         "",
     ]
-    if success_rows:
+    if confirmed_rows:
         lines.extend(["## Confirmed P0", ""])
-        for row in success_rows:
+        for row in confirmed_rows:
             lines.append(
                 f"- {row.get('hypothesis_id')} | {row.get('project_id')} | {row.get('route')} | "
                 f"payload: {row.get('payload_ref')}"
+            )
+    if preserved_rows:
+        lines.extend(["", "## Stage C Preserved / D Unsupported", ""])
+        for row in preserved_rows:
+            lines.append(
+                f"- {row.get('hypothesis_id')} | {row.get('project_id')} | {row.get('route')} | "
+                f"reason: {row.get('preservation_reason')}"
             )
     if failed_rows:
         lines.extend(["", "## Failed / 回流", ""])
@@ -787,7 +864,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     write_jsonl(args.out_dir / "verification.failed.jsonl", failed_rows)
     write_summary(args.out_dir, success_rows, failed_rows)
 
-    print(f"confirmed: {len(success_rows)}")
+    confirmed_count = sum(1 for row in success_rows if row.get("status") == "confirmed")
+    preserved_count = sum(1 for row in success_rows if row.get("status") == "stage_c_preserved")
+    print(f"reportable: {len(success_rows)}")
+    print(f"confirmed:  {confirmed_count}")
+    print(f"preserved:  {preserved_count}")
     print(f"failed:    {len(failed_rows)}")
     print(f"output:    {args.out_dir}")
     return 0 if success_rows or failed_rows else 1

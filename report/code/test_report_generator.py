@@ -32,6 +32,26 @@ def _confirmed_row():
     }
 
 
+def _preserved_row():
+    row = _confirmed_row()
+    row.update(
+        {
+            "hypothesis_id": "hyp_preserved",
+            "status": "stage_c_preserved",
+            "severity": "P1",
+            "oracle_status": "unsupported",
+            "preservation_reason": "UNSUPPORTED_ORACLE",
+            "failure_code": "UNSUPPORTED_ORACLE",
+            "stage_c_verdict": {
+                "priority": "P1",
+                "routing_decision": "dynamic_verification",
+                "agent_verdict": "vulnerability",
+            },
+        }
+    )
+    return row
+
+
 class FinalReportTests(unittest.TestCase):
     def test_final_report_row_contains_required_vulnerability_fields(self):
         row = generate_report.final_report_rows([_confirmed_row()])[0]
@@ -63,6 +83,14 @@ class FinalReportTests(unittest.TestCase):
             report_text = report_md.read_text(encoding="utf-8")
             self.assertIn("漏洞位置: file.c:42", report_text)
             self.assertNotIn("修复意见", report_text)
+
+    def test_preserved_stage_c_verdict_is_reportable(self):
+        row = generate_report.final_report_rows([_preserved_row()])[0]
+
+        self.assertEqual(row["verification_status"], "stage_c_preserved")
+        self.assertEqual(row["risk_level"], "P1")
+        self.assertEqual(row["evidence"]["preservation_reason"], "UNSUPPORTED_ORACLE")
+        self.assertEqual(validate_report.validate_report(row), [])
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 #define MAGUS_JULIET_WIN_SHIM_IO_H
 
 #include <fcntl.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -36,6 +37,15 @@
 extern "C" {
 #endif
 
+#ifndef MAGUS_JULIET_WIN_SHIM_ERRNO_T
+#define MAGUS_JULIET_WIN_SHIM_ERRNO_T
+typedef int errno_t;
+#endif
+
+errno_t _mktemp_s(char *template_name, size_t size);
+wchar_t *_wmktemp(wchar_t *template_name);
+wchar_t *_wtmpnam(wchar_t *buffer);
+wchar_t *_wtempnam(const wchar_t *dir, const wchar_t *prefix);
 int _open(const char *path, int flags, ...);
 int _wopen(const wchar_t *path, int flags, ...);
 int _close(int fd);

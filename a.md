@@ -111,7 +111,7 @@ python3 a/cmd/miner.py --input a/input/xxx.in.jsonl --output a/out/samples.raw.j
 - `config_cmd`：可选；在 `build_cmd` 前执行，适合 configure/cmake 之类准备步骤。
 - `build_env`：可选对象；合并进子进程环境。
 - `build_cwd`：可选；构建工作目录。默认是 `repo_path`。相对路径按 `repo_path` 解析。
-- `analysis_timeout`：可选正整数，默认 900 秒。用于 config/build/analyzer 子命令超时。
+- `analysis_timeout`：可选正整数，默认 1800 秒。用于 config/build/analyzer 子命令超时。
 - `analyzer_jobs`：必填整数，且必须大于 1。当前 analyzer 必走 chunked parallel 执行。
 - `target_subdirs`：可选字符串列表。若提供，只保留这些目录前缀下的源码记录。
 - `entry_functions`：可选字符串列表。若提供，只保留函数名精确匹配的记录。
@@ -178,6 +178,7 @@ Stage A 的主流程在 `miner.py` 的 `main()`、`formal_mine()` 和 `run_dfa_a
   -> 写 samples.raw.jsonl
   -> 派生并写 samples.stats.jsonl
   -> 删除成功项目的 artifact root
+  -> 删除成功项目由 bitcode_globs 推导出的 repo-local bitcode 输出目录
 ```
 
 ### 3.1 项目读取与校验
@@ -195,7 +196,9 @@ Stage A 的主流程在 `miner.py` 的 `main()`、`formal_mine()` 和 `run_dfa_a
    - 校验 backend 只能是 `llvm_api_dfa`。
    - 校验 `analyzer_jobs > 1`。
 
-不合法项目会打印 `skip invalid project ...` 并跳过，不会中断整个 JSONL 文件中其他项目。
+不合法项目会打印 `skip invalid project ...` 并跳过当前记录，继续处理同一 JSONL
+中的其他项目；但本轮 Stage A 会记录失败计数，并在写出已完成项目的 raw/stats 后以
+非零状态退出，避免根管线继续让 Stage B 消费不完整输出。
 
 ### 3.2 artifact 目录
 
@@ -219,6 +222,8 @@ Stage A 的主流程在 `miner.py` 的 `main()`、`formal_mine()` 和 `run_dfa_a
 `a.artifacts/<project_id>/`，避免长期保留 bitcode 副本和 DFA 临时输出。
 失败项目的 artifact 会保留，用于查看 `run_manifest.json` 和 `failures.json`
 等诊断信息。
+成功项目中由 `bitcode_globs` 推导出的 repo-local bitcode 输出目录也会在成功写出后删除，
+例如默认生成器创建的 `repo_path/bc/`。
 
 ### 3.3 构建阶段
 
@@ -1150,7 +1155,10 @@ Stage A 倾向显式失败，不做静默 fallback。
 - `failures.json` 写入结构化失败记录。
 - 该项目返回 `None`，主流程继续处理其他项目。
 
-如果所有项目都失败，当前仍会写出空的 raw/stats 文件，并打印 `wrote 0 samples ...`。
+只要有任一项目无效或 mining 失败，Stage A 会在写出已成功项目的 raw/stats 后打印
+`Stage A failed for <N> project(s)` 并以非零状态退出。若所有项目都失败，可能仍会留下
+空的 raw/stats 文件和 `wrote 0 samples ...` 日志，但根管线会因非零退出停止，不应把
+这些空输出交给 Stage B。
 
 ## 10. 设计边界和注意事项
 
@@ -1491,7 +1499,7 @@ flowchart TD
 | `ProjectInput.config_command()` / `config_command()` | 读取并归一化可选 `extensions.config_cmd`。 |
 | `ProjectInput.build_env()` | 读取 `extensions.build_env`，要求是对象，并把 key/value 转成字符串。 |
 | `ProjectInput.build_cwd()` | 读取 `extensions.build_cwd`，默认 repo 根；相对路径按 repo 根解析。 |
-| `ProjectInput.analysis_timeout()` | 读取 `extensions.analysis_timeout`，默认 900，必须是正整数且不能是 bool。 |
+| `ProjectInput.analysis_timeout()` | 读取 `extensions.analysis_timeout`，默认 1800，必须是正整数且不能是 bool。 |
 | `ProjectInput.analyzer_jobs()` | 读取 `extensions.analyzer_jobs`，必须存在、是整数、大于 1。 |
 | `ProjectInput.target_subdirs()` | 读取过滤目录前缀，归一化为无首尾 `/` 的 posix 路径。 |
 | `ProjectInput.entry_functions()` | 读取入口函数白名单，只保留非空字符串。 |
@@ -1638,11 +1646,12 @@ Python 恢复字段
 | --- | --- |
 | `formal_mine(project, artifact_root)` | 单项目正式执行流程：校验 repo/build_cwd，准备 env，执行 config/build，收集 bitcode，运行 analyzer，归一化 DFA，写 run_manifest。 |
 | `mine(project, output_path)` | 为项目创建/清理 artifact root，调用 `formal_mine()`；若发生 `ProjectFailure`，额外写 `failures.json` 后继续抛出。 |
-| `prepare_project(project, base_dir)` | 调用 `normalize()` 和 `validate()`；失败时打印 `skip invalid project ...` 并返回 False。 |
-| `run_project(project, output_path)` | 调用 `mine()`；捕获 `ProjectFailure` 和其他异常，打印项目失败摘要，返回 None。 |
-| `write_outputs(output_path, samples)` | 先写 raw，再写 stats。stats 路径由 raw 路径推导。 |
+| `prepare_project(project, base_dir)` | 调用 `normalize()` 和 `validate()`；失败时打印 `skip invalid project ...`、返回 False，并由 `main()` 计入最终失败数。 |
+| `run_project(project, output_path)` | 调用 `mine()`；捕获 `ProjectFailure` 和其他异常，打印项目失败摘要，返回 None，并由 `main()` 计入最终失败数。 |
+| `write_outputs(output_path, samples)` | 先写 raw，再写 stats。stats 路径由 raw 路径推导；若本轮存在失败项目，写出后仍会非零退出。 |
 | `cleanup_successful_artifacts(output_path, projects)` | 在 raw/stats 都写成功后，删除成功项目的 artifact root；失败项目 artifact 保留。 |
-| `main()` | Stage A CLI 顶层：读输入、逐项目 prepare/run、聚合样本、排序、写输出、清理成功 artifact、打印样本数。 |
+| `cleanup_successful_bitcode(projects)` | 在 raw/stats 都写成功后，按成功项目的 `bitcode_globs` 推导并删除 repo-local bitcode 输出目录，例如 `bc/`。 |
+| `main()` | Stage A CLI 顶层：读输入、逐项目 prepare/run、聚合样本、排序、写输出、清理成功 artifact 和 bitcode 输出目录、打印样本数；若存在失败项目则非零退出。 |
 
 ### 15.11 `formal_mine()` 的失败和 manifest 语义
 

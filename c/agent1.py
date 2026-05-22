@@ -28,6 +28,7 @@ LLM_MAX_OUTPUT_TOKENS = 4096              # max_tokens只限制模型输出长�
 LLM_REQUEST_TIMEOUT_SECONDS = 60.0        # 单次LLM请求上限，会被全局deadline进一步收紧
 LLM_JSON_RETRY_ATTEMPTS = 1               # JSON解析失败后额外重试次数
 POST_DEADLINE_GRACE_SECONDS = 5.0         # 到达提交预算后等待已完成结果的宽限时间
+WORKER_RESULT_DRAIN_GRACE_SECONDS = 0.2   # worker刚退出时等待Queue结果刷新的边界窗口
 EVIDENCE_TEXT_MAX_CHARS = 1200            # 单段证据文本最多保留字符数
 MAX_CALL_CHAIN = 12                       # 调用序列最多保留个数
 MAX_SINK_SOURCE = 5                       # source/sink、trace、代码片段最多保留个数
@@ -1004,15 +1005,34 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
             except queue.Empty:
                 return drained
 
+    def wait_for_worker_result(pid, timeout_seconds):
+        deadline_at = time.monotonic() + timeout_seconds
+        while pid in running:
+            remaining = deadline_at - time.monotonic()
+            if remaining <= 0:
+                return False
+            try:
+                handle_result(result_queue.get(timeout=min(0.05, remaining)))
+            except queue.Empty:
+                continue
+        return True
+
     def terminate_running():
         drain_results()
         for pid, (process, cand, group) in list(running.items()):
+            if not process.is_alive():
+                process.join(timeout=0)
+                if wait_for_worker_result(pid, WORKER_RESULT_DRAIN_GRACE_SECONDS):
+                    continue
             if process.is_alive():
                 process.terminate()
                 process.join(timeout=1)
             if process.is_alive():
                 process.kill()
                 process.join(timeout=1)
+            drain_results()
+            if pid not in running:
+                continue
             bucket = process_completed_future(
                 CompletedFuture(audit_timeout_record(cand, [])),
                 cand,
@@ -1053,6 +1073,8 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
                 if process.is_alive():
                     continue
                 process.join(timeout=0)
+                if wait_for_worker_result(pid, WORKER_RESULT_DRAIN_GRACE_SECONDS):
+                    continue
                 bucket = process_completed_future(
                     CompletedFuture(
                         audit_error_record(
@@ -1088,7 +1110,7 @@ def main():
     truncate_jsonl(output_path)
     truncate_jsonl(audit_output_path)
 
-    # 使用线程池并发处理，提高整体吞吐量
+    # 使用worker进程并发处理，提高整体吞吐量
     with (
         open(output_path, "a", encoding="utf-8", buffering=1) as d_file,
         open(audit_output_path, "a", encoding="utf-8", buffering=1) as audit_file,

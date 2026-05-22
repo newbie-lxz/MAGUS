@@ -121,6 +121,21 @@ def count_jsonl(path: Path) -> int:
     return count
 
 
+def count_jsonl_status(path: Path, status: str) -> int:
+    if not path.exists():
+        return 0
+    count = 0
+    with path.open("r", encoding="utf-8-sig") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if isinstance(row, dict) and row.get("status") == status:
+                count += 1
+    return count
+
+
 def hms(seconds: float | None) -> str:
     if seconds is None:
         return ""
@@ -495,7 +510,9 @@ def row_from_summary(
     mismatch_rate = safe_div(mismatch_count, denominator)
     c_minutes = safe_div(c_duration, 60.0)
     tp_unique = int(counts.get("tp_unique_cases", 0))
-    d_confirmed = count_jsonl(d_dir / JSONL_NAMES["d_confirmed"])
+    d_reportable = count_jsonl(d_dir / JSONL_NAMES["d_confirmed"])
+    d_confirmed = count_jsonl_status(d_dir / JSONL_NAMES["d_confirmed"], "confirmed")
+    d_stage_c_preserved = count_jsonl_status(d_dir / JSONL_NAMES["d_confirmed"], "stage_c_preserved")
     d_failed = count_jsonl(d_dir / JSONL_NAMES["d_failed"])
 
     row: dict[str, Any] = {
@@ -507,7 +524,9 @@ def row_from_summary(
         "source_files": source_files,
         "b_candidates": count_jsonl(b_output_dir(folder.cwe_id) / JSONL_NAMES["b_candidates"]),
         "c_hypotheses": count_jsonl(c_output_path(folder.cwe_id)),
+        "d_reportable": d_reportable,
         "d_confirmed": d_confirmed,
+        "d_stage_c_preserved": d_stage_c_preserved,
         "d_failed": d_failed,
         "truth_cases": int(counts.get("truth_cases", 0)),
         "truth_positive_cases": int(counts.get("truth_positive_cases", 0)),
@@ -540,6 +559,7 @@ def row_from_summary(
         "source_files_per_c_min": round_metric(safe_div(source_files, c_minutes)),
         "b_candidates_per_c_min": round_metric(safe_div(count_jsonl(b_output_dir(folder.cwe_id) / JSONL_NAMES["b_candidates"]), c_minutes)),
         "c_hypotheses_per_c_min": round_metric(safe_div(count_jsonl(c_output_path(folder.cwe_id)), c_minutes)),
+        "d_reportable_per_c_min": round_metric(safe_div(d_reportable, c_minutes)),
         "d_confirmed_per_c_min": round_metric(safe_div(d_confirmed, c_minutes)),
         "tp_unique_per_c_min": round_metric(safe_div(tp_unique, c_minutes)),
         "log": display_path(paths.logs / f"{folder.cwe_id}.eval.log"),
@@ -567,7 +587,9 @@ CSV_FIELDS = [
     "c_d_candidates",
     "c_p0_routed_to_d",
     "c_audit_only",
+    "d_reportable",
     "d_confirmed",
+    "d_stage_c_preserved",
     "d_failed",
     "truth_cases",
     "truth_positive_cases",
@@ -595,6 +617,7 @@ CSV_FIELDS = [
     "source_files_per_c_min",
     "b_candidates_per_c_min",
     "c_hypotheses_per_c_min",
+    "d_reportable_per_c_min",
     "d_confirmed_per_c_min",
     "tp_unique_per_c_min",
     "log",
@@ -626,6 +649,7 @@ def write_batch_summary(paths: BatchPaths, rows: list[dict[str, Any]], stop_reas
         "completed_runs": len(rows),
         "threshold_exceeded_runs": [row["run_name"] for row in rows if row.get("threshold_exceeded")],
         "best_tp_unique_per_c_min": best_row(rows, "tp_unique_per_c_min"),
+        "best_d_reportable_per_c_min": best_row(rows, "d_reportable_per_c_min"),
         "best_d_confirmed_per_c_min": best_row(rows, "d_confirmed_per_c_min"),
         "runs_csv": display_path(paths.root / "runs.csv"),
         "runs_jsonl": display_path(paths.root / "runs.jsonl"),

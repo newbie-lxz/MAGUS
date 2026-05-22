@@ -287,7 +287,10 @@ def run(args: argparse.Namespace) -> int:
             if success:
                 success_rows.append(success)
                 append_jsonl(success_file, success)
-                print(f"[D-stream] confirmed {hypothesis_id}", flush=True)
+                if success.get("status") == "stage_c_preserved":
+                    print(f"[D-stream] preserved {hypothesis_id} code=UNSUPPORTED_ORACLE", flush=True)
+                else:
+                    print(f"[D-stream] confirmed {hypothesis_id}", flush=True)
             if failed:
                 failed_rows.append(failed)
                 append_jsonl(failed_file, failed)
@@ -306,7 +309,11 @@ def run(args: argparse.Namespace) -> int:
     validate_output_files(args.out_dir)
 
     print(f"[D-stream] processed: {processed}", flush=True)
-    print(f"[D-stream] confirmed: {len(success_rows)}", flush=True)
+    confirmed_count = sum(1 for row in success_rows if row.get("status") == "confirmed")
+    preserved_count = sum(1 for row in success_rows if row.get("status") == "stage_c_preserved")
+    print(f"[D-stream] reportable: {len(success_rows)}", flush=True)
+    print(f"[D-stream] confirmed:  {confirmed_count}", flush=True)
+    print(f"[D-stream] preserved:  {preserved_count}", flush=True)
     print(f"[D-stream] failed:    {len(failed_rows)}", flush=True)
     print(f"[D-stream] output:    {args.out_dir}", flush=True)
     return 0

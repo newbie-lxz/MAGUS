@@ -15,7 +15,9 @@ FAILURE_CODES = {
     "HYPOTHESIS_WRONG",
     "TIMEOUT",
     "NON_DETERMINISTIC",
+    "UNSUPPORTED_ORACLE",
 }
+REPORTABLE_STATUSES = {"confirmed", "stage_c_preserved"}
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -53,10 +55,15 @@ def validate_confirmed(row: Dict[str, Any]) -> List[str]:
     errors = []
     errors.extend(f"missing {field}" for field in missing(row, MIN_EVIDENCE_FIELDS))
     errors.extend(f"missing {field}" for field in missing(row, ["verify_id", "hypothesis_id", "payload_ref", "repro_steps", "runtime_trace"]))
-    if row.get("status") != "confirmed":
-        errors.append("status must be confirmed")
-    if row.get("severity") != "P0":
+    status = row.get("status")
+    if status not in REPORTABLE_STATUSES:
+        errors.append("status must be confirmed or stage_c_preserved")
+    if status == "confirmed" and row.get("severity") != "P0":
         errors.append("confirmed record must set severity=P0")
+    if status == "stage_c_preserved":
+        errors.extend(f"missing {field}" for field in missing(row, ["preservation_reason", "stage_c_verdict"]))
+        if row.get("failure_code") != "UNSUPPORTED_ORACLE":
+            errors.append("stage_c_preserved record must set failure_code=UNSUPPORTED_ORACLE")
     return errors
 
 
@@ -94,7 +101,11 @@ def main() -> int:
         return 1
 
     print("VALID")
-    print(f"confirmed: {len(confirmed)}")
+    confirmed_count = sum(1 for row in confirmed if row.get("status") == "confirmed")
+    preserved_count = sum(1 for row in confirmed if row.get("status") == "stage_c_preserved")
+    print(f"reportable: {len(confirmed)}")
+    print(f"confirmed:  {confirmed_count}")
+    print(f"preserved:  {preserved_count}")
     print(f"failed:    {len(failed)}")
     return 0
 

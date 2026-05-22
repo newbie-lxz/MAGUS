@@ -361,6 +361,82 @@ static wchar_t *wide_from_narrow_static(const char *value)
     return buffer;
 }
 
+static wchar_t *wide_strdup_alloc(const wchar_t *value)
+{
+    size_t len;
+    wchar_t *result;
+    if (value == NULL)
+    {
+        return NULL;
+    }
+    len = wcslen(value);
+    result = (wchar_t *)malloc((len + 1) * sizeof(wchar_t));
+    if (result == NULL)
+    {
+        return NULL;
+    }
+    copy_wstring(result, len + 1, value);
+    return result;
+}
+
+static int replace_x_suffix(char *template_name, size_t size)
+{
+    size_t len;
+    size_t first_x;
+    size_t i;
+    if (template_name == NULL || size == 0)
+    {
+        return EINVAL;
+    }
+    for (len = 0; len < size && template_name[len] != '\0'; len++)
+    {
+    }
+    if (len == size)
+    {
+        return EINVAL;
+    }
+    first_x = len;
+    while (first_x > 0 && template_name[first_x - 1] == 'X')
+    {
+        first_x--;
+    }
+    if (first_x == len)
+    {
+        return EINVAL;
+    }
+    for (i = first_x; i < len; i++)
+    {
+        template_name[i] = (char)('A' + ((i - first_x) % 26));
+    }
+    return 0;
+}
+
+static int replace_wx_suffix(wchar_t *template_name)
+{
+    size_t len;
+    size_t first_x;
+    size_t i;
+    if (template_name == NULL)
+    {
+        return EINVAL;
+    }
+    len = wcslen(template_name);
+    first_x = len;
+    while (first_x > 0 && template_name[first_x - 1] == L'X')
+    {
+        first_x--;
+    }
+    if (first_x == len)
+    {
+        return EINVAL;
+    }
+    for (i = first_x; i < len; i++)
+    {
+        template_name[i] = (wchar_t)(L'A' + ((i - first_x) % 26));
+    }
+    return 0;
+}
+
 static intptr_t process_marker_a(const char *name, const char *cmdname)
 {
     sink_marker(name, cmdname);
@@ -1259,6 +1335,71 @@ int _wchdir(const wchar_t *path)
     int result = narrow ? chdir(narrow) : -1;
     free(narrow);
     return result;
+}
+
+char *mktemp(char *template_name)
+{
+    if (replace_x_suffix(template_name, strlen(template_name) + 1) != 0)
+    {
+        return NULL;
+    }
+    sink_marker("mktemp", template_name);
+    flaw_marker("mktemp", template_name, "temporary_name_created_before_open");
+    return template_name;
+}
+
+char *tempnam(const char *dir, const char *prefix)
+{
+    char value[256];
+    snprintf(value, sizeof(value), "%s/%sABCDEF", dir ? dir : ".", prefix ? prefix : "tmp");
+    sink_marker("tempnam", value);
+    flaw_marker("tempnam", value, "temporary_name_created_before_open");
+    return strdup(value);
+}
+
+char *tmpnam(char *buffer)
+{
+    static char static_buffer[L_tmpnam];
+    char *target = buffer ? buffer : static_buffer;
+    copy_string(target, L_tmpnam, "tmpABCDEF");
+    sink_marker("tmpnam", target);
+    flaw_marker("tmpnam", target, "temporary_name_created_before_open");
+    return target;
+}
+
+int _mktemp_s(char *template_name, size_t size)
+{
+    return replace_x_suffix(template_name, size);
+}
+
+wchar_t *_wmktemp(wchar_t *template_name)
+{
+    if (replace_wx_suffix(template_name) != 0)
+    {
+        return NULL;
+    }
+    sink_marker_w("_wmktemp", template_name);
+    flaw_marker_w("_wmktemp", template_name, "temporary_name_created_before_open");
+    return template_name;
+}
+
+wchar_t *_wtmpnam(wchar_t *buffer)
+{
+    static wchar_t static_buffer[L_tmpnam];
+    wchar_t *target = buffer ? buffer : static_buffer;
+    copy_wstring(target, L_tmpnam, L"tmpABCDEF");
+    sink_marker_w("_wtmpnam", target);
+    flaw_marker_w("_wtmpnam", target, "temporary_name_created_before_open");
+    return target;
+}
+
+wchar_t *_wtempnam(const wchar_t *dir, const wchar_t *prefix)
+{
+    wchar_t value[256];
+    swprintf(value, sizeof(value) / sizeof(value[0]), L"%ls/%lsABCDEF", dir ? dir : L".", prefix ? prefix : L"tmp");
+    sink_marker_w("_wtempnam", value);
+    flaw_marker_w("_wtempnam", value, "temporary_name_created_before_open");
+    return wide_strdup_alloc(value);
 }
 
 int _open(const char *path, int flags, ...)

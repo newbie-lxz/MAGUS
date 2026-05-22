@@ -143,11 +143,14 @@ def final_report_record(row: Dict[str, Any]) -> Dict[str, Any]:
         "trigger_condition": trigger_condition(row),
         "claim": row.get("claim"),
         "confidence": row.get("confidence"),
+        "stage_c_verdict": row.get("stage_c_verdict"),
         "evidence": {
             "evidence_slice": row.get("evidence_slice"),
             "observations": row.get("observations") or [],
             "payload_ref": row.get("payload_ref"),
             "plan_ref": row.get("plan_ref"),
+            "oracle_status": row.get("oracle_status"),
+            "preservation_reason": row.get("preservation_reason"),
         },
     }
 
@@ -175,6 +178,8 @@ def write_final_report(
     failed_path: Path,
 ) -> None:
     report_rows = final_report_rows(success_rows)
+    d_confirmed_rows = [row for row in success_rows if row.get("status") == "confirmed"]
+    preserved_rows = [row for row in success_rows if row.get("status") == "stage_c_preserved"]
     out_dir.mkdir(parents=True, exist_ok=True)
     write_jsonl(out_dir / REPORT_JSONL_NAME, report_rows)
 
@@ -182,7 +187,9 @@ def write_final_report(
         "# MAGUS Final Vulnerability Report",
         "",
         f"- generated_at: {utc_now()}",
-        f"- confirmed_vulnerabilities: {len(report_rows)}",
+        f"- reportable_vulnerabilities: {len(report_rows)}",
+        f"- d_confirmed_vulnerabilities: {len(d_confirmed_rows)}",
+        f"- stage_c_preserved_vulnerabilities: {len(preserved_rows)}",
         f"- failed_verifications: {len(failed_rows)}",
         f"- source_confirmed: {confirmed_path}",
         f"- source_failed: {failed_path}",
@@ -217,6 +224,7 @@ def write_final_report(
                     f"- 结论: {format_report_text(row.get('claim'))}",
                     f"- D验证: {format_report_text(row.get('verification_status'))} / {format_report_text(row.get('verify_id'))}",
                     f"- 运行证据: {format_report_text(evidence.get('observations'))}",
+                    f"- 保留原因: {format_report_text(evidence.get('preservation_reason'))}",
                     "",
                 ]
             )
@@ -245,7 +253,7 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
         "--confirmed",
         default=DEFAULT_D_OUTPUT_DIR / "verification.jsonl",
         type=Path,
-        help="Stage D confirmed verification JSONL",
+        help="Stage D reportable verification JSONL",
     )
     parser.add_argument(
         "--failed",

@@ -293,9 +293,11 @@ def juliet_win32_oracle() -> Dict[str, Any]:
         "accepted_evidence": [
             "Juliet bad/good main banner proves the selected route executed",
             "MAGUS_JULIET_ROUTE_CONFIRMED proves a tainted Win32/API sink or point-flaw marker was reached",
+            "MAGUS_JULIET_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the C hypothesis semantics",
         ],
         "failure_patterns": ["MAGUS_JULIET_ROUTE_CONFIRMED"],
         "required_patterns": ["MAGUS_JULIET_ROUTE_EXECUTED"],
+        "unsupported_patterns": ["MAGUS_JULIET_ORACLE_UNSUPPORTED"],
         "failure_code_patterns": {
             "NOT_ROUTE_BOUND": ["MAGUS_JULIET_NOT_ROUTE_BOUND"],
             "ENV_MISSING": ["MAGUS_JULIET_BUILD_FAILED", "MAGUS_JULIET_RUNNER_ERROR"],

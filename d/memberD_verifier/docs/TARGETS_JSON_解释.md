@@ -63,8 +63,9 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
 - `oracle.failure_patterns`：stdout/stderr 中可确认漏洞的模式。
 - `oracle.required_patterns`：可选；confirmed 前必须同时出现在 stdout/stderr 中的模式，常用于证明当前 route / source API 序列已执行。
 - `oracle.failure_code_patterns`：可选；把 stdout/stderr 中的模式映射为失败码，例如 `NOT_ROUTE_BOUND` 或 `NOT_EXPLOITABLE`。
+- `oracle.unsupported_patterns`：可选；把 stdout/stderr 中的模式映射为 D oracle 能力缺口。命中时输出 `stage_c_preserved`，保留 Stage C 判断。
 - `oracle.expect_nonzero_exit`：是否把非零退出作为确认信号之一。
 
 ## 能否 confirmed
 
-只有生成 payload 不会自动 confirmed。要 confirmed，必须能在 `repo_path` 中运行具体命令，并且运行结果命中 oracle。若运行结果不能证明当前 `route` 或 source API 序列被触发，即使同项目里存在其他可触发路径，也不能写 confirmed，应回流为 failed。
+只有生成 payload 不会自动 confirmed。要 confirmed，必须能在 `repo_path` 中运行具体命令，并且运行结果命中 oracle。若运行结果不能证明当前 `route` 或 source API 序列被触发，即使同项目里存在其他可触发路径，也不能写 confirmed，应回流为 failed。若 route 已执行但 D 明确命中 `unsupported_patterns`，写 `stage_c_preserved`，不把能力缺口记成 `NOT_EXPLOITABLE`。

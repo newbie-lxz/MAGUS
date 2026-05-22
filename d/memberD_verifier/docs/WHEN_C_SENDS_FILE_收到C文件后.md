@@ -38,7 +38,7 @@ report/<run-name>/verification.report.jsonl
 report/<run-name>/verification.report.md
 ```
 
-`report/<run-name>/verification.report.jsonl` / `report/<run-name>/verification.report.md` 是最终漏洞报告，只汇总 D confirmed 记录。`<run-name>` 优先来自 D 输出中的唯一 Juliet CWE 源码目录名，没有唯一 CWE 目录时取唯一 `project_id`；也可以用 `REPORT_RUN_NAME=<name>` 显式指定。每条报告包含漏洞位置（文件路径、行号、route）、漏洞类型、风险等级、触发条件、运行证据和 payload/plan 引用。
+`report/<run-name>/verification.report.jsonl` / `report/<run-name>/verification.report.md` 是最终漏洞报告，汇总 D `verification.jsonl` 中的 reportable 记录：D `confirmed`，以及 D 明确返回 `UNSUPPORTED_ORACLE` 时保留的 `stage_c_preserved`。`<run-name>` 优先来自 D 输出中的唯一 Juliet CWE 源码目录名，没有唯一 CWE 目录时取唯一 `project_id`；也可以用 `REPORT_RUN_NAME=<name>` 显式指定。每条报告包含漏洞位置（文件路径、行号、route）、漏洞类型、风险等级、触发条件、运行证据和 payload/plan 引用。
 
 如果 C 的假设文件没有可执行上下文，可以在同目录补一个 sidecar：
 
@@ -59,11 +59,11 @@ verification_context.run_cmd 或 poc_cmd 或 test_cmd
 verification_context.oracle
 ```
 
-D 会执行生成的 runner，并按 oracle 判定 confirmed 或 failed。confirmed 需要能把证据归因到当前 `route` / source API 序列；如果只能证明同项目或同文件的其他路径触发，结果应进入 failed，通常是 `NOT_ROUTE_BOUND`。
+D 会执行生成的 runner，并按 oracle 判定 reportable 或 failed。confirmed 需要能把证据归因到当前 `route` / source API 序列；如果只能证明同项目或同文件的其他路径触发，结果应进入 failed，通常是 `NOT_ROUTE_BOUND`。如果 route 已执行但 oracle 明确报告能力不支持，D 写 `stage_c_preserved` 保留 C 判断。
 
 这些字段也可以来自 `verification_contexts.jsonl`。sidecar 支持按 `project_id`、`route`、`hypothesis_id` 绑定，优先级是 `hypothesis_id > route > project_id`。
 
-sidecar oracle 可使用 `required_patterns` 作为 confirmed 前必须存在的 route-bound marker，也可以用 `failure_code_patterns` 把输出 marker 映射为 `NOT_ROUTE_BOUND` / `NOT_EXPLOITABLE` 等失败码。
+sidecar oracle 可使用 `required_patterns` 作为 confirmed 前必须存在的 route-bound marker，也可以用 `failure_code_patterns` 把输出 marker 映射为 `NOT_ROUTE_BOUND` / `NOT_EXPLOITABLE` 等失败码；`unsupported_patterns` 用于把 D 能力缺口映射为 `UNSUPPORTED_ORACLE`，并保留 Stage C 判断。
 
 如果缺少这些字段，D 仍会生成 payload 和 plan，但结果会进入 `verification.failed.jsonl`，用于回流缺失信息。
 

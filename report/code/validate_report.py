@@ -22,6 +22,7 @@ REPORT_REQUIRED_FIELDS = [
     "risk_level",
     "trigger_condition",
 ]
+REPORTABLE_VERIFICATION_STATUSES = {"confirmed", "stage_c_preserved"}
 
 
 def missing(row: Dict[str, Any], fields: Iterable[str]) -> List[str]:
@@ -49,8 +50,8 @@ def validate_report(row: Dict[str, Any]) -> List[str]:
         )
         if not has_trigger:
             errors.append("trigger_condition must include preconditions, attack_path, route, or evidence_slice")
-    if row.get("verification_status") != "confirmed":
-        errors.append("report record must be based on confirmed verification")
+    if row.get("verification_status") not in REPORTABLE_VERIFICATION_STATUSES:
+        errors.append("report record must be based on confirmed verification or preserved Stage C judgment")
     return errors
 
 
@@ -60,7 +61,7 @@ def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
         "--confirmed",
         default=generate_report.DEFAULT_D_OUTPUT_DIR / "verification.jsonl",
         type=Path,
-        help="Stage D confirmed verification JSONL used as the report source",
+        help="Stage D reportable verification JSONL used as the report source",
     )
     parser.add_argument(
         "--report-dir",
@@ -113,7 +114,7 @@ def main(argv: List[str] | None = None) -> int:
         return 1
 
     print("VALID")
-    print(f"confirmed: {len(confirmed)}")
+    print(f"reportable: {len(confirmed)}")
     print(f"reported:  {len(report)}")
     return 0
 

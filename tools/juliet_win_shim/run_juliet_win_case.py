@@ -24,6 +24,7 @@ ROUTE_EXECUTED_MARKER = "MAGUS_JULIET_ROUTE_EXECUTED"
 ROUTE_CONFIRMED_MARKER = "MAGUS_JULIET_ROUTE_CONFIRMED"
 NOT_ROUTE_BOUND_MARKER = "MAGUS_JULIET_NOT_ROUTE_BOUND"
 NOT_CONFIRMED_MARKER = "MAGUS_JULIET_NOT_CONFIRMED"
+ORACLE_UNSUPPORTED_MARKER = "MAGUS_JULIET_ORACLE_UNSUPPORTED"
 BUILD_FAILED_MARKER = "MAGUS_JULIET_BUILD_FAILED"
 RUNNER_ERROR_MARKER = "MAGUS_JULIET_RUNNER_ERROR"
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
@@ -352,6 +353,18 @@ def oracle_confirmed(stdout: str, scenario: str) -> bool:
     return False
 
 
+def unsupported_oracle_reason(source: Path, scenario: str) -> str:
+    if scenario != "bad":
+        return ""
+    try:
+        source_text = desanitize_text(source.read_text(encoding="utf-8", errors="ignore"))
+    except OSError:
+        return ""
+    if "Missing required step" in source_text:
+        return "required_step_absence_without_runtime_marker"
+    return ""
+
+
 def main() -> int:
     args = parse_args()
     source = resolve_source(args.source_file)
@@ -403,6 +416,15 @@ def main() -> int:
                 f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source}"
             )
             return 0
+
+        if route_executed:
+            reason = unsupported_oracle_reason(source, scenario)
+            if reason:
+                print(
+                    f"{ORACLE_UNSUPPORTED_MARKER} reason={reason} scenario={scenario} "
+                    f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source}"
+                )
+                return 3
 
         print(NOT_CONFIRMED_MARKER)
         print(f"entry_symbol={args.entry_symbol}")
