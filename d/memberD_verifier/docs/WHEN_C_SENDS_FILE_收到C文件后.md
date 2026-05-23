@@ -59,7 +59,7 @@ verification_context.run_cmd 或 poc_cmd 或 test_cmd
 verification_context.oracle
 ```
 
-D 会执行生成的 runner，并按 oracle 判定 reportable 或 failed。confirmed 需要能把证据归因到当前 `route` / source API 序列，并命中 D 选择的 `oracle_profile_id` 的语义证据；CWE 只是 profile 选择的辅助信号，不是必需输入。oracle profile 使用项目无关的 `MAGUS_ORACLE_*` 语义 marker，不包含测试集专用逻辑。如果只能证明同项目或同文件的其他路径触发，结果应进入 failed，通常是 `NOT_ROUTE_BOUND`。如果 route 已执行但 oracle 明确报告能力不支持，D 只对 `P0`/`P1` 写 `stage_c_preserved` 保留 C 判断；`P2` 写 failed，`failure_code=UNSUPPORTED_ORACLE`。
+D 会执行生成的 runner，并按 oracle 判定 reportable 或 failed。confirmed 需要能把证据归因到当前 `route` / source API 序列，并命中 D 选择的 `oracle_profile_id` 的语义证据；CWE 只是 profile 选择的辅助信号，不是必需输入。oracle profile 使用项目无关的 `MAGUS_ORACLE_*` 语义 marker，不包含测试集专用逻辑。资源生命周期 profile 还会携带 acquire/release/transfer/duplicate/sentinel 语义模型，并按用户态 fd、C stdio、Win32 HANDLE、Linux kernel API family 分开选择；kernel profile 不能复用用户态 `open`/`close` oracle，必须通过显式内核运行上下文验证。资源生命周期 profile 默认要求 `MAGUS_ORACLE_RAN profile=<oracle_profile_id>`，缺失时表示 harness 没有证明自己能观察该生命周期状态。如果只能证明同项目或同文件的其他路径触发，结果应进入 failed，通常是 `NOT_ROUTE_BOUND`。如果 route 已执行但 oracle 明确报告能力不支持，D 只对 `P0`/`P1` 写 `stage_c_preserved` 保留 C 判断；`P2` 写 failed，`failure_code=UNSUPPORTED_ORACLE`。
 
 这些字段可以来自项目/环境级 adapter，也可以来自 `verification_contexts.jsonl`。adapter 覆盖一类项目或运行环境，不按文件编写；sidecar 支持按 `project_id`、`route`、`hypothesis_id` 绑定，优先级是 `hypothesis_id > route > project_id`。
 

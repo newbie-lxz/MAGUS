@@ -48,7 +48,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--analysis-timeout", type=int, default=DEFAULT_ANALYSIS_TIMEOUT)
     parser.add_argument("--clang", default="clang", help="C compiler used for bitcode generation")
     parser.add_argument("--clangxx", default="clang++", help="C++ compiler used for bitcode generation")
-    parser.add_argument("--bc-dir", default="bc", help="bitcode output directory under repo root")
+    parser.add_argument(
+        "--bc-dir",
+        default="",
+        help="bitcode output directory under repo root; defaults to bc.<project_id>",
+    )
     parser.add_argument(
         "--source-glob",
         action="append",
@@ -235,7 +239,12 @@ def build_project_record(
     seen_shell_commands: set[str] = set()
     sources: list[Path] = []
     source_counts: dict[Path, int] = {}
-    bc_dir = args.bc_dir.strip().strip("/")
+    input_jsonl_dir = input_jsonl_path.parent
+    project_id = args.project_id.strip() or repo_path.name
+    if not project_id:
+        raise ValueError("project_id is empty")
+
+    bc_dir = (args.bc_dir.strip() or f"bc.{project_id}").strip("/")
     if not bc_dir:
         raise ValueError("--bc-dir must be a non-empty relative directory")
     if Path(bc_dir).is_absolute() or ".." in Path(bc_dir).parts:
@@ -281,11 +290,6 @@ def build_project_record(
 
     if not sources:
         raise ValueError(f"compile_commands.json contains no supported C/C++ sources under {repo_path}")
-
-    input_jsonl_dir = input_jsonl_path.parent
-    project_id = args.project_id.strip() or repo_path.name
-    if not project_id:
-        raise ValueError("project_id is empty")
 
     return {
         "project_id": project_id,

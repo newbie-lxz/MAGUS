@@ -56,6 +56,31 @@ SOURCE_KIND_PREFIX: tuple[tuple[str, str], ...] = (
 )
 
 
+def has_glob_magic(part: str) -> bool:
+    return any(ch in part for ch in "*?[")
+
+
+def concrete_bitcode_glob_prefix(pattern: str) -> Path:
+    path = Path(pattern)
+    if path.is_absolute():
+        raise ValueError("extensions.bitcode_globs entries must be relative to repo_path")
+    if ".." in path.parts:
+        raise ValueError("extensions.bitcode_globs entries must stay under repo_path")
+
+    prefix_parts: list[str] = []
+    for part in path.parts:
+        if part in ("", "."):
+            continue
+        if has_glob_magic(part):
+            break
+        prefix_parts.append(part)
+    if not prefix_parts:
+        raise ValueError(
+            "extensions.bitcode_globs entries must include a concrete output directory before any wildcard"
+        )
+    return Path(*prefix_parts)
+
+
 # 1. 输入模型与运行状态
 @dataclass
 class ProjectInput:
@@ -87,6 +112,7 @@ class ProjectInput:
         if self.build_command() is None:
             raise ValueError("missing extensions.build_cmd for build-based analysis")
         self.backend_mode()
+        self.bitcode_globs()
         self.analyzer_jobs()
 
     def backend_mode(self) -> str:
@@ -175,12 +201,14 @@ class ProjectInput:
     def bitcode_globs(self) -> list[str]:
         raw = self.extensions.get("bitcode_globs")
         if raw is None:
-            return ["**/*.bc"]
+            raise ValueError("missing extensions.bitcode_globs for build-based analysis")
         if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
             raise ValueError("extensions.bitcode_globs must be a list of strings")
         globs = [item for item in raw if item.strip()]
         if not globs:
             raise ValueError("extensions.bitcode_globs must not be empty")
+        for pattern in globs:
+            concrete_bitcode_glob_prefix(pattern)
         return globs
 
 
@@ -1797,6 +1825,7 @@ def formal_mine(project: ProjectInput, artifact_root: Path) -> list[dict]:
         env[COMPILE_COMMANDS_SOURCE_GLOBS_ENV] = json.dumps(source_globs, ensure_ascii=False)
     timeout = project.analysis_timeout()
     try:
+        prepare_bitcode_output_dirs(project, run_manifest)
         execute_optional_stage(
             "config",
             project.config_command(),
@@ -1886,23 +1915,38 @@ def bitcode_output_dirs(project: ProjectInput) -> list[Path]:
     dirs: list[Path] = []
     seen: set[Path] = set()
     for pattern in project.bitcode_globs():
-        prefix_parts: list[str] = []
-        for part in Path(pattern).parts:
-            if any(ch in part for ch in "*?["):
-                break
-            prefix_parts.append(part)
-        if not prefix_parts:
-            continue
-        candidate = repo_path.joinpath(*prefix_parts).resolve()
+        prefix = concrete_bitcode_glob_prefix(pattern)
+        candidate = repo_path.joinpath(prefix).resolve()
         try:
             candidate.relative_to(repo_path)
         except ValueError:
-            continue
+            raise ValueError("extensions.bitcode_globs entries must stay under repo_path")
         if candidate in seen:
             continue
         seen.add(candidate)
         dirs.append(candidate)
     return dirs
+
+
+def prepare_bitcode_output_dirs(project: ProjectInput, run_manifest: dict[str, Any]) -> None:
+    """Remove stale generated bitcode before running the project build."""
+    cleaned_dirs: list[str] = []
+    for bitcode_dir in bitcode_output_dirs(project):
+        if not bitcode_dir.exists():
+            continue
+        if not bitcode_dir.is_dir():
+            raise ProjectFailure(
+                "build_setup",
+                "bitcode_output_path_not_directory",
+                {"path": str(bitcode_dir)},
+            )
+        shutil.rmtree(bitcode_dir)
+        cleaned_dirs.append(bitcode_dir.relative_to(Path(project.repo_path).resolve()).as_posix())
+
+    run_manifest["bitcode_prepare"] = {
+        "status": "ok",
+        "cleaned_dirs": cleaned_dirs,
+    }
 
 
 def cleanup_successful_artifacts(output_path: Path, projects: list[ProjectInput]) -> None:

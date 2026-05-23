@@ -29,6 +29,14 @@ BUILD_FAILED_MARKER = "MAGUS_BUILD_FAILED"
 RUNNER_ERROR_MARKER = "MAGUS_RUNNER_ERROR"
 RPC_FORCED_FAILURE_MARKER = "MAGUS_JULIET_FLAW name=RpcImpersonateClient reason=forced_non_ok_return_for_privilege_drop_check"
 RPC_NOT_PROPAGATED_MARKER = "MAGUS_ORACLE_FLAW name=RpcImpersonateClient reason=forced_non_ok_return_not_propagated value="
+POSIX_FD_LIFECYCLE_PROFILE_ID = "resource.fd_lifecycle.user_posix"
+STDIO_LIFECYCLE_PROFILE_ID = "resource.stream_lifecycle.c_stdio"
+WIN32_HANDLE_LIFECYCLE_PROFILE_ID = "resource.handle_lifecycle.win32"
+LIFECYCLE_CAPABILITY_ENV = {
+    POSIX_FD_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_FD_LEAKS",
+    STDIO_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_STREAM_LEAKS",
+    WIN32_HANDLE_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_HANDLE_LEAKS",
+}
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
 SCENARIO_LABELS = {"bad": "case0", "good": "case1"}
 COMPAT_HEADER = SHIM_DIR / "juliet_win_compat.h"
@@ -268,7 +276,7 @@ def write_runtime_files(cwd: Path, payload: str) -> None:
     (cwd / "encrypted.txt").write_bytes(binary_payload[:256].ljust(128, b"X"))
 
 
-def configure_failure_environment(env: dict[str, str], source: Path) -> None:
+def configure_failure_environment(env: dict[str, str], source: Path, oracle_profile_id: str = "") -> None:
     source_text = str(source)
     source_name = source.name
     try:
@@ -291,11 +299,9 @@ def configure_failure_environment(env: dict[str, str], source: Path) -> None:
         env["MAGUS_JULIET_MARK_RAND_FLAW"] = "1"
     if "CWE690_NULL_Deref_From_Return" in source_text and "w32_wfopen" in source_name:
         env["MAGUS_JULIET_FAIL_WFOPEN"] = "1"
-    if (
-        "CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle" in source_text
-        or "CWE775_Missing_Release_of_File_Descriptor_or_Handle" in source_text
-    ):
-        env["MAGUS_JULIET_REPORT_HANDLE_LEAKS"] = "1"
+    lifecycle_env = LIFECYCLE_CAPABILITY_ENV.get(oracle_profile_id)
+    if lifecycle_env:
+        env[lifecycle_env] = "1"
 
 
 def compile_unit(command: list[str], tmp_path: Path) -> bool:
@@ -399,6 +405,13 @@ def route_bound_semantic_markers(stdout: str, route_executed: bool) -> list[str]
     return []
 
 
+def oracle_capability_markers(profile_id: str, env: dict[str, str]) -> list[str]:
+    env_name = LIFECYCLE_CAPABILITY_ENV.get(profile_id)
+    if env_name and env.get(env_name):
+        return [f"MAGUS_ORACLE_RAN profile={profile_id}"]
+    return []
+
+
 def unsupported_oracle_reason(confirm_patterns: list[str], profile_id: str) -> str:
     if confirm_patterns:
         return ""
@@ -431,7 +444,7 @@ def main() -> int:
         env["MAGUS_JULIET_PAYLOAD"] = args.payload
         env.setdefault("ADD", args.payload)
         env.setdefault("WINDIR", r"C:\Windows")
-        configure_failure_environment(env, source)
+        configure_failure_environment(env, source, args.oracle_profile_id)
 
         run = run_checked([str(binary)], tmp_path, env=env, stdin_text=args.payload + "\n")
         raw_stdout = run.stdout or ""
@@ -442,9 +455,13 @@ def main() -> int:
 
         route_executed = route_was_executed(raw_stdout, source, scenario)
         semantic_markers = route_bound_semantic_markers(raw_stdout, route_executed)
+        capability_markers = oracle_capability_markers(args.oracle_profile_id, env) if route_executed else []
         for marker in semantic_markers:
             print(marker)
-        oracle_stdout = generic_stdout + ("\n" + "\n".join(semantic_markers) if semantic_markers else "")
+        for marker in capability_markers:
+            print(marker)
+        route_bound_markers = [*semantic_markers, *capability_markers]
+        oracle_stdout = generic_stdout + ("\n" + "\n".join(route_bound_markers) if route_bound_markers else "")
         confirmed, matched_patterns = oracle_confirmed(oracle_stdout, args.confirm_pattern)
 
         if route_executed:

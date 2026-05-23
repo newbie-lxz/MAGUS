@@ -65,6 +65,7 @@ python3 pipeline.py gen-input \
   --compile-commands srcs_sanitized/compile_commands.cwe15.json \
   --output a/input/srcs.cwe15.in.jsonl \
   --project-id cwe15 \
+  --bc-dir bc.cwe15 \
   --force
 
 python3 tools/gen_juliet_verification_contexts.py \
@@ -100,6 +101,7 @@ python3 pipeline.py gen-input \
   --repo-path srcs_sanitized \
   --compile-commands srcs_sanitized/compile_commands.json \
   --output a/input/srcs.in.jsonl \
+  --bc-dir bc.srcs_sanitized \
   --force
 
 python3 tools/gen_juliet_verification_contexts.py \

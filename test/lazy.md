@@ -58,6 +58,7 @@ run_juliet_folder() {
     --compile-commands "srcs_sanitized/compile_commands.${cwe_id}.json" \
     --output "a/input/srcs.${cwe_id}.in.jsonl" \
     --project-id "${cwe_id}" \
+    --bc-dir "bc.${cwe_id}" \
     --force
 
   python3 tools/gen_juliet_verification_contexts.py \

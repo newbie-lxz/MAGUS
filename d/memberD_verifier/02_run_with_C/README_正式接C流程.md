@@ -73,13 +73,14 @@ hypothesis_id > route > project_id
 {"project_id":"custom_source_api","repo_path":"/datasets/custom-source-api","test_cmd":"./repros/run_case.sh ${file} ${entry_symbol}","oracle":{"failure_patterns":["AddressSanitizer","Segmentation fault"],"expect_nonzero_exit":false}}
 ```
 
-D 的 target generator 先生成项目无关的 source/API target 和 oracle profile，不自动附加 benchmark 或项目专用执行配置。真正的仓库路径、构建命令、运行命令、route marker、失败 marker、unsupported marker 来自显式 sidecar 或显式 target。`oracle_profiles.py` 只保留通用 profile 选择和 `MAGUS_ORACLE_*` 语义模式，不能包含 Juliet 或其他 benchmark 专用代码。自动生成的 source/API payload runner 会把 `MAGUS_D_PROJECT_ID`、`MAGUS_D_SAMPLE_ID`、`MAGUS_D_HYPOTHESIS_ID`、`MAGUS_D_ROUTE`、`MAGUS_D_FILE`、`MAGUS_D_LINE`、`MAGUS_D_ENTRY_SYMBOL`、`MAGUS_D_ORACLE_PROFILE_ID`、`MAGUS_D_PAYLOAD`、`MAGUS_D_PAYLOAD_MARKER` 和 `MAGUS_D_CONFIRM_PATTERNS_JSON` 注入到运行命令环境中；任意项目 harness 都可以读取这些变量，输出 `MAGUS_ROUTE_EXECUTED` 和对应的 `MAGUS_ORACLE_*` marker。搜索路径类 profile 是通用 profile，覆盖 `putenv`、`_putenv`、`_wputenv`、`SetEnvironmentVariableA/W`、`SearchPathA/W`、`SetDllDirectoryA/W` 和 `AddDllDirectory`。benchmark 或运行环境 helper 只能放在 `tools/` 或测试脚本里，并通过命令行 sidecar 显式接入。
+D 的 target generator 先生成项目无关的 source/API target 和 oracle profile，不自动附加 benchmark 或项目专用执行配置。真正的仓库路径、构建命令、运行命令、route marker、失败 marker、unsupported marker 来自显式 sidecar 或显式 target。`oracle_profiles.py` 只保留通用 profile 选择、可审计的 API-family 语义模型和 `MAGUS_ORACLE_*` 语义模式，不能包含 Juliet 或其他 benchmark 专用代码。自动生成的 source/API payload runner 会把 `MAGUS_D_PROJECT_ID`、`MAGUS_D_SAMPLE_ID`、`MAGUS_D_HYPOTHESIS_ID`、`MAGUS_D_ROUTE`、`MAGUS_D_FILE`、`MAGUS_D_LINE`、`MAGUS_D_ENTRY_SYMBOL`、`MAGUS_D_ORACLE_PROFILE_ID`、`MAGUS_D_PAYLOAD`、`MAGUS_D_PAYLOAD_MARKER` 和 `MAGUS_D_CONFIRM_PATTERNS_JSON` 注入到运行命令环境中；任意项目 harness 都可以读取这些变量，输出 `MAGUS_ROUTE_EXECUTED` 和对应的 `MAGUS_ORACLE_*` marker。搜索路径类 profile 是通用 profile，覆盖 `putenv`、`_putenv`、`_wputenv`、`SetEnvironmentVariableA/W`、`SearchPathA/W`、`SetDllDirectoryA/W` 和 `AddDllDirectory`。资源生命周期 profile 按 API 家族和运行环境分开：用户态 fd 覆盖 `open`/`socket`/`pipe` 等到 `close`，C stdio 覆盖 `fopen`/`fdopen`/`popen` 到 `fclose`/`pclose`，Win32 HANDLE 覆盖 `CreateFile*`/HANDLE API 到 `CloseHandle`，Linux kernel 覆盖 `filp_open`/`fput`、`kmalloc`/`kfree`、`kobject_get`/`kobject_put` 等内核语义。kernel profile 必须由 KUnit、kselftest、QEMU、syzkaller repro 或模块 harness 等显式执行上下文承载，不能复用用户态 `open`/`close` oracle。benchmark 或运行环境 helper 只能放在 `tools/` 或测试脚本里，并通过命令行 sidecar 显式接入。
 
 sidecar 的 oracle 支持：
 
 ```text
 failure_patterns         # confirmed 模式
 required_patterns        # confirmed 前必须同时存在的 route-bound 模式；自动 target 默认要求 MAGUS_ROUTE_EXECUTED
+capability_patterns      # 证明 harness 确实运行了该 profile 的语义 oracle；资源生命周期 profile 默认要求 MAGUS_ORACLE_RAN profile=<id>
 failure_code_patterns    # 把输出模式映射为 NOT_ROUTE_BOUND / NOT_EXPLOITABLE 等失败码
 unsupported_patterns     # route 已执行但 D oracle 不支持当前漏洞语义时返回 UNSUPPORTED_ORACLE
 ```

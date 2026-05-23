@@ -1,48 +1,152 @@
 {
   "targets": [
     {
-      "project_id": "cwe15",
+      "project_id": "cwe773",
       "target_type": "source_api",
       "env_profile": "source_repository",
       "cases": {
-        "hyp_path_8fb0e080cc8d": {
+        "hyp_path_e0354592e4ef": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "cpp",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_735case0Ev",
-          "oracle_profile_id": "unsupported.unclassified_source_api",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp",
+          "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_745case0Ev",
+          "oracle_profile_id": "resource.fd_lifecycle.user_posix",
           "oracle_profile": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "supported": false,
-            "selection_score": 22,
-            "matched_apis": [],
-            "inferred_apis": [
-              "system"
+            "profile_id": "resource.fd_lifecycle.user_posix",
+            "supported": true,
+            "selection_score": 33,
+            "description": "User-space file descriptor lifecycle is invalid, duplicated, transferred, or missing release.",
+            "matched_apis": [
+              "open"
             ],
-            "confirm_patterns": [],
+            "inferred_apis": [
+              "open"
+            ],
+            "confirm_patterns": [
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
+            ],
             "accepted_evidence": [
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
-            ]
+              "route-bound user-space fd lifecycle oracle observed acquire/release/transfer state on the same descriptor"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "user_posix_fd",
+              "resource_kind": "file_descriptor",
+              "execution_environment": "user_space",
+              "state_semantics": {
+                "acquire": [
+                  "open",
+                  "openat",
+                  "openat2",
+                  "creat",
+                  "_open",
+                  "_wopen",
+                  "_sopen",
+                  "_wsopen",
+                  "socket",
+                  "socketpair",
+                  "accept",
+                  "accept4",
+                  "pipe",
+                  "pipe2",
+                  "eventfd",
+                  "eventfd2",
+                  "timerfd_create",
+                  "signalfd",
+                  "signalfd4",
+                  "epoll_create",
+                  "epoll_create1",
+                  "inotify_init",
+                  "inotify_init1"
+                ],
+                "release": [
+                  "close",
+                  "_close"
+                ],
+                "transfer": [
+                  "fdopen"
+                ],
+                "duplicate": [
+                  "dup",
+                  "dup2",
+                  "dup3",
+                  "fcntl"
+                ],
+                "sentinel_values": [
+                  "-1"
+                ],
+                "multi_resource_acquire": {
+                  "pipe": 2,
+                  "pipe2": 2,
+                  "socketpair": 2
+                },
+                "release_compatibility": {
+                  "open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_wopen": [
+                    "close",
+                    "_close"
+                  ],
+                  "socket": [
+                    "close",
+                    "_close"
+                  ],
+                  "pipe": [
+                    "close",
+                    "_close"
+                  ],
+                  "eventfd": [
+                    "close",
+                    "_close"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
           },
           "api_sequence": [
-            "acceptSocket = accept(listenSocket, NULL, NULL); @ line 65",
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ line 90",
-            "dataList.push_back(data); @ line 93",
-            "case0Sink(dataList); @ line 94"
+            "data = OPEN(\"Case0Source_open.txt\", O_RDWR|O_CREAT, S_IREAD|S_IWRITE); @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp:44-48",
+            "dataMap[0] = data; dataMap[1] = data; dataMap[2] = data; case0Sink(dataMap); @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp:50-54"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_735case0Ev",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp",
+            "Construct or locate a harness that reaches _ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_745case0Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773, CWE-404",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_8fb0e080cc8d",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_735case0Ev",
+            "marker": "memberD_source_api_probe_hyp_path_e0354592e4ef",
+            "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_745case0Ev",
             "input_source": null,
             "seed_inputs": [
               "boundary-sized input",
@@ -52,19 +156,35 @@
             ]
           },
           "oracle": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "profile_supported": false,
+            "profile_id": "resource.fd_lifecycle.user_posix",
+            "profile_supported": true,
             "accepted_evidence": [
               "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
               "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
               "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
-            "semantic_failure_patterns": [],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
             "failure_patterns": [
               "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
             ],
             "unsupported_patterns": [
               "MAGUS_ORACLE_UNSUPPORTED"
@@ -85,51 +205,531 @@
           },
           "execution": {
             "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp' --entry-symbol '_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_735case0Ev' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_735case0Ev'"
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp' --entry-symbol '_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_745case0Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp::_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_745case0Ev'"
           }
         },
-        "hyp_path_bfee1e414bf1": {
+        "hyp_path_d9e50da1d9d8": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_case0",
-          "oracle_profile_id": "config.external_control",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp",
+          "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_725case0Ev",
+          "oracle_profile_id": "resource.handle_lifecycle.win32",
           "oracle_profile": {
-            "profile_id": "config.external_control",
+            "profile_id": "resource.handle_lifecycle.win32",
+            "supported": true,
+            "selection_score": 25,
+            "description": "Win32 HANDLE lifecycle is invalid, duplicated, or missing the matching CloseHandle operation.",
+            "matched_apis": [
+              "CreateFile"
+            ],
+            "inferred_apis": [
+              "CreateFile"
+            ],
+            "confirm_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "accepted_evidence": [
+              "route-bound Win32 HANDLE lifecycle oracle observed acquire/release/duplicate state on the same HANDLE"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "win32_handle",
+              "resource_kind": "HANDLE",
+              "execution_environment": "user_space_windows",
+              "state_semantics": {
+                "acquire": [
+                  "CreateFile",
+                  "CreateFileA",
+                  "CreateFileW",
+                  "CreateEventA",
+                  "CreateEventW",
+                  "CreateMutexA",
+                  "CreateMutexW",
+                  "CreateNamedPipeA",
+                  "CreateNamedPipeW"
+                ],
+                "release": [
+                  "CloseHandle"
+                ],
+                "transfer": [],
+                "duplicate": [
+                  "DuplicateHandle"
+                ],
+                "sentinel_values": [
+                  "NULL",
+                  "INVALID_HANDLE_VALUE"
+                ],
+                "multi_resource_acquire": {},
+                "release_compatibility": {
+                  "CreateFile": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileA": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileW": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventA": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventW": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexA": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexW": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeA": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeW": [
+                    "CloseHandle"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
+          },
+          "api_sequence": [
+            "data = INVALID_HANDLE_VALUE; /* NOTE: Create a file handle using CreateFile() that may not be closed properly */ data = CreateFile(\"Case0Source_w32CreateFile.txt\", (GENERIC_WRITE|GENERIC_READ), 0, ... @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp:37-41",
+            "dataVector.insert(dataVector.end(), 1, data); case0Sink(dataVector); @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp:49-53"
+          ],
+          "poc_plan": [
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp",
+            "Construct or locate a harness that reaches _ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_725case0Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_path_d9e50da1d9d8",
+            "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_725case0Ev",
+            "input_source": null,
+            "seed_inputs": [
+              "boundary-sized input",
+              "null/zero/negative argument where type permits",
+              "malformed serialized bytes",
+              "state-transition sequence that violates inferred API pattern"
+            ]
+          },
+          "oracle": {
+            "profile_id": "resource.handle_lifecycle.win32",
+            "profile_supported": true,
+            "accepted_evidence": [
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
+            ],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "failure_patterns": [
+              "MAGUS_ROUTE_CONFIRMED"
+            ],
+            "required_patterns": [
+              "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "unsupported_patterns": [
+              "MAGUS_ORACLE_UNSUPPORTED"
+            ],
+            "failure_code_patterns": {
+              "NOT_ROUTE_BOUND": [
+                "MAGUS_NOT_ROUTE_BOUND"
+              ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
+              "NOT_EXPLOITABLE": [
+                "MAGUS_NOT_CONFIRMED"
+              ]
+            },
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp' --entry-symbol '_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_725case0Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp::_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_725case0Ev'"
+          }
+        },
+        "hyp_path_087c9b67005f": {
+          "name": "auto_generic",
+          "target_type": "source_api",
+          "attack_type": "generic",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp",
+          "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72L7case1V2Ev",
+          "oracle_profile_id": "resource.handle_lifecycle.win32",
+          "oracle_profile": {
+            "profile_id": "resource.handle_lifecycle.win32",
+            "supported": true,
+            "selection_score": 25,
+            "description": "Win32 HANDLE lifecycle is invalid, duplicated, or missing the matching CloseHandle operation.",
+            "matched_apis": [
+              "CreateFile"
+            ],
+            "inferred_apis": [
+              "CreateFile"
+            ],
+            "confirm_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "accepted_evidence": [
+              "route-bound Win32 HANDLE lifecycle oracle observed acquire/release/duplicate state on the same HANDLE"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "win32_handle",
+              "resource_kind": "HANDLE",
+              "execution_environment": "user_space_windows",
+              "state_semantics": {
+                "acquire": [
+                  "CreateFile",
+                  "CreateFileA",
+                  "CreateFileW",
+                  "CreateEventA",
+                  "CreateEventW",
+                  "CreateMutexA",
+                  "CreateMutexW",
+                  "CreateNamedPipeA",
+                  "CreateNamedPipeW"
+                ],
+                "release": [
+                  "CloseHandle"
+                ],
+                "transfer": [],
+                "duplicate": [
+                  "DuplicateHandle"
+                ],
+                "sentinel_values": [
+                  "NULL",
+                  "INVALID_HANDLE_VALUE"
+                ],
+                "multi_resource_acquire": {},
+                "release_compatibility": {
+                  "CreateFile": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileA": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileW": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventA": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventW": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexA": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexW": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeA": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeW": [
+                    "CloseHandle"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
+          },
+          "api_sequence": [
+            "data = CreateFile(\"Case0Source_w32CreateFile.txt\", (GENERIC_WRITE|GENERIC_READ), 0, ...); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp:65",
+            "dataVector.insert(dataVector.end(), 1, data); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp:67-76",
+            "case1V2Sink(dataVector); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp:78"
+          ],
+          "poc_plan": [
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp",
+            "Construct or locate a harness that reaches _ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72L7case1V2Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_path_087c9b67005f",
+            "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72L7case1V2Ev",
+            "input_source": null,
+            "seed_inputs": [
+              "boundary-sized input",
+              "null/zero/negative argument where type permits",
+              "malformed serialized bytes",
+              "state-transition sequence that violates inferred API pattern"
+            ]
+          },
+          "oracle": {
+            "profile_id": "resource.handle_lifecycle.win32",
+            "profile_supported": true,
+            "accepted_evidence": [
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
+            ],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "failure_patterns": [
+              "MAGUS_ROUTE_CONFIRMED"
+            ],
+            "required_patterns": [
+              "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "unsupported_patterns": [
+              "MAGUS_ORACLE_UNSUPPORTED"
+            ],
+            "failure_code_patterns": {
+              "NOT_ROUTE_BOUND": [
+                "MAGUS_NOT_ROUTE_BOUND"
+              ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
+              "NOT_EXPLOITABLE": [
+                "MAGUS_NOT_CONFIRMED"
+              ]
+            },
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp' --entry-symbol '_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72L7case1V2Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72a.cpp::_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_72L7case1V2Ev'"
+          }
+        },
+        "hyp_path_175beae3889a": {
+          "name": "auto_generic",
+          "target_type": "source_api",
+          "attack_type": "generic",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp",
+          "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72L7case1V2Ev",
+          "oracle_profile_id": "resource.fd_lifecycle.user_posix",
+          "oracle_profile": {
+            "profile_id": "resource.fd_lifecycle.user_posix",
             "supported": true,
             "selection_score": 31,
-            "description": "External input controls security-sensitive configuration API.",
+            "description": "User-space file descriptor lifecycle is invalid, duplicated, transferred, or missing release.",
             "matched_apis": [
-              "SetComputerNameA"
+              "close",
+              "open"
             ],
             "inferred_apis": [
-              "SetComputerNameA",
-              "system"
+              "close",
+              "open"
             ],
             "confirm_patterns": [
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
             ],
             "accepted_evidence": [
-              "route-bound configuration API consumed attacker-controlled data"
-            ]
+              "route-bound user-space fd lifecycle oracle observed acquire/release/transfer state on the same descriptor"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "user_posix_fd",
+              "resource_kind": "file_descriptor",
+              "execution_environment": "user_space",
+              "state_semantics": {
+                "acquire": [
+                  "open",
+                  "openat",
+                  "openat2",
+                  "creat",
+                  "_open",
+                  "_wopen",
+                  "_sopen",
+                  "_wsopen",
+                  "socket",
+                  "socketpair",
+                  "accept",
+                  "accept4",
+                  "pipe",
+                  "pipe2",
+                  "eventfd",
+                  "eventfd2",
+                  "timerfd_create",
+                  "signalfd",
+                  "signalfd4",
+                  "epoll_create",
+                  "epoll_create1",
+                  "inotify_init",
+                  "inotify_init1"
+                ],
+                "release": [
+                  "close",
+                  "_close"
+                ],
+                "transfer": [
+                  "fdopen"
+                ],
+                "duplicate": [
+                  "dup",
+                  "dup2",
+                  "dup3",
+                  "fcntl"
+                ],
+                "sentinel_values": [
+                  "-1"
+                ],
+                "multi_resource_acquire": {
+                  "pipe": 2,
+                  "pipe2": 2,
+                  "socketpair": 2
+                },
+                "release_compatibility": {
+                  "open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_wopen": [
+                    "close",
+                    "_close"
+                  ],
+                  "socket": [
+                    "close",
+                    "_close"
+                  ],
+                  "pipe": [
+                    "close",
+                    "_close"
+                  ],
+                  "eventfd": [
+                    "close",
+                    "_close"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
           },
           "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c:85",
-            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); exit(1); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c:93-97"
+            "data = OPEN(\"Case0Source_open.txt\", O_RDWR|O_CREAT, S_IREAD|S_IWRITE); @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp:68",
+            "dataVector.insert(dataVector.end(), 1, data); ... dataVector.insert(dataVector.end(), 1, data); @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp:69-71",
+            "case1V2Sink(dataVector); // sink中未调用close @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp:72"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_case0",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp",
+            "Construct or locate a harness that reaches _ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72L7case1V2Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_bfee1e414bf1",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_case0",
+            "marker": "memberD_source_api_probe_hyp_path_175beae3889a",
+            "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72L7case1V2Ev",
             "input_source": null,
             "seed_inputs": [
               "boundary-sized input",
@@ -139,7 +739,7 @@
             ]
           },
           "oracle": {
-            "profile_id": "config.external_control",
+            "profile_id": "resource.fd_lifecycle.user_posix",
             "profile_supported": true,
             "accepted_evidence": [
               "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
@@ -147,13 +747,33 @@
               "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
             ],
             "failure_patterns": [
               "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
             ],
             "unsupported_patterns": [
               "MAGUS_ORACLE_UNSUPPORTED"
@@ -174,225 +794,160 @@
           },
           "execution": {
             "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_case0'"
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp' --entry-symbol '_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72L7case1V2Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp::_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72L7case1V2Ev'"
           }
         },
-        "hyp_path_0b0c49ef539a": {
+        "hyp_path_a9cd86757869": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "cpp",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_745case0Ev",
-          "oracle_profile_id": "unsupported.unclassified_source_api",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp",
+          "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_725case0Ev",
+          "oracle_profile_id": "resource.fd_lifecycle.user_posix",
           "oracle_profile": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "supported": false,
-            "selection_score": 22,
-            "matched_apis": [],
-            "inferred_apis": [
-              "system"
-            ],
-            "confirm_patterns": [],
-            "accepted_evidence": [
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
-            ]
-          },
-          "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:90",
-            "dataMap[0] = data; dataMap[1] = data; dataMap[2] = data; @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:98-102",
-            "case0Sink(dataMap); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp:??? (sink函数case0Sink)"
-          ],
-          "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_745case0Ev",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_0b0c49ef539a",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_745case0Ev",
-            "input_source": null,
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "profile_supported": false,
-            "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
-              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
-              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
-            ],
-            "semantic_failure_patterns": [],
-            "failure_patterns": [
-              "MAGUS_ROUTE_CONFIRMED"
-            ],
-            "required_patterns": [
-              "MAGUS_ROUTE_EXECUTED"
-            ],
-            "unsupported_patterns": [
-              "MAGUS_ORACLE_UNSUPPORTED"
-            ],
-            "failure_code_patterns": {
-              "NOT_ROUTE_BOUND": [
-                "MAGUS_NOT_ROUTE_BOUND"
-              ],
-              "ENV_MISSING": [
-                "MAGUS_BUILD_FAILED",
-                "MAGUS_RUNNER_ERROR"
-              ],
-              "NOT_EXPLOITABLE": [
-                "MAGUS_NOT_CONFIRMED"
-              ]
-            },
-            "expect_nonzero_exit": false
-          },
-          "execution": {
-            "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp' --entry-symbol '_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_745case0Ev' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_745case0Ev'"
-          }
-        },
-        "hyp_path_940b4e857004": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0",
-          "oracle_profile_id": "config.external_control",
-          "oracle_profile": {
-            "profile_id": "config.external_control",
-            "supported": true,
-            "selection_score": 28,
-            "description": "External input controls security-sensitive configuration API.",
-            "matched_apis": [
-              "SetComputerNameA"
-            ],
-            "inferred_apis": [
-              "SetComputerNameA",
-              "system"
-            ],
-            "confirm_patterns": [
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
-            ],
-            "accepted_evidence": [
-              "route-bound configuration API consumed attacker-controlled data"
-            ]
-          },
-          "api_sequence": [
-            "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c:73-77",
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c:90-92",
-            "CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0Sink(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c:39",
-            "SetComputerNameA(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c:31"
-          ],
-          "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_940b4e857004",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0",
-            "input_source": null,
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "profile_id": "config.external_control",
-            "profile_supported": true,
-            "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
-              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
-              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
-            ],
-            "semantic_failure_patterns": [
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
-            ],
-            "failure_patterns": [
-              "MAGUS_ROUTE_CONFIRMED"
-            ],
-            "required_patterns": [
-              "MAGUS_ROUTE_EXECUTED"
-            ],
-            "unsupported_patterns": [
-              "MAGUS_ORACLE_UNSUPPORTED"
-            ],
-            "failure_code_patterns": {
-              "NOT_ROUTE_BOUND": [
-                "MAGUS_NOT_ROUTE_BOUND"
-              ],
-              "ENV_MISSING": [
-                "MAGUS_BUILD_FAILED",
-                "MAGUS_RUNNER_ERROR"
-              ],
-              "NOT_EXPLOITABLE": [
-                "MAGUS_NOT_CONFIRMED"
-              ]
-            },
-            "expect_nonzero_exit": false
-          },
-          "execution": {
-            "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0'"
-          }
-        },
-        "hyp_path_1b647b79197e": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_case0",
-          "oracle_profile_id": "config.external_control",
-          "oracle_profile": {
-            "profile_id": "config.external_control",
+            "profile_id": "resource.fd_lifecycle.user_posix",
             "supported": true,
             "selection_score": 31,
-            "description": "External input controls security-sensitive configuration API.",
+            "description": "User-space file descriptor lifecycle is invalid, duplicated, transferred, or missing release.",
             "matched_apis": [
-              "SetComputerNameA"
+              "close",
+              "open"
             ],
             "inferred_apis": [
-              "SetComputerNameA",
-              "system"
+              "close",
+              "open"
             ],
             "confirm_patterns": [
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
             ],
             "accepted_evidence": [
-              "route-bound configuration API consumed attacker-controlled data"
-            ]
+              "route-bound user-space fd lifecycle oracle observed acquire/release/transfer state on the same descriptor"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "user_posix_fd",
+              "resource_kind": "file_descriptor",
+              "execution_environment": "user_space",
+              "state_semantics": {
+                "acquire": [
+                  "open",
+                  "openat",
+                  "openat2",
+                  "creat",
+                  "_open",
+                  "_wopen",
+                  "_sopen",
+                  "_wsopen",
+                  "socket",
+                  "socketpair",
+                  "accept",
+                  "accept4",
+                  "pipe",
+                  "pipe2",
+                  "eventfd",
+                  "eventfd2",
+                  "timerfd_create",
+                  "signalfd",
+                  "signalfd4",
+                  "epoll_create",
+                  "epoll_create1",
+                  "inotify_init",
+                  "inotify_init1"
+                ],
+                "release": [
+                  "close",
+                  "_close"
+                ],
+                "transfer": [
+                  "fdopen"
+                ],
+                "duplicate": [
+                  "dup",
+                  "dup2",
+                  "dup3",
+                  "fcntl"
+                ],
+                "sentinel_values": [
+                  "-1"
+                ],
+                "multi_resource_acquire": {
+                  "pipe": 2,
+                  "pipe2": 2,
+                  "socketpair": 2
+                },
+                "release_compatibility": {
+                  "open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_wopen": [
+                    "close",
+                    "_close"
+                  ],
+                  "socket": [
+                    "close",
+                    "_close"
+                  ],
+                  "pipe": [
+                    "close",
+                    "_close"
+                  ],
+                  "eventfd": [
+                    "close",
+                    "_close"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
           },
           "api_sequence": [
-            "acceptSocket = accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c:59",
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c:84",
-            "if (!SetComputerNameA(data)) { printLine(\"Failure setting computer name\"); } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c:88（估计）"
+            "data = OPEN(\"Case0Source_open.txt\", O_RDWR|O_CREAT, S_IREAD|S_IWRITE); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp:44-46",
+            "dataVector.insert(dataVector.end(), 1, data); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp:48",
+            "case0Sink(dataVector); // 内部未关闭文件描述符 @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp:50-54"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_case0",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp",
+            "Construct or locate a harness that reaches _ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_725case0Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_1b647b79197e",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_case0",
+            "marker": "memberD_source_api_probe_hyp_path_a9cd86757869",
+            "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_725case0Ev",
             "input_source": null,
             "seed_inputs": [
               "boundary-sized input",
@@ -402,7 +957,7 @@
             ]
           },
           "oracle": {
-            "profile_id": "config.external_control",
+            "profile_id": "resource.fd_lifecycle.user_posix",
             "profile_supported": true,
             "accepted_evidence": [
               "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
@@ -410,13 +965,33 @@
               "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
             ],
             "failure_patterns": [
               "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
             ],
             "unsupported_patterns": [
               "MAGUS_ORACLE_UNSUPPORTED"
@@ -437,127 +1012,159 @@
           },
           "execution": {
             "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_case0'"
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp' --entry-symbol '_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_725case0Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_72a.cpp::_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_725case0Ev'"
           }
         },
-        "hyp_path_3ac2b660d3ba": {
-          "name": "auto_generic",
-          "target_type": "source_api",
-          "attack_type": "generic",
-          "auto_generated": true,
-          "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_case0",
-          "oracle_profile_id": "unsupported.unclassified_source_api",
-          "oracle_profile": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "supported": false,
-            "selection_score": 22,
-            "matched_apis": [],
-            "inferred_apis": [
-              "system"
-            ],
-            "confirm_patterns": [],
-            "accepted_evidence": [
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
-            ]
-          },
-          "api_sequence": [
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c:85",
-            "CWE15_External_Control_of_System_or_Configuration_Setting__w32_52b_case0Sink(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c:96-97"
-          ],
-          "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_case0",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
-            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
-          ],
-          "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_3ac2b660d3ba",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_case0",
-            "input_source": null,
-            "seed_inputs": [
-              "boundary-sized input",
-              "null/zero/negative argument where type permits",
-              "malformed serialized bytes",
-              "state-transition sequence that violates inferred API pattern"
-            ]
-          },
-          "oracle": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "profile_supported": false,
-            "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
-              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
-              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
-            ],
-            "semantic_failure_patterns": [],
-            "failure_patterns": [
-              "MAGUS_ROUTE_CONFIRMED"
-            ],
-            "required_patterns": [
-              "MAGUS_ROUTE_EXECUTED"
-            ],
-            "unsupported_patterns": [
-              "MAGUS_ORACLE_UNSUPPORTED"
-            ],
-            "failure_code_patterns": {
-              "NOT_ROUTE_BOUND": [
-                "MAGUS_NOT_ROUTE_BOUND"
-              ],
-              "ENV_MISSING": [
-                "MAGUS_BUILD_FAILED",
-                "MAGUS_RUNNER_ERROR"
-              ],
-              "NOT_EXPLOITABLE": [
-                "MAGUS_NOT_CONFIRMED"
-              ]
-            },
-            "expect_nonzero_exit": false
-          },
-          "execution": {
-            "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_case0'"
-          }
-        },
-        "hyp_path_ac4ba2963d66": {
+        "hyp_path_c22385414a4d": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
           "poc_language": "cpp",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp",
-          "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_825case0Ev",
-          "oracle_profile_id": "unsupported.unclassified_source_api",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp",
+          "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74L7case1V2Ev",
+          "oracle_profile_id": "resource.fd_lifecycle.user_posix",
           "oracle_profile": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "supported": false,
-            "selection_score": 22,
-            "matched_apis": [],
-            "inferred_apis": [
-              "system"
+            "profile_id": "resource.fd_lifecycle.user_posix",
+            "supported": true,
+            "selection_score": 31,
+            "description": "User-space file descriptor lifecycle is invalid, duplicated, transferred, or missing release.",
+            "matched_apis": [
+              "close",
+              "open"
             ],
-            "confirm_patterns": [],
+            "inferred_apis": [
+              "close",
+              "open"
+            ],
+            "confirm_patterns": [
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
+            ],
             "accepted_evidence": [
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
-            ]
+              "route-bound user-space fd lifecycle oracle observed acquire/release/transfer state on the same descriptor"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "user_posix_fd",
+              "resource_kind": "file_descriptor",
+              "execution_environment": "user_space",
+              "state_semantics": {
+                "acquire": [
+                  "open",
+                  "openat",
+                  "openat2",
+                  "creat",
+                  "_open",
+                  "_wopen",
+                  "_sopen",
+                  "_wsopen",
+                  "socket",
+                  "socketpair",
+                  "accept",
+                  "accept4",
+                  "pipe",
+                  "pipe2",
+                  "eventfd",
+                  "eventfd2",
+                  "timerfd_create",
+                  "signalfd",
+                  "signalfd4",
+                  "epoll_create",
+                  "epoll_create1",
+                  "inotify_init",
+                  "inotify_init1"
+                ],
+                "release": [
+                  "close",
+                  "_close"
+                ],
+                "transfer": [
+                  "fdopen"
+                ],
+                "duplicate": [
+                  "dup",
+                  "dup2",
+                  "dup3",
+                  "fcntl"
+                ],
+                "sentinel_values": [
+                  "-1"
+                ],
+                "multi_resource_acquire": {
+                  "pipe": 2,
+                  "pipe2": 2,
+                  "socketpair": 2
+                },
+                "release_compatibility": {
+                  "open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_wopen": [
+                    "close",
+                    "_close"
+                  ],
+                  "socket": [
+                    "close",
+                    "_close"
+                  ],
+                  "pipe": [
+                    "close",
+                    "_close"
+                  ],
+                  "eventfd": [
+                    "close",
+                    "_close"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
           },
           "api_sequence": [
-            "acceptSocket = accept(listenSocket, NULL, NULL); if (acceptSocket == INVALID_SOCKET) { break; } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp:65-69",
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); if (recvResult == SOCKET_ERROR || recvResult == 0) { break; } @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp:82-86",
-            "baseObject->action(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp:84后调用（未直接展示）"
+            "data = -1; data = OPEN(\"Case0Source_open.txt\", O_RDWR|O_CREAT, S_IREAD|S_IWRITE); dataMap[0] = data; dataMap[1] = data; dataMap[2] = data; case1V2Sink(dataMap); @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp:61-70",
+            "sink函数接收dataMap，但未调用close()关闭文件描述符。 @ case1V2Sink函数内部（未提供源码，但依据CWE-773典型bad case模式，sink未调用close）"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp",
-            "Construct or locate a harness that reaches _ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_825case0Ev",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp",
+            "Construct or locate a harness that reaches _ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74L7case1V2Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_ac4ba2963d66",
-            "entry_symbol": "_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_825case0Ev",
+            "marker": "memberD_source_api_probe_hyp_path_c22385414a4d",
+            "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74L7case1V2Ev",
             "input_source": null,
             "seed_inputs": [
               "boundary-sized input",
@@ -567,19 +1174,41 @@
             ]
           },
           "oracle": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "profile_supported": false,
+            "profile_id": "resource.fd_lifecycle.user_posix",
+            "profile_supported": true,
             "accepted_evidence": [
               "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
               "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
               "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
-            "semantic_failure_patterns": [],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
             "failure_patterns": [
               "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
             ],
             "unsupported_patterns": [
               "MAGUS_ORACLE_UNSUPPORTED"
@@ -600,49 +1229,160 @@
           },
           "execution": {
             "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp' --entry-symbol '_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_825case0Ev' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_825case0Ev'"
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp' --entry-symbol '_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74L7case1V2Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74a.cpp::_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_74L7case1V2Ev'"
           }
         },
-        "hyp_path_dddf8e75d107": {
+        "hyp_path_89aafef3b8dd": {
           "name": "auto_generic",
           "target_type": "source_api",
           "attack_type": "generic",
           "auto_generated": true,
           "payload_kind": "api_misuse_plan",
-          "poc_language": "unknown",
-          "source_file": "juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c",
-          "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0",
-          "oracle_profile_id": "unsupported.unclassified_source_api",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73a.cpp",
+          "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73L7case1V2Ev",
+          "oracle_profile_id": "resource.fd_lifecycle.user_posix",
           "oracle_profile": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "supported": false,
-            "selection_score": 22,
-            "matched_apis": [],
-            "inferred_apis": [
-              "system"
+            "profile_id": "resource.fd_lifecycle.user_posix",
+            "supported": true,
+            "selection_score": 31,
+            "description": "User-space file descriptor lifecycle is invalid, duplicated, transferred, or missing release.",
+            "matched_apis": [
+              "close",
+              "open"
             ],
-            "confirm_patterns": [],
+            "inferred_apis": [
+              "close",
+              "open"
+            ],
+            "confirm_patterns": [
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
+            ],
             "accepted_evidence": [
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
-            ]
+              "route-bound user-space fd lifecycle oracle observed acquire/release/transfer state on the same descriptor"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "user_posix_fd",
+              "resource_kind": "file_descriptor",
+              "execution_environment": "user_space",
+              "state_semantics": {
+                "acquire": [
+                  "open",
+                  "openat",
+                  "openat2",
+                  "creat",
+                  "_open",
+                  "_wopen",
+                  "_sopen",
+                  "_wsopen",
+                  "socket",
+                  "socketpair",
+                  "accept",
+                  "accept4",
+                  "pipe",
+                  "pipe2",
+                  "eventfd",
+                  "eventfd2",
+                  "timerfd_create",
+                  "signalfd",
+                  "signalfd4",
+                  "epoll_create",
+                  "epoll_create1",
+                  "inotify_init",
+                  "inotify_init1"
+                ],
+                "release": [
+                  "close",
+                  "_close"
+                ],
+                "transfer": [
+                  "fdopen"
+                ],
+                "duplicate": [
+                  "dup",
+                  "dup2",
+                  "dup3",
+                  "fcntl"
+                ],
+                "sentinel_values": [
+                  "-1"
+                ],
+                "multi_resource_acquire": {
+                  "pipe": 2,
+                  "pipe2": 2,
+                  "socketpair": 2
+                },
+                "release_compatibility": {
+                  "open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_open": [
+                    "close",
+                    "_close"
+                  ],
+                  "_wopen": [
+                    "close",
+                    "_close"
+                  ],
+                  "socket": [
+                    "close",
+                    "_close"
+                  ],
+                  "pipe": [
+                    "close",
+                    "_close"
+                  ],
+                  "eventfd": [
+                    "close",
+                    "_close"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
           },
           "api_sequence": [
-            "listenSocket = socket(PF_INET, SOCK_STREAM, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:49-53",
-            "bind(listenSocket, (struct sockaddr*)&service, sizeof(service)); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:60",
-            "listen(listenSocket, LISTEN_BACKLOG); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:60",
-            "accept(listenSocket, NULL, NULL); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:60",
-            "recvResult = recv(acceptSocket, data, 100 - 1, 0); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c:85",
-            "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51b_case0Sink(data); @ juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51b.c"
+            "data = -1;\ndata = OPEN(\"Case0Source_open.txt\", O_RDWR|O_CREAT, S_IREAD|S_IWRITE);\ndataList.push_back(data); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73a.cpp:66-70",
+            "dataList.push_back(data);\ncase1V2Sink(dataList); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73a.cpp:71-75",
+            "sink函数中仅使用list数据，未调用close()关闭文件描述符。 @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73a.cpp (sink函数)"
           ],
           "poc_plan": [
-            "Build or load project containing juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c",
-            "Construct or locate a harness that reaches CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0",
-            "Drive the API sequence with misuse-oriented inputs for CWE-15",
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73a.cpp",
+            "Construct or locate a harness that reaches _ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73L7case1V2Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
             "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
           ],
           "payload": {
-            "marker": "memberD_source_api_probe_hyp_path_dddf8e75d107",
-            "entry_symbol": "CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0",
+            "marker": "memberD_source_api_probe_hyp_path_89aafef3b8dd",
+            "entry_symbol": "_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73L7case1V2Ev",
             "input_source": null,
             "seed_inputs": [
               "boundary-sized input",
@@ -652,19 +1392,41 @@
             ]
           },
           "oracle": {
-            "profile_id": "unsupported.unclassified_source_api",
-            "profile_supported": false,
+            "profile_id": "resource.fd_lifecycle.user_posix",
+            "profile_supported": true,
             "accepted_evidence": [
               "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
               "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
               "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
-            "semantic_failure_patterns": [],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=close reason=wrong_release_api",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix name=open reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+            ],
             "failure_patterns": [
               "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"
             ],
             "unsupported_patterns": [
               "MAGUS_ORACLE_UNSUPPORTED"
@@ -685,7 +1447,376 @@
           },
           "execution": {
             "repo_path": "/home/sq_hu/MAGUS",
-            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0'"
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73a.cpp' --entry-symbol '_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73L7case1V2Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73a.cpp::_ZN69CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__open_73L7case1V2Ev'"
+          }
+        },
+        "hyp_path_7cecd39b9067": {
+          "name": "auto_generic",
+          "target_type": "source_api",
+          "attack_type": "generic",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp",
+          "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74L7case1V2Ev",
+          "oracle_profile_id": "resource.handle_lifecycle.win32",
+          "oracle_profile": {
+            "profile_id": "resource.handle_lifecycle.win32",
+            "supported": true,
+            "selection_score": 25,
+            "description": "Win32 HANDLE lifecycle is invalid, duplicated, or missing the matching CloseHandle operation.",
+            "matched_apis": [
+              "CreateFile"
+            ],
+            "inferred_apis": [
+              "CreateFile"
+            ],
+            "confirm_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "accepted_evidence": [
+              "route-bound Win32 HANDLE lifecycle oracle observed acquire/release/duplicate state on the same HANDLE"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "win32_handle",
+              "resource_kind": "HANDLE",
+              "execution_environment": "user_space_windows",
+              "state_semantics": {
+                "acquire": [
+                  "CreateFile",
+                  "CreateFileA",
+                  "CreateFileW",
+                  "CreateEventA",
+                  "CreateEventW",
+                  "CreateMutexA",
+                  "CreateMutexW",
+                  "CreateNamedPipeA",
+                  "CreateNamedPipeW"
+                ],
+                "release": [
+                  "CloseHandle"
+                ],
+                "transfer": [],
+                "duplicate": [
+                  "DuplicateHandle"
+                ],
+                "sentinel_values": [
+                  "NULL",
+                  "INVALID_HANDLE_VALUE"
+                ],
+                "multi_resource_acquire": {},
+                "release_compatibility": {
+                  "CreateFile": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileA": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileW": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventA": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventW": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexA": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexW": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeA": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeW": [
+                    "CloseHandle"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
+          },
+          "api_sequence": [
+            "data = INVALID_HANDLE_VALUE; data = CreateFile(\"Case0Source_w32CreateFile.txt\", (GENERIC_WRITE|GENERIC_READ), 0, ... @ juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp:65-69"
+          ],
+          "poc_plan": [
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp",
+            "Construct or locate a harness that reaches _ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74L7case1V2Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_path_7cecd39b9067",
+            "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74L7case1V2Ev",
+            "input_source": null,
+            "seed_inputs": [
+              "boundary-sized input",
+              "null/zero/negative argument where type permits",
+              "malformed serialized bytes",
+              "state-transition sequence that violates inferred API pattern"
+            ]
+          },
+          "oracle": {
+            "profile_id": "resource.handle_lifecycle.win32",
+            "profile_supported": true,
+            "accepted_evidence": [
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
+            ],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "failure_patterns": [
+              "MAGUS_ROUTE_CONFIRMED"
+            ],
+            "required_patterns": [
+              "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "unsupported_patterns": [
+              "MAGUS_ORACLE_UNSUPPORTED"
+            ],
+            "failure_code_patterns": {
+              "NOT_ROUTE_BOUND": [
+                "MAGUS_NOT_ROUTE_BOUND"
+              ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
+              "NOT_EXPLOITABLE": [
+                "MAGUS_NOT_CONFIRMED"
+              ]
+            },
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp' --entry-symbol '_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74L7case1V2Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp::_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74L7case1V2Ev'"
+          }
+        },
+        "hyp_path_75032181bfae": {
+          "name": "auto_generic",
+          "target_type": "source_api",
+          "attack_type": "generic",
+          "auto_generated": true,
+          "payload_kind": "api_misuse_plan",
+          "poc_language": "cpp",
+          "source_file": "juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp",
+          "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_745case0Ev",
+          "oracle_profile_id": "resource.handle_lifecycle.win32",
+          "oracle_profile": {
+            "profile_id": "resource.handle_lifecycle.win32",
+            "supported": true,
+            "selection_score": 25,
+            "description": "Win32 HANDLE lifecycle is invalid, duplicated, or missing the matching CloseHandle operation.",
+            "matched_apis": [
+              "CreateFile"
+            ],
+            "inferred_apis": [
+              "CreateFile"
+            ],
+            "confirm_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "accepted_evidence": [
+              "route-bound Win32 HANDLE lifecycle oracle observed acquire/release/duplicate state on the same HANDLE"
+            ],
+            "semantic_model": {
+              "kind": "resource_lifecycle",
+              "family": "win32_handle",
+              "resource_kind": "HANDLE",
+              "execution_environment": "user_space_windows",
+              "state_semantics": {
+                "acquire": [
+                  "CreateFile",
+                  "CreateFileA",
+                  "CreateFileW",
+                  "CreateEventA",
+                  "CreateEventW",
+                  "CreateMutexA",
+                  "CreateMutexW",
+                  "CreateNamedPipeA",
+                  "CreateNamedPipeW"
+                ],
+                "release": [
+                  "CloseHandle"
+                ],
+                "transfer": [],
+                "duplicate": [
+                  "DuplicateHandle"
+                ],
+                "sentinel_values": [
+                  "NULL",
+                  "INVALID_HANDLE_VALUE"
+                ],
+                "multi_resource_acquire": {},
+                "release_compatibility": {
+                  "CreateFile": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileA": [
+                    "CloseHandle"
+                  ],
+                  "CreateFileW": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventA": [
+                    "CloseHandle"
+                  ],
+                  "CreateEventW": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexA": [
+                    "CloseHandle"
+                  ],
+                  "CreateMutexW": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeA": [
+                    "CloseHandle"
+                  ],
+                  "CreateNamedPipeW": [
+                    "CloseHandle"
+                  ]
+                }
+              },
+              "oracle_obligations": [
+                "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+                "prove the acquire/release state transition on the same logical resource",
+                "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+                "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+                "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state"
+              ]
+            }
+          },
+          "api_sequence": [
+            "data = CreateFile(\"Case0Source_w32CreateFile.txt\", (GENERIC_WRITE|GENERIC_READ), 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp:32-36",
+            "dataMap[2] = data; case0Sink(dataMap); @ CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp:49-53"
+          ],
+          "poc_plan": [
+            "Build or load project containing juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp",
+            "Construct or locate a harness that reaches _ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_745case0Ev",
+            "Drive the API sequence with misuse-oriented inputs for CWE-773",
+            "Run under sanitizer/test oracle and collect crash, error-code, assertion, or differential evidence"
+          ],
+          "payload": {
+            "marker": "memberD_source_api_probe_hyp_path_75032181bfae",
+            "entry_symbol": "_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_745case0Ev",
+            "input_source": null,
+            "seed_inputs": [
+              "boundary-sized input",
+              "null/zero/negative argument where type permits",
+              "malformed serialized bytes",
+              "state-transition sequence that violates inferred API pattern"
+            ]
+          },
+          "oracle": {
+            "profile_id": "resource.handle_lifecycle.win32",
+            "profile_supported": true,
+            "accepted_evidence": [
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
+            ],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 name=CreateFile reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=duplicate_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=failed_acquire_used",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=missing_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=ownership_transfer_lost",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=use_after_release",
+              "MAGUS_ORACLE_FLAW profile=resource.handle_lifecycle.win32 reason=wrong_release_api"
+            ],
+            "failure_patterns": [
+              "MAGUS_ROUTE_CONFIRMED"
+            ],
+            "required_patterns": [
+              "MAGUS_ROUTE_EXECUTED"
+            ],
+            "capability_patterns": [
+              "MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"
+            ],
+            "unsupported_patterns": [
+              "MAGUS_ORACLE_UNSUPPORTED"
+            ],
+            "failure_code_patterns": {
+              "NOT_ROUTE_BOUND": [
+                "MAGUS_NOT_ROUTE_BOUND"
+              ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
+              "NOT_EXPLOITABLE": [
+                "MAGUS_NOT_CONFIRMED"
+              ]
+            },
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp' --entry-symbol '_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_745case0Ev' --route 'juliet-api-misuse/testcases/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle/CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_74a.cpp::_ZN78CWE773_Missing_Reference_to_Active_File_Descriptor_or_Handle__w32CreateFile_745case0Ev'"
           }
         }
       }

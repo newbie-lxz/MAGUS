@@ -424,6 +424,8 @@ def build_gen_input_command(folder: JulietFolder) -> list[str]:
         str(a_input_path(folder.cwe_id).relative_to(REPO_ROOT)),
         "--project-id",
         folder.cwe_id,
+        "--bc-dir",
+        f"bc.{folder.cwe_id}",
         "--force",
     ]
 

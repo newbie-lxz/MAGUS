@@ -242,11 +242,109 @@ class OracleProfileSelectionTests(unittest.TestCase):
             profile["confirm_patterns"],
         )
 
+    def test_selects_user_posix_fd_lifecycle_without_cwe(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "load_config -> open -> parse_config",
+                "claim": "the user-space file descriptor returned by open can miss close on an error path",
+                "evidence_slice": "fd = open(path, O_RDONLY); if (parse(fd) < 0) return -1;",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "resource.fd_lifecycle.user_posix")
+        self.assertTrue(profile["supported"])
+        self.assertIn("open", profile["matched_apis"])
+        self.assertEqual(profile["semantic_model"]["resource_kind"], "file_descriptor")
+        self.assertEqual(profile["semantic_model"]["execution_environment"], "user_space")
+        self.assertIn(
+            "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release",
+            profile["confirm_patterns"],
+        )
+
+    def test_selects_multi_resource_fd_acquire(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "spawn_worker -> pipe2",
+                "claim": "one descriptor from pipe2 is released but the paired descriptor leaks",
+                "evidence_slice": "int fds[2]; pipe2(fds, O_CLOEXEC); close(fds[0]);",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "resource.fd_lifecycle.user_posix")
+        self.assertEqual(profile["semantic_model"]["state_semantics"]["multi_resource_acquire"]["pipe2"], 2)
+
+    def test_selects_c_stdio_lifecycle_without_cwe(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "load_template -> fopen",
+                "claim": "the FILE stream opened by fopen can miss fclose on a parse error",
+                "evidence_slice": "FILE *fp = fopen(path, \"r\"); if (parse(fp) < 0) return;",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "resource.stream_lifecycle.c_stdio")
+        self.assertTrue(profile["supported"])
+        self.assertIn("fopen", profile["matched_apis"])
+        self.assertEqual(profile["semantic_model"]["resource_kind"], "FILE_stream")
+        self.assertEqual(
+            profile["semantic_model"]["state_semantics"]["release_compatibility"]["fopen"],
+            ["fclose"],
+        )
+
+    def test_selects_win32_handle_lifecycle(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "read_state -> CreateFileW",
+                "claim": "Win32 HANDLE returned by CreateFileW can miss CloseHandle",
+                "evidence_slice": "HANDLE h = CreateFileW(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "resource.handle_lifecycle.win32")
+        self.assertTrue(profile["supported"])
+        self.assertIn("CreateFileW", profile["matched_apis"])
+        self.assertEqual(profile["semantic_model"]["execution_environment"], "user_space_windows")
+        self.assertIn("INVALID_HANDLE_VALUE", profile["semantic_model"]["state_semantics"]["sentinel_values"])
+        self.assertIn(
+            "MAGUS_ORACLE_FLAW name=CreateFileW reason=missing_closehandle",
+            profile["confirm_patterns"],
+        )
+
+    def test_selects_linux_kernel_lifecycle_separately_from_user_space_open(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "driver_ioctl -> filp_open",
+                "claim": "Linux kernel route leaks a file reference returned by filp_open without fput",
+                "evidence_slice": "struct file *f = filp_open(path, O_RDONLY, 0); return PTR_ERR_OR_ZERO(f);",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "resource.lifecycle.linux_kernel")
+        self.assertTrue(profile["supported"])
+        self.assertIn("filp_open", profile["matched_apis"])
+        self.assertNotIn("open", profile["inferred_apis"])
+        self.assertEqual(profile["semantic_model"]["execution_environment"], "linux_kernel")
+        self.assertIn("KUnit", profile["semantic_model"]["execution_contexts"])
+
+    def test_kernel_refcount_api_does_not_select_user_fd_lifecycle(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "driver_probe -> get_file",
+                "claim": "kernel refcount acquire with get_file is not paired with fput",
+                "evidence_slice": "get_file(file); if (fail) return -EINVAL;",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "resource.lifecycle.linux_kernel")
+        self.assertNotEqual(profile["profile_id"], "resource.fd_lifecycle.user_posix")
+
     def test_profile_markers_are_project_agnostic(self):
         for profile in oracle_profiles.PROFILES:
             for marker_group in profile.api_markers.values():
                 for marker in marker_group:
                     self.assertNotIn("JULIET", marker.upper())
+            for marker in profile.generic_markers:
+                self.assertNotIn("JULIET", marker.upper())
 
 
 if __name__ == "__main__":

@@ -421,7 +421,11 @@ def main() -> None:
     parser_gen_input.add_argument("--analysis-timeout", type=int, default=1800, help="Stage A analysis_timeout")
     parser_gen_input.add_argument("--clang", default="clang", help="C bitcode compiler")
     parser_gen_input.add_argument("--clangxx", default="clang++", help="C++ bitcode compiler")
-    parser_gen_input.add_argument("--bc-dir", default="bc", help="repo_path 下的 bitcode 输出目录")
+    parser_gen_input.add_argument(
+        "--bc-dir",
+        default="",
+        help="repo_path 下的 bitcode 输出目录；默认 bc.<project_id>",
+    )
     parser_gen_input.add_argument(
         "--source-glob",
         action="append",

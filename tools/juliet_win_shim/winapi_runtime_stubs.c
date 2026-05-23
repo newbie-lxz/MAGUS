@@ -28,6 +28,24 @@ typedef struct _MAGUS_HANDLE_STATE {
 static MAGUS_HANDLE_STATE handle_states[4096];
 static size_t handle_state_count = 0;
 
+typedef struct _MAGUS_FD_STATE {
+    int fd;
+    int closed;
+    const char *kind;
+} MAGUS_FD_STATE;
+
+static MAGUS_FD_STATE fd_states[4096];
+static size_t fd_state_count = 0;
+
+typedef struct _MAGUS_STREAM_STATE {
+    FILE *stream;
+    int closed;
+    const char *kind;
+} MAGUS_STREAM_STATE;
+
+static MAGUS_STREAM_STATE stream_states[4096];
+static size_t stream_state_count = 0;
+
 typedef struct _MAGUS_KEY_STATE {
     HCRYPTKEY key;
     ALG_ID alg;
@@ -82,6 +100,57 @@ static HANDLE fake_handle_kind(const char *kind)
 static HANDLE fake_handle(void)
 {
     return fake_handle_kind("handle");
+}
+
+static void register_fd(int fd, const char *kind)
+{
+    if (fd < 0 || fd_state_count >= sizeof(fd_states) / sizeof(fd_states[0]))
+    {
+        return;
+    }
+    fd_states[fd_state_count].fd = fd;
+    fd_states[fd_state_count].closed = 0;
+    fd_states[fd_state_count].kind = kind;
+    fd_state_count++;
+}
+
+static MAGUS_FD_STATE *find_fd_state(int fd)
+{
+    size_t i = fd_state_count;
+    while (i > 0)
+    {
+        i--;
+        if (fd_states[i].fd == fd)
+        {
+            return &fd_states[i];
+        }
+    }
+    return NULL;
+}
+
+static void register_stream(FILE *stream, const char *kind)
+{
+    if (stream == NULL || stream_state_count >= sizeof(stream_states) / sizeof(stream_states[0]))
+    {
+        return;
+    }
+    stream_states[stream_state_count].stream = stream;
+    stream_states[stream_state_count].closed = 0;
+    stream_states[stream_state_count].kind = kind;
+    stream_state_count++;
+}
+
+static MAGUS_STREAM_STATE *find_stream_state(FILE *stream)
+{
+    size_t i;
+    for (i = 0; i < stream_state_count; i++)
+    {
+        if (stream_states[i].stream == stream)
+        {
+            return &stream_states[i];
+        }
+    }
+    return NULL;
 }
 
 static void register_key(HCRYPTKEY key, ALG_ID alg)
@@ -173,11 +242,76 @@ static void flaw_marker(const char *name, const char *value, const char *reason)
         value == NULL ? "" : value);
 }
 
+static void lifecycle_flaw_marker(const char *profile, const char *name, const char *value, const char *reason)
+{
+    flaw_marker(name, value, reason);
+    printf(
+        "MAGUS_JULIET_FLAW profile=%s reason=%s value=%s\n",
+        profile == NULL ? "" : profile,
+        reason == NULL ? "" : reason,
+        value == NULL ? "" : value);
+    printf(
+        "MAGUS_JULIET_FLAW profile=%s name=%s reason=%s value=%s\n",
+        profile == NULL ? "" : profile,
+        name == NULL ? "" : name,
+        reason == NULL ? "" : reason,
+        value == NULL ? "" : value);
+}
+
 static void flaw_marker_w(const char *name, const wchar_t *value, const char *reason)
 {
     char buffer[512];
     wide_to_narrow(value, buffer, sizeof(buffer));
     flaw_marker(name, buffer, reason);
+}
+
+static int tracked_close_fd(const char *name, int fd)
+{
+    MAGUS_FD_STATE *state;
+    if (fd < 0)
+    {
+        lifecycle_flaw_marker("resource.fd_lifecycle.user_posix", name, "", "failed_acquire_used");
+        return -1;
+    }
+    state = find_fd_state(fd);
+    if (state != NULL)
+    {
+        if (state->closed)
+        {
+            lifecycle_flaw_marker("resource.fd_lifecycle.user_posix", name, "", "duplicate_release");
+            return -1;
+        }
+        state->closed = 1;
+    }
+    return close(fd);
+}
+
+static int tracked_close_stream(const char *name, FILE *stream)
+{
+    MAGUS_STREAM_STATE *state;
+    int fd;
+    if (stream == NULL)
+    {
+        lifecycle_flaw_marker("resource.stream_lifecycle.c_stdio", name, "", "failed_acquire_used");
+        return EOF;
+    }
+    state = find_stream_state(stream);
+    if (state != NULL)
+    {
+        if (state->closed)
+        {
+            lifecycle_flaw_marker("resource.stream_lifecycle.c_stdio", name, "", "duplicate_release");
+            return EOF;
+        }
+        state->closed = 1;
+    }
+    fflush(stream);
+    fd = fileno(stream);
+    if (fd >= 0)
+    {
+        close(fd);
+    }
+    return 0;
 }
 
 static int ascii_ieq(char left, char right)
@@ -628,7 +762,47 @@ static void report_handle_leaks(void)
     {
         if (!handle_states[i].closed && handle_states[i].kind != NULL && strcmp(handle_states[i].kind, "CreateFile") == 0)
         {
-            flaw_marker("CreateFile", "", "missing_closehandle");
+            lifecycle_flaw_marker("resource.handle_lifecycle.win32", "CreateFile", "", "missing_release");
+        }
+    }
+}
+
+static void report_fd_leaks(void)
+{
+    size_t i;
+    if (!env_enabled("MAGUS_JULIET_REPORT_FD_LEAKS"))
+    {
+        return;
+    }
+    for (i = 0; i < fd_state_count; i++)
+    {
+        if (!fd_states[i].closed)
+        {
+            lifecycle_flaw_marker(
+                "resource.fd_lifecycle.user_posix",
+                fd_states[i].kind == NULL ? "open" : fd_states[i].kind,
+                "",
+                "missing_release");
+        }
+    }
+}
+
+static void report_stream_leaks(void)
+{
+    size_t i;
+    if (!env_enabled("MAGUS_JULIET_REPORT_STREAM_LEAKS"))
+    {
+        return;
+    }
+    for (i = 0; i < stream_state_count; i++)
+    {
+        if (!stream_states[i].closed)
+        {
+            lifecycle_flaw_marker(
+                "resource.stream_lifecycle.c_stdio",
+                stream_states[i].kind == NULL ? "fopen" : stream_states[i].kind,
+                "",
+                "missing_release");
         }
     }
 }
@@ -636,6 +810,8 @@ static void report_handle_leaks(void)
 __attribute__((constructor)) static void register_process_reporters(void)
 {
     atexit(report_handle_leaks);
+    atexit(report_fd_leaks);
+    atexit(report_stream_leaks);
 }
 
 int rand(void)
@@ -1627,7 +1803,11 @@ int _open(const char *path, int flags, ...)
         va_end(ap);
     }
     sink_marker("_open", path);
-    return open(path, flags, mode);
+    {
+        int fd = open(path, flags, mode);
+        register_fd(fd, "_open");
+        return fd;
+    }
 }
 
 int _wopen(const wchar_t *path, int flags, ...)
@@ -1645,13 +1825,14 @@ int _wopen(const wchar_t *path, int flags, ...)
     narrow = narrow_from_wide_alloc(path);
     sink_marker_w("_wopen", path);
     result = narrow ? open(narrow, flags, mode) : -1;
+    register_fd(result, "_wopen");
     free(narrow);
     return result;
 }
 
 int _close(int fd)
 {
-    return close(fd);
+    return tracked_close_fd("_close", fd);
 }
 
 int _write(int fd, const void *buf, unsigned int count)
@@ -1869,6 +2050,40 @@ int _wputenv(const wchar_t *envstring)
     return result;
 }
 
+static int fopen_flags_from_mode(const char *mode)
+{
+    int read_write = mode != NULL && strchr(mode, '+') != NULL;
+    if (mode != NULL && strchr(mode, 'a') != NULL)
+    {
+        return O_CREAT | O_APPEND | (read_write ? O_RDWR : O_WRONLY);
+    }
+    if (mode != NULL && strchr(mode, 'w') != NULL)
+    {
+        return O_CREAT | O_TRUNC | (read_write ? O_RDWR : O_WRONLY);
+    }
+    return read_write ? O_RDWR : O_RDONLY;
+}
+
+FILE *fopen(const char *path, const char *mode)
+{
+    int fd;
+    FILE *stream;
+    sink_marker("fopen", path);
+    fd = open(path, fopen_flags_from_mode(mode), 0666);
+    if (fd < 0)
+    {
+        return NULL;
+    }
+    stream = fdopen(fd, mode == NULL ? "r" : mode);
+    if (stream == NULL)
+    {
+        close(fd);
+        return NULL;
+    }
+    register_stream(stream, "fopen");
+    return stream;
+}
+
 int fclose(FILE *stream)
 {
     if (stream == NULL)
@@ -1876,7 +2091,7 @@ int fclose(FILE *stream)
         flaw_marker("fclose", "", "null_file_pointer_used");
         return EOF;
     }
-    return 0;
+    return tracked_close_stream("fclose", stream);
 }
 
 int vsnprintf(char *str, size_t size, const char *format, va_list ap)
@@ -1922,6 +2137,7 @@ FILE *popen(const char *command, const char *type)
     {
         fputs(payload_value(), file);
         rewind(file);
+        register_stream(file, "popen");
     }
     (void)type;
     return file;
@@ -1929,7 +2145,7 @@ FILE *popen(const char *command, const char *type)
 
 int pclose(FILE *stream)
 {
-    return fclose(stream);
+    return tracked_close_stream("pclose", stream);
 }
 
 FILE *_popen(const char *command, const char *type)
@@ -1965,6 +2181,7 @@ FILE *_wfopen(const wchar_t *path, const wchar_t *mode)
     }
     if (narrow_path != NULL && narrow_mode != NULL)
     {
+        sink_marker_w("_wfopen", path);
         result = fopen(narrow_path, narrow_mode);
     }
     free(narrow_path);

@@ -41,6 +41,25 @@ class ExplicitContextTests(unittest.TestCase):
         self.assertIn("MAGUS_ORACLE_FLAW name=LoadLibraryA reason=relative_library_path", oracle_text)
         self.assertIn("MAGUS_ROUTE_EXECUTED", oracle_text)
 
+    def test_resource_lifecycle_requires_oracle_capability_marker(self):
+        hyp = {
+            "project_id": "posix_project",
+            "sample_id": "s1",
+            "hypothesis_id": "h1",
+            "route": "load_config -> open",
+            "file": "src/config.c",
+            "claim": "file descriptor returned by open can miss close on an error path",
+            "evidence_slice": "fd = open(path, O_RDONLY); if (parse(fd) < 0) return -1;",
+        }
+
+        case = target_gen.make_source_api_case(hyp, auto_fill=True)
+
+        self.assertEqual(case["oracle_profile_id"], "resource.fd_lifecycle.user_posix")
+        self.assertIn(
+            "MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix",
+            case["oracle"]["capability_patterns"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

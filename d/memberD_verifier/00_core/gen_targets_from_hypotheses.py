@@ -301,6 +301,7 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
             "semantic_failure_patterns": oracle_profile.get("confirm_patterns") or [],
             "failure_patterns": sorted(set(DEFAULT_FAILURE_PATTERNS + (oracle_profile.get("confirm_patterns") or []))),
             "required_patterns": ["MAGUS_ROUTE_EXECUTED"],
+            "capability_patterns": oracle_profile.get("capability_patterns") or [],
             "unsupported_patterns": ["MAGUS_ORACLE_UNSUPPORTED"],
             "failure_code_patterns": {
                 "NOT_ROUTE_BOUND": ["MAGUS_NOT_ROUTE_BOUND"],

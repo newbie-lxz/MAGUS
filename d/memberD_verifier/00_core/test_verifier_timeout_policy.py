@@ -226,6 +226,121 @@ class GenericSourceApiRunnerTests(unittest.TestCase):
         assert success is not None
         self.assertEqual(success["status"], "confirmed")
 
+    def test_lifecycle_oracle_requires_capability_marker(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hyp = _hyp("P1")
+            target = {
+                "project_id": "p",
+                "target_type": "source_api",
+                "cases": {
+                    "hyp_p1": {
+                        "target_type": "source_api",
+                        "attack_type": "generic",
+                        "execution": {
+                            "repo_path": temp_dir,
+                            "test_cmd": (
+                                f"{sys.executable} -c "
+                                "\"print('MAGUS_ROUTE_EXECUTED'); "
+                                "print('MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release')\""
+                            ),
+                        },
+                        "oracle": {
+                            "failure_patterns": [
+                                "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release"
+                            ],
+                            "required_patterns": ["MAGUS_ROUTE_EXECUTED"],
+                            "capability_patterns": ["MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"],
+                            "expect_nonzero_exit": False,
+                        },
+                    }
+                },
+            }
+
+            success, failed = verifier.run_one(hyp, target, Path(temp_dir) / "out", dry_run=False)
+
+        self.assertIsNone(failed)
+        self.assertIsNotNone(success)
+        assert success is not None
+        self.assertEqual(success["status"], "stage_c_preserved")
+        self.assertEqual(success["failure_code"], "UNSUPPORTED_ORACLE")
+
+    def test_lifecycle_not_confirmed_marker_does_not_bypass_capability_marker(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hyp = _hyp("P1")
+            target = {
+                "project_id": "p",
+                "target_type": "source_api",
+                "cases": {
+                    "hyp_p1": {
+                        "target_type": "source_api",
+                        "attack_type": "generic",
+                        "execution": {
+                            "repo_path": temp_dir,
+                            "test_cmd": (
+                                f"{sys.executable} -c "
+                                "\"print('MAGUS_ROUTE_EXECUTED'); "
+                                "print('MAGUS_NOT_CONFIRMED')\""
+                            ),
+                        },
+                        "oracle": {
+                            "failure_patterns": [
+                                "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release"
+                            ],
+                            "required_patterns": ["MAGUS_ROUTE_EXECUTED"],
+                            "capability_patterns": ["MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"],
+                            "failure_code_patterns": {"NOT_EXPLOITABLE": ["MAGUS_NOT_CONFIRMED"]},
+                            "expect_nonzero_exit": False,
+                        },
+                    }
+                },
+            }
+
+            success, failed = verifier.run_one(hyp, target, Path(temp_dir) / "out", dry_run=False)
+
+        self.assertIsNone(failed)
+        self.assertIsNotNone(success)
+        assert success is not None
+        self.assertEqual(success["status"], "stage_c_preserved")
+        self.assertEqual(success["failure_code"], "UNSUPPORTED_ORACLE")
+
+    def test_lifecycle_oracle_confirms_when_capability_and_flaw_match(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hyp = _hyp("P1")
+            target = {
+                "project_id": "p",
+                "target_type": "source_api",
+                "cases": {
+                    "hyp_p1": {
+                        "target_type": "source_api",
+                        "attack_type": "generic",
+                        "execution": {
+                            "repo_path": temp_dir,
+                            "test_cmd": (
+                                f"{sys.executable} -c "
+                                "\"print('MAGUS_ROUTE_EXECUTED'); "
+                                "print('MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix'); "
+                                "print('MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release')\""
+                            ),
+                        },
+                        "oracle": {
+                            "failure_patterns": [
+                                "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=missing_release"
+                            ],
+                            "required_patterns": ["MAGUS_ROUTE_EXECUTED"],
+                            "capability_patterns": ["MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"],
+                            "expect_nonzero_exit": False,
+                        },
+                    }
+                },
+            }
+
+            success, failed = verifier.run_one(hyp, target, Path(temp_dir) / "out", dry_run=False)
+
+        self.assertIsNone(failed)
+        self.assertIsNotNone(success)
+        assert success is not None
+        self.assertEqual(success["status"], "confirmed")
+
 
 if __name__ == "__main__":
     unittest.main()

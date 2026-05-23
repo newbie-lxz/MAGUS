@@ -165,6 +165,7 @@ def run_command(cmd: Any, cwd: Path, timeout: float | None, env: dict[str, str])
 def decide(run_results: list[dict[str, Any]], oracle: dict[str, Any]) -> tuple[str, str, list[str]]:
     patterns = oracle.get("failure_patterns") or DEFAULT_FAILURE_PATTERNS
     required_patterns = pattern_list(oracle.get("required_patterns"))
+    capability_patterns = pattern_list(oracle.get("capability_patterns"))
     unsupported_patterns = pattern_list(oracle.get("unsupported_patterns"))
     code_patterns = failure_code_patterns(oracle)
     expect_nonzero = bool(oracle.get("expect_nonzero_exit", True))
@@ -186,23 +187,42 @@ def decide(run_results: list[dict[str, Any]], oracle: dict[str, Any]) -> tuple[s
         for code, code_pattern_values in code_patterns.items():
             matched_code_patterns = [pattern for pattern in code_pattern_values if pattern in output]
             if matched_code_patterns:
+                if missing_required:
+                    observations.append(f"{code} matched without route-bound patterns: {', '.join(missing_required)}")
+                    return "failed", "NOT_ROUTE_BOUND", observations
+                missing_capability = [pattern for pattern in capability_patterns if pattern not in output]
+                if missing_capability:
+                    observations.append(f"oracle capability patterns missing: {', '.join(missing_capability)}")
+                    return "unsupported", "UNSUPPORTED_ORACLE", observations
                 observations.append(f"{code} matched patterns: {', '.join(matched_code_patterns)}")
                 return "failed", code, observations
         if matched:
             if missing_required:
                 observations.append(f"oracle matched but route-bound patterns were missing: {', '.join(missing_required)}")
                 return "failed", "NOT_ROUTE_BOUND", observations
+            missing_capability = [pattern for pattern in capability_patterns if pattern not in output]
+            if missing_capability:
+                observations.append(f"oracle capability patterns missing: {', '.join(missing_capability)}")
+                return "unsupported", "UNSUPPORTED_ORACLE", observations
             observations.append(f"oracle matched patterns: {', '.join(matched)}")
             return "confirmed", "ORACLE_MATCH", observations
         if expect_nonzero and result.get("exit_code") not in (0, None):
             if missing_required:
                 observations.append(f"non-zero exit observed without route-bound patterns: {', '.join(missing_required)}")
                 return "failed", "NOT_ROUTE_BOUND", observations
+            missing_capability = [pattern for pattern in capability_patterns if pattern not in output]
+            if missing_capability:
+                observations.append(f"oracle capability patterns missing: {', '.join(missing_capability)}")
+                return "unsupported", "UNSUPPORTED_ORACLE", observations
             observations.append(f"non-zero exit observed: {result.get('exit_code')}")
             return "confirmed", "NONZERO_EXIT", observations
         if missing_required:
             observations.append(f"route-bound patterns missing: {', '.join(missing_required)}")
             return "failed", "NOT_ROUTE_BOUND", observations
+        missing_capability = [pattern for pattern in capability_patterns if pattern not in output]
+        if missing_capability:
+            observations.append(f"oracle capability patterns missing: {', '.join(missing_capability)}")
+            return "unsupported", "UNSUPPORTED_ORACLE", observations
         observations.append(f"exit={result.get('exit_code')} for {result.get('cmd')}")
     return "failed", "NOT_EXPLOITABLE", observations
 

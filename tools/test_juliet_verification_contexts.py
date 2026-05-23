@@ -72,6 +72,26 @@ class JulietHelperOutputTests(unittest.TestCase):
             ["MAGUS_ORACLE_FLAW name=RpcImpersonateClient reason=forced_non_ok_return_not_propagated value="],
         )
 
+    def test_lifecycle_capability_markers_cover_fd_stdio_and_win32_profiles(self):
+        env = {
+            "MAGUS_JULIET_REPORT_FD_LEAKS": "1",
+            "MAGUS_JULIET_REPORT_STREAM_LEAKS": "1",
+            "MAGUS_JULIET_REPORT_HANDLE_LEAKS": "1",
+        }
+
+        self.assertEqual(
+            self.runner.oracle_capability_markers("resource.fd_lifecycle.user_posix", env),
+            ["MAGUS_ORACLE_RAN profile=resource.fd_lifecycle.user_posix"],
+        )
+        self.assertEqual(
+            self.runner.oracle_capability_markers("resource.stream_lifecycle.c_stdio", env),
+            ["MAGUS_ORACLE_RAN profile=resource.stream_lifecycle.c_stdio"],
+        )
+        self.assertEqual(
+            self.runner.oracle_capability_markers("resource.handle_lifecycle.win32", env),
+            ["MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

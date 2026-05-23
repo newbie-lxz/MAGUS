@@ -48,10 +48,163 @@ class OracleProfile:
     cwe_tokens: Tuple[str, ...] = ()
     accepted_evidence: Tuple[str, ...] = ()
     generic_markers: Tuple[str, ...] = ()
+    semantic_model: Dict[str, Any] | None = None
 
     @property
     def api_names(self) -> Tuple[str, ...]:
         return tuple(self.api_markers.keys())
+
+
+LIFECYCLE_FAILURE_REASONS: Tuple[str, ...] = (
+    "missing_release",
+    "duplicate_release",
+    "wrong_release_api",
+    "use_after_release",
+    "failed_acquire_used",
+    "ownership_transfer_lost",
+)
+
+
+def lifecycle_generic_markers(profile_id: str) -> Tuple[str, ...]:
+    return tuple(f"MAGUS_ORACLE_FLAW profile={profile_id} reason={reason}" for reason in LIFECYCLE_FAILURE_REASONS)
+
+
+def lifecycle_api_markers(profile_id: str, api_name: str, reasons: Tuple[str, ...]) -> Tuple[str, ...]:
+    markers: List[str] = []
+    for reason in reasons:
+        markers.append(f"MAGUS_ORACLE_FLAW profile={profile_id} name={api_name} reason={reason}")
+        markers.append(f"MAGUS_ORACLE_FLAW name={api_name} reason={reason}")
+    return tuple(markers)
+
+
+def lifecycle_semantic_model(
+    *,
+    family: str,
+    resource_kind: str,
+    execution_environment: str,
+    acquire: Tuple[str, ...],
+    release: Tuple[str, ...],
+    sentinel_values: Tuple[str, ...],
+    transfer: Tuple[str, ...] = (),
+    duplicate: Tuple[str, ...] = (),
+    multi_resource_acquire: Dict[str, int] | None = None,
+    release_compatibility: Dict[str, Tuple[str, ...]] | None = None,
+    execution_contexts: Tuple[str, ...] = (),
+) -> Dict[str, Any]:
+    model: Dict[str, Any] = {
+        "kind": "resource_lifecycle",
+        "family": family,
+        "resource_kind": resource_kind,
+        "execution_environment": execution_environment,
+        "state_semantics": {
+            "acquire": list(acquire),
+            "release": list(release),
+            "transfer": list(transfer),
+            "duplicate": list(duplicate),
+            "sentinel_values": list(sentinel_values),
+            "multi_resource_acquire": multi_resource_acquire or {},
+            "release_compatibility": {
+                key: list(value) for key, value in (release_compatibility or {}).items()
+            },
+        },
+        "oracle_obligations": [
+            "prove MAGUS_ROUTE_EXECUTED for the selected route or source/API sequence",
+            "prove the acquire/release state transition on the same logical resource",
+            "distinguish failed acquisition sentinels from live resources before reporting lifecycle misuse",
+            "treat ownership transfer and duplicate handles/descriptors as new ownership facts",
+            "return MAGUS_ORACLE_UNSUPPORTED instead of NOT_EXPLOITABLE when the harness cannot observe the lifecycle state",
+        ],
+    }
+    if execution_contexts:
+        model["execution_contexts"] = list(execution_contexts)
+    return model
+
+
+POSIX_FD_PROFILE_ID = "resource.fd_lifecycle.user_posix"
+POSIX_FD_ACQUIRE_APIS: Tuple[str, ...] = (
+    "open",
+    "openat",
+    "openat2",
+    "creat",
+    "_open",
+    "_wopen",
+    "_sopen",
+    "_wsopen",
+    "socket",
+    "socketpair",
+    "accept",
+    "accept4",
+    "pipe",
+    "pipe2",
+    "eventfd",
+    "eventfd2",
+    "timerfd_create",
+    "signalfd",
+    "signalfd4",
+    "epoll_create",
+    "epoll_create1",
+    "inotify_init",
+    "inotify_init1",
+)
+POSIX_FD_RELEASE_APIS: Tuple[str, ...] = ("close", "_close")
+POSIX_FD_TRANSFER_APIS: Tuple[str, ...] = ("fdopen",)
+POSIX_FD_DUP_APIS: Tuple[str, ...] = ("dup", "dup2", "dup3", "fcntl")
+
+STDIO_PROFILE_ID = "resource.stream_lifecycle.c_stdio"
+STDIO_ACQUIRE_APIS: Tuple[str, ...] = ("fopen", "_wfopen", "fdopen", "freopen", "tmpfile", "popen")
+STDIO_RELEASE_APIS: Tuple[str, ...] = ("fclose", "pclose")
+
+WIN32_HANDLE_PROFILE_ID = "resource.handle_lifecycle.win32"
+WIN32_HANDLE_ACQUIRE_APIS: Tuple[str, ...] = (
+    "CreateFile",
+    "CreateFileA",
+    "CreateFileW",
+    "CreateEventA",
+    "CreateEventW",
+    "CreateMutexA",
+    "CreateMutexW",
+    "CreateNamedPipeA",
+    "CreateNamedPipeW",
+)
+WIN32_HANDLE_RELEASE_APIS: Tuple[str, ...] = ("CloseHandle",)
+WIN32_HANDLE_DUP_APIS: Tuple[str, ...] = ("DuplicateHandle",)
+
+LINUX_KERNEL_PROFILE_ID = "resource.lifecycle.linux_kernel"
+LINUX_KERNEL_ACQUIRE_APIS: Tuple[str, ...] = ("filp_open", "get_file", "kmalloc", "kzalloc", "kobject_get")
+LINUX_KERNEL_RELEASE_APIS: Tuple[str, ...] = ("filp_close", "fput", "kfree", "kobject_put")
+
+
+def lifecycle_profile_api_markers(
+    profile_id: str,
+    acquire: Tuple[str, ...],
+    release: Tuple[str, ...],
+    transfer: Tuple[str, ...] = (),
+    duplicate: Tuple[str, ...] = (),
+) -> Dict[str, Tuple[str, ...]]:
+    markers: Dict[str, Tuple[str, ...]] = {}
+    acquire_reasons = ("missing_release", "failed_acquire_used", "ownership_transfer_lost")
+    release_reasons = ("duplicate_release", "wrong_release_api", "use_after_release")
+    transfer_reasons = ("ownership_transfer_lost", "wrong_release_api")
+    duplicate_reasons = ("missing_release", "duplicate_release", "ownership_transfer_lost")
+    for api in acquire:
+        markers[api] = lifecycle_api_markers(profile_id, api, acquire_reasons)
+    for api in release:
+        markers[api] = lifecycle_api_markers(profile_id, api, release_reasons)
+    for api in transfer:
+        markers[api] = lifecycle_api_markers(profile_id, api, transfer_reasons)
+    for api in duplicate:
+        markers[api] = lifecycle_api_markers(profile_id, api, duplicate_reasons)
+    return markers
+
+
+def extend_marker_map(
+    markers: Dict[str, Tuple[str, ...]],
+    extras: Dict[str, Tuple[str, ...]],
+) -> Dict[str, Tuple[str, ...]]:
+    merged = dict(markers)
+    for api, extra_markers in extras.items():
+        merged[api] = tuple(dict.fromkeys((*merged.get(api, ()), *extra_markers)))
+    return merged
 
 
 PROFILES: Tuple[OracleProfile, ...] = (
@@ -227,20 +380,187 @@ PROFILES: Tuple[OracleProfile, ...] = (
         accepted_evidence=("route-bound API failure was forced and later used without a valid check",),
     ),
     OracleProfile(
-        profile_id="resource.handle_lifecycle",
-        description="Handle or resource lifecycle is invalid, duplicated, or missing release.",
+        profile_id=POSIX_FD_PROFILE_ID,
+        description="User-space file descriptor lifecycle is invalid, duplicated, transferred, or missing release.",
         cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
-        keywords=("resource shutdown", "after expiration", "duplicate operations", "missing release", "handle leak"),
-        api_markers={
-            "CloseHandle": (
-                "MAGUS_ORACLE_FLAW name=CloseHandle reason=invalid_or_failed_handle_used",
-                "MAGUS_ORACLE_FLAW name=CloseHandle reason=duplicate_close",
-                "MAGUS_ORACLE_FLAW name=CloseHandle reason=unrecognized_handle_or_wrong_close_api",
+        keywords=(
+            "file descriptor",
+            "fd leak",
+            "descriptor leak",
+            "socket leak",
+            "missing close",
+            "missing release",
+            "duplicate close",
+            "wrong close",
+            "ownership transfer",
+        ),
+        api_markers=lifecycle_profile_api_markers(
+            POSIX_FD_PROFILE_ID,
+            POSIX_FD_ACQUIRE_APIS,
+            POSIX_FD_RELEASE_APIS,
+            POSIX_FD_TRANSFER_APIS,
+            POSIX_FD_DUP_APIS,
+        ),
+        generic_markers=lifecycle_generic_markers(POSIX_FD_PROFILE_ID),
+        accepted_evidence=(
+            "route-bound user-space fd lifecycle oracle observed acquire/release/transfer state on the same descriptor",
+        ),
+        semantic_model=lifecycle_semantic_model(
+            family="user_posix_fd",
+            resource_kind="file_descriptor",
+            execution_environment="user_space",
+            acquire=POSIX_FD_ACQUIRE_APIS,
+            release=POSIX_FD_RELEASE_APIS,
+            transfer=POSIX_FD_TRANSFER_APIS,
+            duplicate=POSIX_FD_DUP_APIS,
+            sentinel_values=("-1",),
+            multi_resource_acquire={"pipe": 2, "pipe2": 2, "socketpair": 2},
+            release_compatibility={
+                "open": ("close", "_close"),
+                "_open": ("close", "_close"),
+                "_wopen": ("close", "_close"),
+                "socket": ("close", "_close"),
+                "pipe": ("close", "_close"),
+                "eventfd": ("close", "_close"),
+            },
+        ),
+    ),
+    OracleProfile(
+        profile_id=STDIO_PROFILE_ID,
+        description="C stdio stream lifecycle is invalid, transferred, or missing the matching close operation.",
+        cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
+        keywords=(
+            "stdio",
+            "file stream",
+            "stream leak",
+            "missing fclose",
+            "missing pclose",
+            "missing release",
+            "wrong close",
+            "ownership transfer",
+        ),
+        api_markers=lifecycle_profile_api_markers(
+            STDIO_PROFILE_ID,
+            STDIO_ACQUIRE_APIS,
+            STDIO_RELEASE_APIS,
+        ),
+        generic_markers=lifecycle_generic_markers(STDIO_PROFILE_ID),
+        accepted_evidence=(
+            "route-bound C stdio lifecycle oracle observed acquire/release/transfer state on the same FILE stream",
+        ),
+        semantic_model=lifecycle_semantic_model(
+            family="c_stdio_stream",
+            resource_kind="FILE_stream",
+            execution_environment="user_space",
+            acquire=STDIO_ACQUIRE_APIS,
+            release=STDIO_RELEASE_APIS,
+            transfer=("fdopen",),
+            sentinel_values=("NULL",),
+            release_compatibility={
+                "fopen": ("fclose",),
+                "_wfopen": ("fclose",),
+                "fdopen": ("fclose",),
+                "freopen": ("fclose",),
+                "tmpfile": ("fclose",),
+                "popen": ("pclose",),
+            },
+        ),
+    ),
+    OracleProfile(
+        profile_id=WIN32_HANDLE_PROFILE_ID,
+        description="Win32 HANDLE lifecycle is invalid, duplicated, or missing the matching CloseHandle operation.",
+        cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
+        keywords=(
+            "win32 handle",
+            "handle leak",
+            "missing closehandle",
+            "missing close handle",
+            "duplicate closehandle",
+            "invalid handle",
+            "wrong close api",
+        ),
+        api_markers=extend_marker_map(
+            lifecycle_profile_api_markers(
+                WIN32_HANDLE_PROFILE_ID,
+                WIN32_HANDLE_ACQUIRE_APIS,
+                WIN32_HANDLE_RELEASE_APIS,
+                duplicate=WIN32_HANDLE_DUP_APIS,
             ),
-            "CreateFile": ("MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",),
-            "FreeLibrary": ("MAGUS_ORACLE_SINK name=FreeLibrary tainted=1",),
-        },
-        accepted_evidence=("route-bound resource lifecycle marker showed invalid or missing release behavior",),
+            {
+                "CloseHandle": (
+                    "MAGUS_ORACLE_FLAW name=CloseHandle reason=invalid_or_failed_handle_used",
+                    "MAGUS_ORACLE_FLAW name=CloseHandle reason=duplicate_close",
+                    "MAGUS_ORACLE_FLAW name=CloseHandle reason=unrecognized_handle_or_wrong_close_api",
+                ),
+                "CreateFile": ("MAGUS_ORACLE_FLAW name=CreateFile reason=missing_closehandle",),
+                "CreateFileA": ("MAGUS_ORACLE_FLAW name=CreateFileA reason=missing_closehandle",),
+                "CreateFileW": ("MAGUS_ORACLE_FLAW name=CreateFileW reason=missing_closehandle",),
+            },
+        ),
+        generic_markers=lifecycle_generic_markers(WIN32_HANDLE_PROFILE_ID),
+        accepted_evidence=(
+            "route-bound Win32 HANDLE lifecycle oracle observed acquire/release/duplicate state on the same HANDLE",
+        ),
+        semantic_model=lifecycle_semantic_model(
+            family="win32_handle",
+            resource_kind="HANDLE",
+            execution_environment="user_space_windows",
+            acquire=WIN32_HANDLE_ACQUIRE_APIS,
+            release=WIN32_HANDLE_RELEASE_APIS,
+            duplicate=WIN32_HANDLE_DUP_APIS,
+            sentinel_values=("NULL", "INVALID_HANDLE_VALUE"),
+            release_compatibility={
+                "CreateFile": ("CloseHandle",),
+                "CreateFileA": ("CloseHandle",),
+                "CreateFileW": ("CloseHandle",),
+                "CreateEventA": ("CloseHandle",),
+                "CreateEventW": ("CloseHandle",),
+                "CreateMutexA": ("CloseHandle",),
+                "CreateMutexW": ("CloseHandle",),
+                "CreateNamedPipeA": ("CloseHandle",),
+                "CreateNamedPipeW": ("CloseHandle",),
+            },
+        ),
+    ),
+    OracleProfile(
+        profile_id=LINUX_KERNEL_PROFILE_ID,
+        description="Linux kernel resource lifecycle is invalid, leaked, or released with the wrong kernel API family.",
+        cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
+        keywords=(
+            "linux kernel",
+            "kernel resource",
+            "kernel refcount",
+            "file reference",
+            "missing fput",
+            "missing kfree",
+            "missing kobject_put",
+            "reference leak",
+        ),
+        api_markers=lifecycle_profile_api_markers(
+            LINUX_KERNEL_PROFILE_ID,
+            LINUX_KERNEL_ACQUIRE_APIS,
+            LINUX_KERNEL_RELEASE_APIS,
+        ),
+        generic_markers=lifecycle_generic_markers(LINUX_KERNEL_PROFILE_ID),
+        accepted_evidence=(
+            "route-bound Linux kernel lifecycle oracle observed acquire/release/refcount state in a kernel execution context",
+        ),
+        semantic_model=lifecycle_semantic_model(
+            family="linux_kernel_resource",
+            resource_kind="kernel_resource_or_reference",
+            execution_environment="linux_kernel",
+            acquire=LINUX_KERNEL_ACQUIRE_APIS,
+            release=LINUX_KERNEL_RELEASE_APIS,
+            sentinel_values=("NULL", "ERR_PTR", "IS_ERR", "IS_ERR_OR_NULL"),
+            release_compatibility={
+                "filp_open": ("filp_close", "fput"),
+                "get_file": ("fput",),
+                "kmalloc": ("kfree",),
+                "kzalloc": ("kfree",),
+                "kobject_get": ("kobject_put",),
+            },
+            execution_contexts=("KUnit", "kselftest", "QEMU", "syzkaller_repro", "module_harness"),
+        ),
     ),
     OracleProfile(
         profile_id="memory.sensitive_without_lock",
@@ -345,9 +665,15 @@ def _contains_token(haystack_lower: str, token: str) -> bool:
     return any(haystack_words[index : index + width] == token_words for index in range(len(haystack_words) - width + 1))
 
 
+def _contains_api_name(haystack_lower: str, api_name: str) -> bool:
+    api_lower = api_name.lower()
+    pattern = rf"(?<![a-z0-9_]){re.escape(api_lower)}(?![a-z0-9_])"
+    return re.search(pattern, haystack_lower) is not None
+
+
 def infer_api_names(hypothesis: Dict[str, Any]) -> List[str]:
     haystack_lower = hypothesis_text(hypothesis).lower()
-    found = [api for api in API_NAMES if _contains_token(haystack_lower, api)]
+    found = [api for api in API_NAMES if _contains_api_name(haystack_lower, api)]
     return sorted(set(found), key=lambda item: API_NAMES.index(item))
 
 
@@ -403,6 +729,10 @@ def build_oracle_profile(hypothesis: Dict[str, Any]) -> Dict[str, Any]:
             ],
         }
 
+    capability_patterns: List[str] = []
+    if (profile.semantic_model or {}).get("kind") == "resource_lifecycle":
+        capability_patterns.append(f"MAGUS_ORACLE_RAN profile={profile.profile_id}")
+
     return {
         "profile_id": profile.profile_id,
         "supported": True,
@@ -411,7 +741,9 @@ def build_oracle_profile(hypothesis: Dict[str, Any]) -> Dict[str, Any]:
         "matched_apis": matched_apis,
         "inferred_apis": inferred_apis,
         "confirm_patterns": _confirm_patterns(profile, matched_apis),
+        "capability_patterns": capability_patterns,
         "accepted_evidence": list(profile.accepted_evidence),
+        "semantic_model": profile.semantic_model or {},
     }
 
 
