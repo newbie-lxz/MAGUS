@@ -72,12 +72,27 @@ def _no_vuln(**extra):
     return resp
 
 
+def _llm_error():
+    return {
+        "claim": "LLM_CALL_FAILED",
+        "confidence": 0.0,
+        "llm_error": "api_error",
+        "llm_error_detail": "test failure",
+    }
+
+
 class RouteRecordTests(unittest.TestCase):
     def test_all_no_vulnerability_routes_to_p3(self):
         _, priority, verdict, reason, _ = agent1.route_record(
             _candidate(), [_no_vuln(), _no_vuln(), _no_vuln()]
         )
-        self.assertEqual((priority, verdict, reason), ("P3", "audit_only", "red_team_no_vulnerability"))
+        self.assertEqual((priority, verdict, reason), ("P3", "audit_only", "multi_agent_no_vulnerability"))
+
+    def test_llm_errors_do_not_count_as_no_vulnerability_consensus(self):
+        _, priority, verdict, reason, _ = agent1.route_record(
+            _candidate(), [_llm_error(), _llm_error(), _llm_error()]
+        )
+        self.assertEqual((priority, verdict, reason), ("P3", "audit_only", "stage_c_llm_error"))
 
     def test_disputed_vulnerability_does_not_route_to_p3(self):
         _, priority, verdict, reason, contradictions = agent1.route_record(
@@ -88,14 +103,20 @@ class RouteRecordTests(unittest.TestCase):
                 _no_vuln(stability="hard_contradiction"),
             ],
         )
-        self.assertEqual((priority, verdict, reason), ("P2", "candidate_for_d", "red_team_vulnerability_once"))
+        self.assertEqual((priority, verdict, reason), ("P2", "candidate_for_d", "multi_agent_vulnerability_once"))
         self.assertIn("sink not shown", contradictions)
 
     def test_final_rejection_after_vulnerability_routes_to_p2(self):
         _, priority, verdict, reason, _ = agent1.route_record(
             _candidate(), [_vuln(evidence_complete=False), _vuln(evidence_complete=False), _no_vuln()]
         )
-        self.assertEqual((priority, verdict, reason), ("P2", "candidate_for_d", "red_team_vulnerability_once"))
+        self.assertEqual((priority, verdict, reason), ("P2", "candidate_for_d", "multi_agent_vulnerability_once"))
+
+    def test_partial_llm_error_with_vulnerability_routes_to_p2(self):
+        _, priority, verdict, reason, _ = agent1.route_record(
+            _candidate(), [_vuln(), _llm_error(), _vuln()]
+        )
+        self.assertEqual((priority, verdict, reason), ("P2", "candidate_for_d", "stage_c_partial_llm_error"))
 
     def test_corrected_vulnerability_routes_to_p1_when_final_two_rounds_agree(self):
         _, priority, verdict, reason, _ = agent1.route_record(
@@ -109,14 +130,14 @@ class RouteRecordTests(unittest.TestCase):
         )
         self.assertEqual(
             (priority, verdict, reason),
-            ("P1", "candidate_for_d", "red_team_reaffirmed_after_challenge"),
+            ("P1", "candidate_for_d", "red_rebuttal_after_blue_challenge"),
         )
 
     def test_complete_consensus_vulnerability_can_route_to_p0(self):
         _, priority, verdict, reason, _ = agent1.route_record(
             _candidate(), [_vuln(0.95), _vuln(0.95), _vuln(0.95)]
         )
-        self.assertEqual((priority, verdict, reason), ("P0", "static_confirmed", "red_team_static_strong"))
+        self.assertEqual((priority, verdict, reason), ("P0", "static_confirmed", "multi_agent_static_strong"))
 
     def test_stage_b_static_confirmation_block_routes_to_d_candidate(self):
         cand = _candidate()
@@ -176,7 +197,7 @@ class RouteRecordTests(unittest.TestCase):
             cand, [_no_vuln(), _no_vuln(), _no_vuln()]
         )
 
-        self.assertEqual((priority, verdict, reason), ("P3", "audit_only", "red_team_no_vulnerability"))
+        self.assertEqual((priority, verdict, reason), ("P3", "audit_only", "multi_agent_no_vulnerability"))
 
     def test_source_api_safety_net_routes_rpc_without_cwe_label(self):
         cand = _candidate(

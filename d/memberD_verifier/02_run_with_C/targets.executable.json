@@ -55,24 +55,13 @@
             "profile_id": "unsupported.unclassified_source_api",
             "profile_supported": false,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [],
             "failure_patterns": [
-              "AddressSanitizer",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -84,11 +73,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp' --entry-symbol '_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_735case0Ev' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_73a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_735case0Ev'"
           }
         },
         "hyp_path_bfee1e414bf1": {
@@ -145,27 +142,15 @@
             "profile_id": "config.external_control",
             "profile_supported": true,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route-bound configuration API consumed attacker-controlled data"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [
               "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
             ],
             "failure_patterns": [
-              "AddressSanitizer",
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -177,11 +162,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_17.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_17_case0'"
           }
         },
         "hyp_path_0b0c49ef539a": {
@@ -233,24 +226,13 @@
             "profile_id": "unsupported.unclassified_source_api",
             "profile_supported": false,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [],
             "failure_patterns": [
-              "AddressSanitizer",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -262,11 +244,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp' --entry-symbol '_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_745case0Ev' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_74a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_745case0Ev'"
           }
         },
         "hyp_path_940b4e857004": {
@@ -325,27 +315,15 @@
             "profile_id": "config.external_control",
             "profile_supported": true,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route-bound configuration API consumed attacker-controlled data"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [
               "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
             ],
             "failure_patterns": [
-              "AddressSanitizer",
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -357,11 +335,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_41.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_41_case0'"
           }
         },
         "hyp_path_1b647b79197e": {
@@ -419,27 +405,15 @@
             "profile_id": "config.external_control",
             "profile_supported": true,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route-bound configuration API consumed attacker-controlled data"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [
               "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1"
             ],
             "failure_patterns": [
-              "AddressSanitizer",
-              "MAGUS_ORACLE_SINK name=SetComputerNameA tainted=1",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -451,11 +425,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_12.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_12_case0'"
           }
         },
         "hyp_path_3ac2b660d3ba": {
@@ -506,24 +488,13 @@
             "profile_id": "unsupported.unclassified_source_api",
             "profile_supported": false,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [],
             "failure_patterns": [
-              "AddressSanitizer",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -535,11 +506,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_52a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_52_case0'"
           }
         },
         "hyp_path_ac4ba2963d66": {
@@ -591,24 +570,13 @@
             "profile_id": "unsupported.unclassified_source_api",
             "profile_supported": false,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [],
             "failure_patterns": [
-              "AddressSanitizer",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -620,11 +588,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp' --entry-symbol '_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_825case0Ev' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_82a.cpp::_ZN65CWE15_External_Control_of_System_or_Configuration_Setting__w32_825case0Ev'"
           }
         },
         "hyp_path_dddf8e75d107": {
@@ -679,24 +655,13 @@
             "profile_id": "unsupported.unclassified_source_api",
             "profile_supported": false,
             "accepted_evidence": [
-              "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
-              "ASan/UBSan crash",
-              "non-zero test exit caused by crafted source/API input",
-              "unexpected success on invalid API state",
-              "differential behavior between vulnerable and fixed revision",
-              "route execution can be observed, but Stage D has no semantic oracle profile for this hypothesis"
+              "MAGUS_ROUTE_EXECUTED proves the selected dynamic route was reached",
+              "MAGUS_ROUTE_CONFIRMED is emitted only when the selected oracle profile matches route-bound semantic evidence",
+              "MAGUS_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the hypothesis semantics"
             ],
             "semantic_failure_patterns": [],
             "failure_patterns": [
-              "AddressSanitizer",
-              "Segmentation fault",
-              "UndefinedBehaviorSanitizer",
-              "double-free",
-              "heap-buffer-overflow",
-              "heap-use-after-free",
-              "null pointer",
-              "runtime error:",
-              "stack-buffer-overflow"
+              "MAGUS_ROUTE_CONFIRMED"
             ],
             "required_patterns": [
               "MAGUS_ROUTE_EXECUTED"
@@ -708,11 +673,19 @@
               "NOT_ROUTE_BOUND": [
                 "MAGUS_NOT_ROUTE_BOUND"
               ],
+              "ENV_MISSING": [
+                "MAGUS_BUILD_FAILED",
+                "MAGUS_RUNNER_ERROR"
+              ],
               "NOT_EXPLOITABLE": [
                 "MAGUS_NOT_CONFIRMED"
               ]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
+          },
+          "execution": {
+            "repo_path": "/home/sq_hu/MAGUS",
+            "test_cmd": "'${PYTHON}' tools/juliet_win_shim/run_juliet_win_case.py --source-file 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c' --entry-symbol 'CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0' --route 'juliet-api-misuse/testcases/CWE15_External_Control_of_System_or_Configuration_Setting/CWE15_External_Control_of_System_or_Configuration_Setting__w32_51a.c::CWE15_External_Control_of_System_or_Configuration_Setting__w32_51_case0'"
           }
         }
       }

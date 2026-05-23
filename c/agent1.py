@@ -288,7 +288,7 @@ def build_evidence_brief(cand):
     return "\n".join(lines)
 
 
-# ==================== 红队三轮提示词 ====================
+# ==================== 双Agent三轮对抗提示词 ====================
 PROPOSER_PROMPT = """你是一位红队安全审计专家。基于以下代码证据，高召回判断是否存在安全漏洞。
 
 **审计信息**：
@@ -312,12 +312,14 @@ PROPOSER_PROMPT = """你是一位红队安全审计专家。基于以下代码�
     {{"step": 1, "loc": "L? 或 描述", "code": "关键代码行"}}
   ],
   "preconditions": ["攻击者能够控制某个输入或参数"],
-  "confidence": 0.8
+  "confidence": 0.8,
+  "hard_contradictions": [],
+  "evidence_complete": true
 }}
 
 **注意**：即使代码中可能存在防御检查，你也必须输出假设条件和路径，不要提前过滤。"""
 
-RED_REVIEW_PROMPT = """你仍然是红队安全审计专家，不是蓝队。请对第一轮判断做自查和修正。
+BLUE_CHALLENGER_PROMPT = """你是独立蓝队复审专家。请严格挑战红队第一轮判断，寻找误报、漏报和证据缺口。
 
 **代码证据**：
 {evidence_brief}
@@ -326,27 +328,33 @@ RED_REVIEW_PROMPT = """你仍然是红队安全审计专家，不是蓝队。请
 {proposer_json}
 
 **任务**：
-- 如果第一轮已发现漏洞，检查 source/sink 或 API misuse 路径是否真实、是否引用了不存在的代码。
-- 如果第一轮判断为 NO_VULNERABILITY_FOUND，但证据中存在具体可验证漏洞路径，必须纠正为漏洞。
+- 如果红队已发现漏洞，检查 source/sink 或 API misuse 路径是否真实、是否可达、是否引用了不存在的代码，且是否被防御检查、错误处理、常量输入或安全路径阻断。
+- 如果红队判断为 NO_VULNERABILITY_FOUND，必须主动挑战这个结论；只要代码证据中存在具体可验证的漏洞路径或 source/API misuse 路径，就输出修正后的漏洞假设。
 - 只有发现硬矛盾（路径不可达、sink不存在、source和sink不连通、把安全路径当漏洞路径等）时，才列入 hard_contradictions。
-- 使用B阶段门禁、缺失feature和参考样本约束第一轮判断：这些信号只能说明优先级或异常模式，不能替代真实代码路径。
-- 如果B阶段P0静态确认支持为supported=false，必须复查是否只是把安全路径、固定字符串、错误处理或注释文字当成外部可控漏洞路径；代码证据不闭合时降低confidence或标记evidence_complete=false。
+- 使用B阶段门禁、缺失feature和参考样本约束红队判断：这些信号只能说明优先级或异常模式，不能替代真实代码路径。
+- 如果B阶段P0静态确认支持为supported=false，必须检查红队是否把安全路径、固定字符串、错误处理或注释文字当成外部可控漏洞路径；代码证据不闭合时降低confidence或标记evidence_complete=false。
 
 **输出格式（严格JSON）**：
 {{
-  "claim": "漏洞描述，无漏洞写'NO_VULNERABILITY_FOUND'",
+  "claim": "蓝队修正后的漏洞描述，无漏洞写'NO_VULNERABILITY_FOUND'",
   "cwe_candidates": ["CWE-XXX"],
   "trigger_path": [
     {{"step": 1, "loc": "L? 或 描述", "code": "关键代码行"}}
   ],
   "preconditions": ["攻击者能够控制某个输入或参数"],
   "confidence": 0.8,
+  "condition_checks": [
+    {{"condition_id": "A1", "status": "valid|contradicted|plausible", "reason": "依据"}}
+  ],
+  "guard_checks": [
+    {{"target_step": 1, "guard_location": "L?", "guard_code": "防御代码或空字符串", "reason": "依据"}}
+  ],
   "hard_contradictions": [],
   "evidence_complete": true,
-  "review_notes": "自查结论"
+  "challenge_notes": "蓝队审查结论"
 }}"""
 
-RED_FINAL_PROMPT = """你是红队最终整理者。请汇总前两轮结果，输出可用于分流的最终漏洞假设。
+RED_REBUTTAL_PROMPT = """你是红队回应者。请回应蓝队挑战，输出可用于分流的最终漏洞假设。
 
 **代码证据**：
 {evidence_brief}
@@ -354,13 +362,15 @@ RED_FINAL_PROMPT = """你是红队最终整理者。请汇总前两轮结果，�
 **第一轮判断**：
 {proposer_json}
 
-**第二轮自查**：
-{review_json}
+**第二轮蓝队挑战**：
+{challenger_json}
 
 **分流要求**：
 - 如果存在可验证漏洞路径，输出具体漏洞假设。
 - 如果无漏洞，输出 NO_VULNERABILITY_FOUND。
 - 如果发现硬矛盾，写入 hard_contradictions。
+- 如果蓝队指出红队误报，必须用代码证据回应；无法回应时接受蓝队结论或降为证据不完整。
+- 如果蓝队指出红队漏报，且代码证据支持该路径，必须采纳为最终漏洞假设。
 - 不要输出 HTTP/base_url/token/*.http 等Web验证内容；这里的API指C/C++函数调用接口或调用序列。
 - 最终结论必须说明得通A阶段代码证据和B阶段结构信号；当代码证据不闭合但仍有漏洞可能时，保留漏洞假设并标记 evidence_complete=false，不要把不确定性伪装成已确认无漏洞。
 - 如果B阶段P0静态确认支持为supported=false，最终结果不得伪装成静态强确认；只有A阶段代码证据明确证明同一路由source到sink闭合时才可保持高置信，否则输出动态验证候选所需的不完整证据状态。
@@ -376,8 +386,8 @@ RED_FINAL_PROMPT = """你是红队最终整理者。请汇总前两轮结果，�
   "confidence": 0.8,
   "hard_contradictions": [],
   "evidence_complete": true,
-  "stability": "stable_vulnerability|corrected_to_vulnerability|unstable_vulnerability|no_vulnerability|hard_contradiction",
-  "final_notes": "最终整理说明"
+  "stability": "stable_vulnerability|corrected_to_vulnerability|reaffirmed_after_blue_challenge|unstable_vulnerability|no_vulnerability|hard_contradiction",
+  "final_notes": "红队回应说明"
 }}"""
 
 
@@ -395,7 +405,7 @@ def has_time_remaining(deadline, min_seconds=1.0):
 
 def llm_failure(error_type, detail):
     return {
-        "claim": "NO_VULNERABILITY_FOUND",
+        "claim": "LLM_CALL_FAILED",
         "confidence": 0.0,
         "llm_error": error_type,
         "llm_error_detail": detail,
@@ -487,6 +497,10 @@ def response_cwes(resp):
     return []
 
 
+def has_llm_error(resp):
+    return isinstance(resp, dict) and bool(resp.get("llm_error"))
+
+
 def no_vulnerability_claim(claim):
     text = " ".join(str(claim or "").split()).lower()
     markers = [
@@ -501,6 +515,8 @@ def no_vulnerability_claim(claim):
 
 
 def is_vulnerability_response(resp):
+    if has_llm_error(resp):
+        return False
     claim = response_claim(resp)
     return bool(claim) and not no_vulnerability_claim(claim)
 
@@ -588,6 +604,9 @@ def selected_vulnerability_response(responses):
     for resp in reversed(responses):
         if is_vulnerability_response(resp):
             return resp
+    for resp in reversed(responses):
+        if not has_llm_error(resp):
+            return resp
     return responses[-1] if responses else {}
 
 
@@ -672,6 +691,7 @@ def route_record(cand, responses):
     vuln_count = sum(1 for flag in vuln_flags if flag)
     any_vuln = bool(vuln_count)
     final_is_vuln = vuln_flags[-1] if vuln_flags else False
+    has_error = any(has_llm_error(resp) for resp in responses)
     selected = selected_vulnerability_response(responses)
     contradictions = []
     for resp in responses:
@@ -681,7 +701,12 @@ def route_record(cand, responses):
         safety_net = source_api_safety_net_response(cand)
         if safety_net:
             return safety_net, "P1", "candidate_for_d", "source_api_semantic_safety_net", contradictions
-        return selected, "P3", "audit_only", "red_team_no_vulnerability", contradictions
+        if has_error:
+            return selected, "P3", "audit_only", "stage_c_llm_error", contradictions
+        return selected, "P3", "audit_only", "multi_agent_no_vulnerability", contradictions
+
+    if has_error:
+        return selected, "P2", "candidate_for_d", "stage_c_partial_llm_error", contradictions
 
     confidence = response_confidence(selected)
     all_vuln = vuln_count == len(responses)
@@ -690,18 +715,18 @@ def route_record(cand, responses):
     if all_vuln and selected_evidence_complete and confidence >= STATIC_CONFIDENCE_THRESHOLD and has_cwe:
         if not stage_b_static_confirmation_supported(cand):
             return selected, "P1", "candidate_for_d", "stage_b_static_confirmation_unsupported", contradictions
-        return selected, "P0", "static_confirmed", "red_team_static_strong", contradictions
+        return selected, "P0", "static_confirmed", "multi_agent_static_strong", contradictions
 
     if final_is_vuln and vuln_count >= 2:
         if not first_is_vuln:
             return selected, "P1", "candidate_for_d", "corrected_to_vulnerability", contradictions
         if len(vuln_flags) >= 2 and not vuln_flags[-2]:
-            return selected, "P1", "candidate_for_d", "red_team_reaffirmed_after_challenge", contradictions
-        return selected, "P1", "candidate_for_d", "red_team_stable_needs_dynamic_verification", contradictions
-    return selected, "P2", "candidate_for_d", "red_team_vulnerability_once", contradictions
+            return selected, "P1", "candidate_for_d", "red_rebuttal_after_blue_challenge", contradictions
+        return selected, "P1", "candidate_for_d", "multi_agent_stable_needs_dynamic_verification", contradictions
+    return selected, "P2", "candidate_for_d", "multi_agent_vulnerability_once", contradictions
 
 
-def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, contradictions, red_team_rounds):
+def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, contradictions, agent_rounds):
     attack_path = attack_path_strings(selected, cand)
     confidence = response_confidence(selected)
     record = {
@@ -718,7 +743,7 @@ def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, co
         "routing_decision": agent_verdict,
         "suspicion_reason": routing_reason,
         "hard_contradictions": contradictions,
-        "red_team_rounds": red_team_rounds,
+        "agent_rounds": agent_rounds,
         "route": cand.get("route", ""),
         "file": cand.get("file", ""),
         "line": cand.get("line", 0),
@@ -771,7 +796,7 @@ def audit_timeout_record(cand, completed_rounds):
         "routing_decision": "audit_only",
         "suspicion_reason": "stage_c_time_budget_exhausted",
         "hard_contradictions": [],
-        "red_team_rounds": completed_rounds,
+        "agent_rounds": completed_rounds,
         "route": cand.get("route", ""),
         "file": cand.get("file", ""),
         "line": cand.get("line", 0),
@@ -784,53 +809,51 @@ def audit_timeout_record(cand, completed_rounds):
 
 def audit_one(cand, deadline=None):
     """
-    单个样本的三轮红队审计流程：
+    单个样本的双Agent三轮对抗审计流程：
     1. 红队提出高召回漏洞假设。
-    2. 红队自查并修正，特别捕捉先非漏洞后纠正为漏洞的样本。
-    3. 红队最终整理，按P0/P1/P2/P3分流。
+    2. 蓝队挑战红队判断，检查误报、漏报、防御和证据闭合。
+    3. 红队回应蓝队挑战，按P0/P1/P2/P3分流。
     """
     sample_id = cand["sample_id"]
     brief = build_evidence_brief(cand)
-    red_team_rounds = []
+    agent_rounds = []
 
     if not has_time_remaining(deadline):
-        return audit_timeout_record(cand, red_team_rounds)
+        return audit_timeout_record(cand, agent_rounds)
 
     print(f"[C] red round 1 proposer {sample_id}")
     prop_resp = call_llm(PROPOSER_PROMPT.format(evidence_brief=brief), deadline)
     if not prop_resp:
-        prop_resp = {"claim": "NO_VULNERABILITY_FOUND", "confidence": 0.0, "llm_error": "round_1_failed"}
-    red_team_rounds.append({"round": 1, "role": "red_proposer", "response": prop_resp})
+        prop_resp = llm_failure("round_1_failed", "empty_llm_response")
+    agent_rounds.append({"round": 1, "agent": "red", "role": "red_proposer", "response": prop_resp})
 
     if not has_time_remaining(deadline):
-        return audit_timeout_record(cand, red_team_rounds)
+        return audit_timeout_record(cand, agent_rounds)
 
-    print(f"[C] red round 2 review {sample_id}")
-    review_resp = call_llm(RED_REVIEW_PROMPT.format(
+    print(f"[C] blue round 2 challenger {sample_id}")
+    challenge_resp = call_llm(BLUE_CHALLENGER_PROMPT.format(
         evidence_brief=brief,
         proposer_json=json.dumps(prop_resp, ensure_ascii=False),
     ), deadline)
-    if not review_resp:
-        review_resp = dict(prop_resp)
-        review_resp["llm_error"] = "round_2_failed_reused_round_1"
-    red_team_rounds.append({"round": 2, "role": "red_self_review", "response": review_resp})
+    if not challenge_resp:
+        challenge_resp = llm_failure("round_2_failed", "empty_llm_response")
+    agent_rounds.append({"round": 2, "agent": "blue", "role": "blue_challenger", "response": challenge_resp})
 
     if not has_time_remaining(deadline):
-        return audit_timeout_record(cand, red_team_rounds)
+        return audit_timeout_record(cand, agent_rounds)
 
-    print(f"[C] red round 3 final {sample_id}")
-    final_resp = call_llm(RED_FINAL_PROMPT.format(
+    print(f"[C] red round 3 rebuttal {sample_id}")
+    final_resp = call_llm(RED_REBUTTAL_PROMPT.format(
         evidence_brief=brief,
         proposer_json=json.dumps(prop_resp, ensure_ascii=False),
-        review_json=json.dumps(review_resp, ensure_ascii=False),
+        challenger_json=json.dumps(challenge_resp, ensure_ascii=False),
     ), deadline)
     if not final_resp:
-        final_resp = dict(review_resp)
-        final_resp["llm_error"] = "round_3_failed_reused_round_2"
-    red_team_rounds.append({"round": 3, "role": "red_final", "response": final_resp})
-    responses = [prop_resp, review_resp, final_resp]
+        final_resp = llm_failure("round_3_failed", "empty_llm_response")
+    agent_rounds.append({"round": 3, "agent": "red", "role": "red_rebuttal", "response": final_resp})
+    responses = [prop_resp, challenge_resp, final_resp]
     selected, priority, decision, reason, contradictions = route_record(cand, responses)
-    return build_hypothesis(cand, selected, priority, decision, reason, contradictions, red_team_rounds)
+    return build_hypothesis(cand, selected, priority, decision, reason, contradictions, agent_rounds)
 
 
 # ==================== 主程序（并发 + 即时分流写入）====================
