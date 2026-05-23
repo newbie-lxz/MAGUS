@@ -68,7 +68,7 @@ run_juliet_folder() {
 }
 ```
 
-The queue below is ordered by current Stage D adaptation confidence. Every listed folder has a route-bound D confirmation path through `MAGUS_JULIET_SINK` or `MAGUS_JULIET_FLAW` in the Juliet shim. Do not add a CWE folder here until its decisive source/API misuse has a D marker and oracle path. `CWE114_Process_Control` and `CWE15_External_Control_of_System_or_Configuration_Setting` already ran and are intentionally not listed in this follow-up queue.
+The queue below is ordered by current Stage D adaptation confidence. Every listed folder has a route-bound D confirmation path through an oracle profile with matching `MAGUS_JULIET_SINK` or `MAGUS_JULIET_FLAW` evidence in the Juliet shim. Do not add a CWE folder here until its decisive source/API misuse has a D marker and profile-specific oracle path. `CWE114_Process_Control` and `CWE15_External_Control_of_System_or_Configuration_Setting` already ran and are intentionally not listed in this follow-up queue.
 
 ## CWE247_Reliance_on_DNS_Lookups_in_Security_Decision
 

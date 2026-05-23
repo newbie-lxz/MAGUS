@@ -91,11 +91,26 @@ class RouteRecordTests(unittest.TestCase):
         self.assertEqual((priority, verdict, reason), ("P2", "candidate_for_d", "red_team_vulnerability_once"))
         self.assertIn("sink not shown", contradictions)
 
-    def test_incomplete_vulnerability_does_not_route_to_p3(self):
+    def test_final_rejection_after_vulnerability_routes_to_p2(self):
         _, priority, verdict, reason, _ = agent1.route_record(
             _candidate(), [_vuln(evidence_complete=False), _vuln(evidence_complete=False), _no_vuln()]
         )
-        self.assertEqual((priority, verdict, reason), ("P1", "candidate_for_d", "red_team_stable_needs_dynamic_verification"))
+        self.assertEqual((priority, verdict, reason), ("P2", "candidate_for_d", "red_team_vulnerability_once"))
+
+    def test_corrected_vulnerability_routes_to_p1_when_final_two_rounds_agree(self):
+        _, priority, verdict, reason, _ = agent1.route_record(
+            _candidate(), [_no_vuln(), _vuln(), _vuln()]
+        )
+        self.assertEqual((priority, verdict, reason), ("P1", "candidate_for_d", "corrected_to_vulnerability"))
+
+    def test_final_vulnerability_after_rebuttal_routes_to_p1(self):
+        _, priority, verdict, reason, _ = agent1.route_record(
+            _candidate(), [_vuln(), _no_vuln(), _vuln()]
+        )
+        self.assertEqual(
+            (priority, verdict, reason),
+            ("P1", "candidate_for_d", "red_team_reaffirmed_after_challenge"),
+        )
 
     def test_complete_consensus_vulnerability_can_route_to_p0(self):
         _, priority, verdict, reason, _ = agent1.route_record(
@@ -114,6 +129,67 @@ class RouteRecordTests(unittest.TestCase):
             (priority, verdict, reason),
             ("P1", "candidate_for_d", "stage_b_static_confirmation_unsupported"),
         )
+
+    def test_source_api_safety_net_routes_unguarded_impersonation_to_d(self):
+        cand = _candidate(
+            evidence_slice='\n'.join(
+                [
+                    "ImpersonateNamedPipeClient(hPipe);",
+                    'printLine("Impersonated");',
+                    "if (!RevertToSelf())",
+                    "{",
+                    "    exit(1);",
+                    "}",
+                ]
+            )
+        )
+
+        selected, priority, verdict, reason, _ = agent1.route_record(
+            cand, [_no_vuln(), _no_vuln(), _no_vuln()]
+        )
+
+        self.assertEqual((priority, verdict, reason), ("P1", "candidate_for_d", "source_api_semantic_safety_net"))
+        self.assertIn("ImpersonateNamedPipeClient", selected["claim"])
+        self.assertEqual(selected["cwe_candidates"], [])
+
+    def test_source_api_safety_net_does_not_route_guarded_impersonation(self):
+        cand = _candidate(
+            evidence_slice='\n'.join(
+                [
+                    "if (!ImpersonateNamedPipeClient(hPipe))",
+                    "{",
+                    '    printLine("Failed to impersonate");',
+                    "}",
+                    "else",
+                    "{",
+                    '    printLine("Impersonated");',
+                    "    if (!RevertToSelf())",
+                    "    {",
+                    "        exit(1);",
+                    "    }",
+                    "}",
+                ]
+            )
+        )
+
+        _, priority, verdict, reason, _ = agent1.route_record(
+            cand, [_no_vuln(), _no_vuln(), _no_vuln()]
+        )
+
+        self.assertEqual((priority, verdict, reason), ("P3", "audit_only", "red_team_no_vulnerability"))
+
+    def test_source_api_safety_net_routes_rpc_without_cwe_label(self):
+        cand = _candidate(
+            evidence_slice="RpcImpersonateClient(0); /* unchecked failure return */"
+        )
+
+        selected, priority, verdict, reason, _ = agent1.route_record(
+            cand, [_no_vuln(), _no_vuln(), _no_vuln()]
+        )
+
+        self.assertEqual((priority, verdict, reason), ("P1", "candidate_for_d", "source_api_semantic_safety_net"))
+        self.assertIn("RpcImpersonateClient", selected["claim"])
+        self.assertEqual(selected["cwe_candidates"], [])
 
 
 class OutputRoutingTests(unittest.TestCase):

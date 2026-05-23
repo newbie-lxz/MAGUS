@@ -52,8 +52,11 @@ int _close(int fd);
 int _write(int fd, const void *buf, unsigned int count);
 int _unlink(const char *path);
 int _wunlink(const wchar_t *path);
+int _wrename(const wchar_t *oldname, const wchar_t *newname);
+int _wremove(const wchar_t *path);
 int _access(const char *path, int mode);
 FILE *_wfopen(const wchar_t *path, const wchar_t *mode);
+int _putws(const wchar_t *str);
 
 #ifdef __cplusplus
 }

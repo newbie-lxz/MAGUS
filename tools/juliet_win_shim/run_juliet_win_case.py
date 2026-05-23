@@ -20,13 +20,15 @@ SANITIZED_SRC_ROOT = SANITIZED_SOURCE_ROOT / "juliet-api-misuse"
 SANITIZATION_MAP = SANITIZED_SOURCE_ROOT / "juliet_sanitization_map.json"
 STUBS = SHIM_DIR / "winapi_runtime_stubs.c"
 
-ROUTE_EXECUTED_MARKER = "MAGUS_JULIET_ROUTE_EXECUTED"
-ROUTE_CONFIRMED_MARKER = "MAGUS_JULIET_ROUTE_CONFIRMED"
-NOT_ROUTE_BOUND_MARKER = "MAGUS_JULIET_NOT_ROUTE_BOUND"
-NOT_CONFIRMED_MARKER = "MAGUS_JULIET_NOT_CONFIRMED"
-ORACLE_UNSUPPORTED_MARKER = "MAGUS_JULIET_ORACLE_UNSUPPORTED"
-BUILD_FAILED_MARKER = "MAGUS_JULIET_BUILD_FAILED"
-RUNNER_ERROR_MARKER = "MAGUS_JULIET_RUNNER_ERROR"
+ROUTE_EXECUTED_MARKER = "MAGUS_ROUTE_EXECUTED"
+ROUTE_CONFIRMED_MARKER = "MAGUS_ROUTE_CONFIRMED"
+NOT_ROUTE_BOUND_MARKER = "MAGUS_NOT_ROUTE_BOUND"
+NOT_CONFIRMED_MARKER = "MAGUS_NOT_CONFIRMED"
+ORACLE_UNSUPPORTED_MARKER = "MAGUS_ORACLE_UNSUPPORTED"
+BUILD_FAILED_MARKER = "MAGUS_BUILD_FAILED"
+RUNNER_ERROR_MARKER = "MAGUS_RUNNER_ERROR"
+RPC_FORCED_FAILURE_MARKER = "MAGUS_JULIET_FLAW name=RpcImpersonateClient reason=forced_non_ok_return_for_privilege_drop_check"
+RPC_NOT_PROPAGATED_MARKER = "MAGUS_ORACLE_FLAW name=RpcImpersonateClient reason=forced_non_ok_return_not_propagated value="
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
 SCENARIO_LABELS = {"bad": "case0", "good": "case1"}
 COMPAT_HEADER = SHIM_DIR / "juliet_win_compat.h"
@@ -38,6 +40,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--entry-symbol", default="", help="Entry symbol from D target generation; kept for traceability")
     parser.add_argument("--route", default="", help="Full Stage C route; used to bind the dynamic run to bad/good scenario")
     parser.add_argument("--payload", default="magus-juliet-controlled-input", help="Payload returned by shimmed external sources")
+    parser.add_argument("--oracle-profile-id", default="", help="D oracle profile selected for this hypothesis")
+    parser.add_argument(
+        "--confirm-pattern",
+        action="append",
+        default=[],
+        help="Route-bound semantic marker that can confirm this oracle profile",
+    )
     parser.add_argument("--cc", default=os.environ.get("MAGUS_CC", "/usr/bin/clang-20"))
     parser.add_argument("--cxx", default=os.environ.get("MAGUS_CXX", "/usr/bin/clang++-20"))
     return parser.parse_args()
@@ -241,6 +250,11 @@ def write_runtime_files(cwd: Path, payload: str) -> None:
 def configure_failure_environment(env: dict[str, str], source: Path) -> None:
     source_text = str(source)
     source_name = source.name
+    try:
+        source_body = source.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        source_body = ""
+    source_hint = f"{source_text} {source_name} {source_body}"
     if "wchar_t" in source_name and ("connect_socket" in source_name or "listen_socket" in source_name):
         env["MAGUS_JULIET_SOCKET_WIDE"] = "1"
     if "CWE252_Unchecked_Return_Value" in source_text or "CWE253_Incorrect_Check_of_Function_Return_Value" in source_text:
@@ -248,8 +262,10 @@ def configure_failure_environment(env: dict[str, str], source: Path) -> None:
             env["MAGUS_JULIET_FAIL_CREATE_MUTEX"] = "1"
         if "CreateNamedPipe" in source_name:
             env["MAGUS_JULIET_FAIL_CREATE_NAMED_PIPE"] = "1"
-    if "CWE273_Improper_Check_for_Dropped_Privileges" in source_text:
+    if "ImpersonateNamedPipeClient" in source_hint:
         env["MAGUS_JULIET_FAIL_IMPERSONATE_NAMED_PIPE_CLIENT"] = "1"
+    if "RpcImpersonateClient" in source_hint:
+        env["MAGUS_JULIET_FAIL_RPC_IMPERSONATE_CLIENT"] = "1"
     if "CWE338_Weak_PRNG" in source_text:
         env["MAGUS_JULIET_MARK_RAND_FLAW"] = "1"
     if "CWE690_NULL_Deref_From_Return" in source_text and "w32_wfopen" in source_name:
@@ -344,25 +360,30 @@ def route_was_executed(stdout: str, source: Path, scenario: str) -> bool:
     return expected_call in stdout and expected_finish in stdout and unexpected_call not in stdout
 
 
-def oracle_confirmed(stdout: str, scenario: str) -> bool:
-    for line in stdout.splitlines():
-        if line.startswith("MAGUS_JULIET_SINK ") and "tainted=1" in line:
-            return True
-        if scenario == "bad" and line.startswith("MAGUS_JULIET_FLAW "):
-            return True
-    return False
+def oracle_confirmed(stdout: str, confirm_patterns: list[str]) -> tuple[bool, list[str]]:
+    matched = [pattern for pattern in confirm_patterns if pattern and pattern in stdout]
+    return bool(matched), matched
 
 
-def unsupported_oracle_reason(source: Path, scenario: str) -> str:
-    if scenario != "bad":
+def generic_oracle_output(stdout: str) -> str:
+    return stdout.replace("MAGUS_JULIET_SINK", "MAGUS_ORACLE_SINK").replace(
+        "MAGUS_JULIET_FLAW",
+        "MAGUS_ORACLE_FLAW",
+    )
+
+
+def route_bound_semantic_markers(stdout: str, route_executed: bool) -> list[str]:
+    if route_executed and RPC_FORCED_FAILURE_MARKER in stdout:
+        return [RPC_NOT_PROPAGATED_MARKER]
+    return []
+
+
+def unsupported_oracle_reason(confirm_patterns: list[str], profile_id: str) -> str:
+    if confirm_patterns:
         return ""
-    try:
-        source_text = desanitize_text(source.read_text(encoding="utf-8", errors="ignore"))
-    except OSError:
-        return ""
-    if "Missing required step" in source_text:
-        return "required_step_absence_without_runtime_marker"
-    return ""
+    if profile_id:
+        return f"profile_has_no_confirm_patterns:{profile_id}"
+    return "no_oracle_profile"
 
 
 def main() -> int:
@@ -393,11 +414,16 @@ def main() -> int:
         run = run_checked([str(binary)], tmp_path, env=env, stdin_text=args.payload + "\n")
         raw_stdout = run.stdout or ""
         raw_stderr = run.stderr or ""
-        print(raw_stdout, end="")
+        generic_stdout = generic_oracle_output(raw_stdout)
+        print(generic_stdout, end="")
         print(raw_stderr, end="", file=sys.stderr)
 
         route_executed = route_was_executed(raw_stdout, source, scenario)
-        confirmed = oracle_confirmed(raw_stdout, scenario)
+        semantic_markers = route_bound_semantic_markers(raw_stdout, route_executed)
+        for marker in semantic_markers:
+            print(marker)
+        oracle_stdout = generic_stdout + ("\n" + "\n".join(semantic_markers) if semantic_markers else "")
+        confirmed, matched_patterns = oracle_confirmed(oracle_stdout, args.confirm_pattern)
 
         if route_executed:
             print(
@@ -413,15 +439,18 @@ def main() -> int:
         if route_executed and confirmed:
             print(
                 f"{ROUTE_CONFIRMED_MARKER} scenario={scenario} "
+                f"oracle_profile_id={args.oracle_profile_id or '<unknown>'} "
+                f"matched_patterns={json.dumps(matched_patterns, ensure_ascii=False)} "
                 f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source}"
             )
             return 0
 
         if route_executed:
-            reason = unsupported_oracle_reason(source, scenario)
+            reason = unsupported_oracle_reason(args.confirm_pattern, args.oracle_profile_id)
             if reason:
                 print(
                     f"{ORACLE_UNSUPPORTED_MARKER} reason={reason} scenario={scenario} "
+                    f"oracle_profile_id={args.oracle_profile_id or '<unknown>'} "
                     f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source}"
                 )
                 return 3

@@ -33,12 +33,18 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
             "run_cmd": "${PYTHON} poc_parse_cert.py"
           },
           "oracle": {
-            "failure_patterns": ["AddressSanitizer", "Segmentation fault"],
-            "required_patterns": ["ROUTE_MARKER_FOR_hyp_api_0001"],
+            "failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=_putenv reason=tainted_search_path_environment"
+            ],
+            "semantic_failure_patterns": [
+              "MAGUS_ORACLE_FLAW name=_putenv reason=tainted_search_path_environment"
+            ],
+            "required_patterns": ["MAGUS_ROUTE_EXECUTED"],
             "failure_code_patterns": {
-              "NOT_ROUTE_BOUND": ["ROUTE_NOT_REACHED"]
+              "NOT_ROUTE_BOUND": ["MAGUS_NOT_ROUTE_BOUND"],
+              "NOT_EXPLOITABLE": ["MAGUS_NOT_CONFIRMED"]
             },
-            "expect_nonzero_exit": true
+            "expect_nonzero_exit": false
           }
         }
       }
@@ -53,6 +59,7 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
 - `target_type`：固定为 `source_api`，历史 `native` 可视为同义。
 - `cases`：每个假设一个 case，key 是 `hypothesis_id`。
 - `payload_kind`：固定为 `api_misuse_plan` 或历史 `native_plan`。
+- `execution_adapter_id`：可选；表示由某个项目/环境级 adapter 补充了执行上下文。adapter 不是 oracle profile，也不是按文件编写。
 - `source_file`：可疑源文件。
 - `entry_symbol`：入口函数或可触达可疑路径的符号。
 - `api_sequence`：C/C++ 函数调用链或 API 使用序列。
@@ -61,11 +68,18 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
 - `execution.config_cmd` / `build_cmd`：可选准备命令。
 - `execution.run_cmd` / `poc_cmd` / `test_cmd`：至少需要一个，用来实际触达 API 序列。
 - `oracle.failure_patterns`：stdout/stderr 中可确认漏洞的模式。
+- `oracle.profile_id`：D 选择的可复用 oracle profile；由 API 名、route、attack_path、evidence_slice、claim 和可选 CWE 推导，CWE 不是必需输入。
+- `oracle.semantic_failure_patterns`：profile 语义证据模式；这些模式使用项目无关的 `MAGUS_ORACLE_*` marker，具体项目 runner 或 sidecar 可以选择输出/映射这些 marker。
+  返回值检查类 profile 不能只依赖“API 被强制失败”marker，还需要失败后错误继续使用或错误未传播的 route-bound marker。
 - `oracle.required_patterns`：可选；confirmed 前必须同时出现在 stdout/stderr 中的模式，常用于证明当前 route / source API 序列已执行。
 - `oracle.failure_code_patterns`：可选；把 stdout/stderr 中的模式映射为失败码，例如 `NOT_ROUTE_BOUND` 或 `NOT_EXPLOITABLE`。
-- `oracle.unsupported_patterns`：可选；把 stdout/stderr 中的模式映射为 D oracle 能力缺口。命中时输出 `stage_c_preserved`，保留 Stage C 判断。
+- `oracle.unsupported_patterns`：可选；把 stdout/stderr 中的模式映射为 D oracle 能力缺口。命中时只对 Stage C `P0`/`P1` 输出 `stage_c_preserved`，`P2` 进入 failed 并保留 `failure_code=UNSUPPORTED_ORACLE`。
 - `oracle.expect_nonzero_exit`：是否把非零退出作为确认信号之一。
 
 ## 能否 confirmed
 
-只有生成 payload 不会自动 confirmed。要 confirmed，必须能在 `repo_path` 中运行具体命令，并且运行结果命中 oracle。若运行结果不能证明当前 `route` 或 source API 序列被触发，即使同项目里存在其他可触发路径，也不能写 confirmed，应回流为 failed。若 route 已执行但 D 明确命中 `unsupported_patterns`，写 `stage_c_preserved`，不把能力缺口记成 `NOT_EXPLOITABLE`。
+自动生成的 source/API target 默认要求 `MAGUS_ROUTE_EXECUTED`，并把 `MAGUS_ORACLE_UNSUPPORTED` 作为能力缺口 marker。payload runner 会把 `MAGUS_D_PROJECT_ID`、`MAGUS_D_SAMPLE_ID`、`MAGUS_D_HYPOTHESIS_ID`、`MAGUS_D_ROUTE`、`MAGUS_D_FILE`、`MAGUS_D_LINE`、`MAGUS_D_ENTRY_SYMBOL`、`MAGUS_D_ORACLE_PROFILE_ID`、`MAGUS_D_PAYLOAD`、`MAGUS_D_PAYLOAD_MARKER` 和 `MAGUS_D_CONFIRM_PATTERNS_JSON` 注入到命令环境中，方便任意项目 harness 输出 route-bound marker 和 profile 语义 marker。
+
+搜索路径类漏洞使用通用 `path.untrusted_search_path` profile，不依赖 Juliet 文件名或 good/bad 标签。该 profile 覆盖 `putenv`、`_putenv`、`_wputenv`、`SetEnvironmentVariableA/W`、`SearchPathA/W`、`SetDllDirectoryA/W` 和 `AddDllDirectory`，项目 harness 只需要在当前 route 执行后输出 `MAGUS_ROUTE_EXECUTED`，并在确有攻击者可控搜索路径语义时输出对应的 `MAGUS_ORACLE_*` marker。
+
+只有生成 payload 不会自动 confirmed。要 confirmed，必须能在 `repo_path` 中运行具体命令，并且运行结果命中当前 oracle profile 的语义证据。若运行结果不能证明当前 `route` 或 source API 序列被触发，即使同项目里存在其他可触发路径，也不能写 confirmed，应回流为 failed。若 route 已执行但 D 明确命中 `unsupported_patterns`，不把能力缺口记成 `NOT_EXPLOITABLE`；`P0`/`P1` 写 `stage_c_preserved`，`P2` 写 failed。

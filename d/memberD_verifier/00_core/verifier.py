@@ -29,6 +29,7 @@ FAILURE_CODES = {
     "UNSUPPORTED_ORACLE",
 }
 REPORTABLE_STATUSES = {"confirmed", "stage_c_preserved"}
+STAGE_C_PRESERVABLE_PRIORITIES = {"P0", "P1"}
 
 MIN_EVIDENCE_FIELDS = ["project_id", "sample_id", "hypothesis_id", "route", "file", "line", "evidence_slice"]
 UNRESOLVED_VALUES = ("AUTO_DETECT_FAILED", "TODO", "replace with", "真实", "待填写")
@@ -97,7 +98,32 @@ def parse_timeout(value: Any) -> float | None:
     return float(value)
 
 
-def run_command(cmd: Any, cwd: Path, timeout: float | None) -> dict[str, Any]:
+def execution_env(plan: dict[str, Any]) -> dict[str, str]:
+    env = os.environ.copy()
+    evidence = plan.get("evidence") if isinstance(plan.get("evidence"), dict) else {}
+    payload = plan.get("payload") if isinstance(plan.get("payload"), dict) else {}
+    values = {
+        "MAGUS_D_PROJECT_ID": plan.get("project_id"),
+        "MAGUS_D_SAMPLE_ID": plan.get("sample_id"),
+        "MAGUS_D_HYPOTHESIS_ID": plan.get("hypothesis_id"),
+        "MAGUS_D_ROUTE": evidence.get("route"),
+        "MAGUS_D_FILE": evidence.get("file") or plan.get("source_file"),
+        "MAGUS_D_LINE": evidence.get("line"),
+        "MAGUS_D_ENTRY_SYMBOL": plan.get("entry_symbol"),
+        "MAGUS_D_ORACLE_PROFILE_ID": plan.get("oracle_profile_id"),
+        "MAGUS_D_PAYLOAD": payload.get("marker"),
+        "MAGUS_D_PAYLOAD_MARKER": payload.get("marker"),
+    }
+    for key, value in values.items():
+        if value not in (None, "", []):
+            env[key] = str(value)
+    confirm_patterns = (plan.get("oracle") or {}).get("semantic_failure_patterns") or []
+    if confirm_patterns:
+        env["MAGUS_D_CONFIRM_PATTERNS_JSON"] = json.dumps(confirm_patterns, ensure_ascii=False)
+    return env
+
+
+def run_command(cmd: Any, cwd: Path, timeout: float | None, env: dict[str, str]) -> dict[str, Any]:
     started = time.perf_counter()
     if isinstance(cmd, str):
         cmd = cmd.replace("${PYTHON}", sys.executable)
@@ -113,7 +139,7 @@ def run_command(cmd: Any, cwd: Path, timeout: float | None) -> dict[str, Any]:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=timeout,
-            env=os.environ.copy(),
+            env=env,
         )
         return {
             "cmd": cmd,
@@ -237,7 +263,8 @@ def main() -> int:
         result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return 2
 
-    setup_results = [run_command(cmd, cwd, timeout) for cmd in setup_cmds]
+    command_env = execution_env(plan)
+    setup_results = [run_command(cmd, cwd, timeout, command_env) for cmd in setup_cmds]
     for item in setup_results:
         if item.get("timed_out") or item.get("exit_code") not in (0, None):
             result = {
@@ -251,7 +278,7 @@ def main() -> int:
             result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             return 2
 
-    run_results = [run_command(cmd, cwd, timeout) for cmd in run_cmds]
+    run_results = [run_command(cmd, cwd, timeout, command_env) for cmd in run_cmds]
     status, reason, observations = decide(run_results, oracle)
     result = {
         "status": status,
@@ -443,6 +470,17 @@ def routing_fields(hyp: Dict[str, Any]) -> Dict[str, Any]:
     return fields
 
 
+def oracle_profile_fields(case: Dict[str, Any]) -> Dict[str, Any]:
+    oracle = case.get("oracle") if isinstance(case.get("oracle"), dict) else {}
+    profile_id = case.get("oracle_profile_id") or oracle.get("profile_id")
+    fields: Dict[str, Any] = {}
+    if profile_id not in (None, "", []):
+        fields["oracle_profile_id"] = profile_id
+    if oracle.get("profile_supported") not in (None, "", []):
+        fields["oracle_profile_supported"] = bool(oracle.get("profile_supported"))
+    return fields
+
+
 def get_case(target: Dict[str, Any], hyp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     cases = target.get("cases") or {}
     hypothesis_id = hyp.get("hypothesis_id")
@@ -482,6 +520,14 @@ def stage_c_verdict_fields(hyp: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def stage_c_priority(hyp: Dict[str, Any]) -> str:
+    return str(hyp.get("priority") or "").strip().upper()
+
+
+def can_preserve_stage_c_verdict(hyp: Dict[str, Any]) -> bool:
+    return stage_c_priority(hyp) in STAGE_C_PRESERVABLE_PRIORITIES
+
+
 def preserved_record(
     hyp: Dict[str, Any],
     case: Dict[str, Any],
@@ -495,7 +541,7 @@ def preserved_record(
         "sample_id": hyp.get("sample_id"),
         "hypothesis_id": hyp.get("hypothesis_id"),
         "status": "stage_c_preserved",
-        "severity": hyp.get("priority") or "P0",
+        "severity": stage_c_priority(hyp) or "P0",
         "target_type": "source_api",
         "attack_type": case.get("attack_type"),
         "payload_ref": runner_rel.as_posix(),
@@ -515,9 +561,40 @@ def preserved_record(
         "runtime_trace": result.get("runtime_trace") or [],
         "timestamps": {"preserved_at": utc_now()},
     }
+    record.update(oracle_profile_fields(case))
     record.update(evidence_fields(hyp))
     record.update(hypothesis_context_fields(hyp))
     record.update(routing_fields(hyp))
+    return record
+
+
+def unsupported_oracle_failed_record(
+    hyp: Dict[str, Any],
+    case: Dict[str, Any],
+    result: Dict[str, Any],
+    runner_rel: Path,
+    plan_rel: Path,
+) -> Dict[str, Any]:
+    priority = stage_c_priority(hyp) or "missing"
+    record = failed_record(
+        hyp,
+        "UNSUPPORTED_ORACLE",
+        (
+            "Stage D oracle cannot prove or disprove this route, and Stage C priority "
+            f"{priority} is not eligible for reportable preservation"
+        ),
+        "review the Stage C hypothesis, improve the oracle profile, or rerun after priority is P0/P1",
+    )
+    record["payload_ref"] = runner_rel.as_posix()
+    record["plan_ref"] = plan_rel.as_posix()
+    record["target_type"] = "source_api"
+    record["attack_type"] = case.get("attack_type")
+    record["oracle_status"] = "unsupported"
+    record["preservation_policy"] = "preserve_only_p0_p1"
+    record["stage_c_verdict"] = stage_c_verdict_fields(hyp)
+    record["observations"] = result.get("observations") or []
+    record["runtime_trace"] = result.get("runtime_trace") or []
+    record.update(oracle_profile_fields(case))
     return record
 
 
@@ -594,6 +671,8 @@ def write_source_api_plan(
         "cwe_candidates": hyp.get("cwe_candidates") or hyp.get("CWE_candidates") or hyp.get("cwe_list"),
         "source_file": case.get("source_file") or hyp.get("file"),
         "entry_symbol": case.get("entry_symbol"),
+        "oracle_profile_id": case.get("oracle_profile_id") or (case.get("oracle") or {}).get("profile_id"),
+        "oracle_profile": case.get("oracle_profile"),
         "api_sequence": case.get("api_sequence") or hyp.get("attack_path") or hyp.get("api_sequence"),
         "payload": case.get("payload"),
         "poc_plan": case.get("poc_plan"),
@@ -697,6 +776,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
         record["plan_ref"] = plan_rel.as_posix()
         record["target_type"] = "source_api"
         record["attack_type"] = case.get("attack_type")
+        record.update(oracle_profile_fields(case))
         record["runtime_trace"] = [
             {
                 "name": case.get("name") or "source_api_payload",
@@ -720,6 +800,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
         record["plan_ref"] = plan_rel.as_posix()
         record["target_type"] = "source_api"
         record["attack_type"] = case.get("attack_type")
+        record.update(oracle_profile_fields(case))
         return None, record
 
     result, runner_error = execute_source_payload(runner_abs, timeout)
@@ -740,6 +821,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
         record["plan_ref"] = plan_rel.as_posix()
         record["target_type"] = "source_api"
         record["attack_type"] = case.get("attack_type")
+        record.update(oracle_profile_fields(case))
         return None, record
     assert result is not None
 
@@ -765,13 +847,16 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
             "runtime_trace": result.get("runtime_trace") or [],
             "timestamps": {"verified_at": utc_now()},
         }
+        record.update(oracle_profile_fields(case))
         record.update(evidence_fields(hyp))
         record.update(hypothesis_context_fields(hyp))
         record.update(routing_fields(hyp))
         return record, None
 
     if result.get("status") == "unsupported":
-        return preserved_record(hyp, case, result, runner_rel, plan_rel), None
+        if can_preserve_stage_c_verdict(hyp):
+            return preserved_record(hyp, case, result, runner_rel, plan_rel), None
+        return None, unsupported_oracle_failed_record(hyp, case, result, runner_rel, plan_rel)
 
     record = failed_record(
         hyp,
@@ -783,6 +868,7 @@ def run_one(hyp: Dict[str, Any], target: Dict[str, Any], out_dir: Path, dry_run:
     record["plan_ref"] = plan_rel.as_posix()
     record["target_type"] = "source_api"
     record["attack_type"] = case.get("attack_type")
+    record.update(oracle_profile_fields(case))
     record.update(hypothesis_context_fields(hyp))
     record["observations"] = result.get("observations") or []
     record["runtime_trace"] = result.get("runtime_trace") or []

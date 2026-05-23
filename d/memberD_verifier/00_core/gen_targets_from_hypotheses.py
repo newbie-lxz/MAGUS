@@ -13,9 +13,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shlex
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
+
+from execution_adapters import apply_execution_adapters
+from oracle_profiles import build_oracle_profile, compact_profile_for_json
 
 
 DEFAULT_FAILURE_PATTERNS = [
@@ -29,11 +31,6 @@ DEFAULT_FAILURE_PATTERNS = [
     "heap-buffer-overflow",
     "double-free",
 ]
-
-WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
-JULIET_API_MISUSE_ROOT = WORKSPACE_ROOT / "srcs" / "juliet-api-misuse"
-SANITIZED_SOURCE_ROOT = WORKSPACE_ROOT / "srcs_sanitized"
-SANITIZED_JULIET_API_MISUSE_ROOT = SANITIZED_SOURCE_ROOT / "juliet-api-misuse"
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -233,80 +230,6 @@ def infer_poc_language(hyp: Dict[str, Any]) -> str:
     return "unknown"
 
 
-def resolve_candidate_source_path(source_file: Any) -> Path | None:
-    if source_file in (None, "", []):
-        return None
-    raw = Path(str(source_file))
-    candidates = [raw] if raw.is_absolute() else [
-        WORKSPACE_ROOT / raw,
-        SANITIZED_SOURCE_ROOT / raw,
-        SANITIZED_JULIET_API_MISUSE_ROOT / raw,
-        JULIET_API_MISUSE_ROOT / raw,
-        WORKSPACE_ROOT / "srcs" / raw,
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate.resolve()
-    return None
-
-
-def is_juliet_api_misuse_hypothesis(hyp: Dict[str, Any], source_file: Any) -> bool:
-    text = as_text([source_file, hyp.get("project_id"), hyp.get("sample_id")]).lower()
-    if "juliet-api-misuse" in text:
-        return True
-    resolved = resolve_candidate_source_path(source_file)
-    if resolved is None:
-        return False
-    for root in (SANITIZED_JULIET_API_MISUSE_ROOT, JULIET_API_MISUSE_ROOT):
-        try:
-            resolved.relative_to(root.resolve())
-            return True
-        except ValueError:
-            continue
-    return False
-
-
-def juliet_win32_test_cmd(source_file: Any, symbol: str, route: Any) -> str:
-    return " ".join(
-        [
-            "${PYTHON}",
-            "tools/juliet_win_shim/run_juliet_win_case.py",
-            "--source-file",
-            shlex.quote(str(source_file)),
-            "--entry-symbol",
-            shlex.quote(symbol),
-            "--route",
-            shlex.quote(str(route or "")),
-        ]
-    )
-
-
-def juliet_win32_execution_context(source_file: Any, symbol: str, route: Any) -> Dict[str, Any]:
-    return {
-        "repo_path": str(WORKSPACE_ROOT),
-        "test_cmd": juliet_win32_test_cmd(source_file, symbol, route),
-    }
-
-
-def juliet_win32_oracle() -> Dict[str, Any]:
-    return {
-        "accepted_evidence": [
-            "Juliet bad/good main banner proves the selected route executed",
-            "MAGUS_JULIET_ROUTE_CONFIRMED proves a tainted Win32/API sink or point-flaw marker was reached",
-            "MAGUS_JULIET_ORACLE_UNSUPPORTED means D reached the route but lacks an oracle for the C hypothesis semantics",
-        ],
-        "failure_patterns": ["MAGUS_JULIET_ROUTE_CONFIRMED"],
-        "required_patterns": ["MAGUS_JULIET_ROUTE_EXECUTED"],
-        "unsupported_patterns": ["MAGUS_JULIET_ORACLE_UNSUPPORTED"],
-        "failure_code_patterns": {
-            "NOT_ROUTE_BOUND": ["MAGUS_JULIET_NOT_ROUTE_BOUND"],
-            "ENV_MISSING": ["MAGUS_JULIET_BUILD_FAILED", "MAGUS_JULIET_RUNNER_ERROR"],
-            "NOT_EXPLOITABLE": ["MAGUS_JULIET_NOT_CONFIRMED"],
-        },
-        "expect_nonzero_exit": False,
-    }
-
-
 def seed_inputs_for_attack(attack_type: str) -> List[str]:
     if attack_type == "null_deref":
         return ["empty input", "malformed serialized bytes", "allocation failure path"]
@@ -336,6 +259,7 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
     language = infer_poc_language(hyp)
     source_file = hyp.get("file") or hyp.get("filepath")
     cwe = hyp.get("cwe_candidates") or hyp.get("CWE_candidates") or hyp.get("cwe_list") or []
+    oracle_profile = compact_profile_for_json(build_oracle_profile(hyp))
 
     seed_inputs = seed_inputs_for_attack(attack_type)
     input_source = None
@@ -349,6 +273,8 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
         "poc_language": language,
         "source_file": source_file,
         "entry_symbol": symbol,
+        "oracle_profile_id": oracle_profile.get("profile_id"),
+        "oracle_profile": oracle_profile,
         "api_sequence": hyp.get("api_sequence") or hyp.get("attack_path") or [],
         "poc_plan": [
             f"Build or load project containing {source_file or 'the target source file'}",
@@ -363,24 +289,32 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
             "seed_inputs": seed_inputs,
         },
         "oracle": {
+            "profile_id": oracle_profile.get("profile_id"),
+            "profile_supported": bool(oracle_profile.get("supported")),
             "accepted_evidence": [
+                "MAGUS_ROUTE_EXECUTED proves the selected route or source/API sequence was reached",
                 "ASan/UBSan crash",
                 "non-zero test exit caused by crafted source/API input",
                 "unexpected success on invalid API state",
                 "differential behavior between vulnerable and fixed revision",
+                *(oracle_profile.get("accepted_evidence") or []),
             ],
-            "failure_patterns": DEFAULT_FAILURE_PATTERNS,
+            "semantic_failure_patterns": oracle_profile.get("confirm_patterns") or [],
+            "failure_patterns": sorted(set(DEFAULT_FAILURE_PATTERNS + (oracle_profile.get("confirm_patterns") or []))),
+            "required_patterns": ["MAGUS_ROUTE_EXECUTED"],
+            "unsupported_patterns": ["MAGUS_ORACLE_UNSUPPORTED"],
+            "failure_code_patterns": {
+                "NOT_ROUTE_BOUND": ["MAGUS_NOT_ROUTE_BOUND"],
+                "NOT_EXPLOITABLE": ["MAGUS_NOT_CONFIRMED"],
+            },
             "expect_nonzero_exit": True,
         },
     }
 
     if hyp.get("poc_code") or hyp.get("harness_code"):
         case["harness_code"] = hyp.get("poc_code") or hyp.get("harness_code")
-    if auto_fill and is_juliet_api_misuse_hypothesis(hyp, source_file):
-        case["name"] = "juliet_win32_source_api"
-        case["payload_kind"] = "juliet_win32_dynamic_case"
-        case["execution"] = juliet_win32_execution_context(source_file, symbol, hyp.get("route"))
-        case["oracle"] = juliet_win32_oracle()
+    if auto_fill:
+        apply_execution_adapters(hyp, case)
     return case
 
 
@@ -431,7 +365,7 @@ def main() -> int:
     print(f"generated: {args.out}")
     print(f"projects:  {len(targets['targets'])}")
     print(f"cases:     {total_cases}")
-    print("next: run verifier.py; Juliet api-misuse targets include runner/oracle automatically; other projects require execution context")
+    print("next: adapter or verification_contexts.jsonl must provide repo_path plus run_cmd/poc_cmd/test_cmd before verifier.py")
     return 0
 
 

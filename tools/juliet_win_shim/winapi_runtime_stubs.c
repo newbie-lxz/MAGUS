@@ -17,6 +17,7 @@
 
 static uintptr_t next_handle_value = 0x1000;
 static DWORD last_error_value = 0;
+static int forced_named_pipe_impersonation_failed = 0;
 
 typedef struct _MAGUS_HANDLE_STATE {
     HANDLE handle;
@@ -181,6 +182,149 @@ static void flaw_marker_w(const char *name, const wchar_t *value, const char *re
     char buffer[512];
     wide_to_narrow(value, buffer, sizeof(buffer));
     flaw_marker(name, buffer, reason);
+}
+
+static int ascii_ieq(char left, char right)
+{
+    if (left >= 'A' && left <= 'Z')
+    {
+        left = (char)(left - 'A' + 'a');
+    }
+    if (right >= 'A' && right <= 'Z')
+    {
+        right = (char)(right - 'A' + 'a');
+    }
+    return left == right;
+}
+
+static int is_path_key(const char *key)
+{
+    size_t i;
+    const char *path = "path";
+    if (key == NULL)
+    {
+        return 0;
+    }
+    for (i = 0; path[i] != '\0'; i++)
+    {
+        if (key[i] == '\0' || !ascii_ieq(key[i], path[i]))
+        {
+            return 0;
+        }
+    }
+    return key[i] == '\0';
+}
+
+static const char *path_assignment_value(const char *envstring)
+{
+    size_t i;
+    const char *path = "path";
+    if (envstring == NULL)
+    {
+        return NULL;
+    }
+    for (i = 0; path[i] != '\0'; i++)
+    {
+        if (envstring[i] == '\0' || !ascii_ieq(envstring[i], path[i]))
+        {
+            return NULL;
+        }
+    }
+    if (envstring[i] != '=')
+    {
+        return NULL;
+    }
+    return envstring + i + 1;
+}
+
+static void sink_marker_key_value(const char *name, const char *key, const char *value)
+{
+    printf(
+        "MAGUS_JULIET_SINK name=%s key=%s tainted=%d value=%s\n",
+        name,
+        key == NULL ? "" : key,
+        contains_payload(value),
+        value == NULL ? "" : value);
+}
+
+static void path_environment_marker(const char *name, const char *envstring)
+{
+    const char *value = path_assignment_value(envstring);
+    if (value == NULL)
+    {
+        return;
+    }
+    sink_marker_key_value(name, "PATH", value);
+    if (contains_payload(value))
+    {
+        flaw_marker(name, value, "tainted_search_path_environment");
+    }
+}
+
+static void path_environment_pair_marker(const char *name, const char *key, const char *value)
+{
+    if (!is_path_key(key))
+    {
+        return;
+    }
+    sink_marker_key_value(name, "PATH", value);
+    if (contains_payload(value))
+    {
+        flaw_marker(name, value, "tainted_search_path_environment");
+    }
+}
+
+static void dll_search_directory_marker(const char *name, const char *value)
+{
+    sink_marker(name, value);
+    if (contains_payload(value))
+    {
+        flaw_marker(name, value, "tainted_dll_search_directory");
+    }
+}
+
+static void search_path_api_marker(const char *name, const char *path, const char *file, const char *result)
+{
+    const char *marker_value =
+        path != NULL && path[0] != '\0' ? path : file != NULL && file[0] != '\0' ? file
+                                                                                 : result;
+    int tainted = contains_payload(path) || contains_payload(file) || contains_payload(result);
+    printf(
+        "MAGUS_JULIET_SINK name=%s tainted=%d value=%s\n",
+        name,
+        tainted,
+        marker_value == NULL ? "" : marker_value);
+    if (tainted)
+    {
+        flaw_marker(name, marker_value, "tainted_search_path_api");
+    }
+}
+
+static int set_environment_assignment(const char *envstring)
+{
+    char *copy;
+    char *equals;
+    int result;
+
+    if (envstring == NULL)
+    {
+        return -1;
+    }
+    copy = strdup(envstring);
+    if (copy == NULL)
+    {
+        return -1;
+    }
+    equals = strchr(copy, '=');
+    if (equals == NULL || equals == copy)
+    {
+        free(copy);
+        return -1;
+    }
+    *equals = '\0';
+    result = setenv(copy, equals + 1, 1);
+    free(copy);
+    return result;
 }
 
 static int is_relative_library_path(const char *value)
@@ -963,6 +1107,19 @@ BOOL WINAPI LogonUserW(LPCWSTR lpszUsername, LPCWSTR lpszDomain, LPCWSTR lpszPas
     return TRUE;
 }
 
+BOOL WINAPI ImpersonateSelf(SECURITY_IMPERSONATION_LEVEL ImpersonationLevel)
+{
+    (void)ImpersonationLevel;
+    sink_marker("ImpersonateSelf", "");
+    if (env_enabled("MAGUS_JULIET_FAIL_IMPERSONATE_SELF"))
+    {
+        last_error_value = STATUS_NO_MEMORY;
+        flaw_marker("ImpersonateSelf", "", "forced_false_return_for_privilege_drop_check");
+        return FALSE;
+    }
+    return TRUE;
+}
+
 BOOL WINAPI ImpersonateNamedPipeClient(HANDLE hNamedPipe)
 {
     (void)hNamedPipe;
@@ -970,15 +1127,22 @@ BOOL WINAPI ImpersonateNamedPipeClient(HANDLE hNamedPipe)
     if (env_enabled("MAGUS_JULIET_FAIL_IMPERSONATE_NAMED_PIPE_CLIENT"))
     {
         last_error_value = STATUS_NO_MEMORY;
+        forced_named_pipe_impersonation_failed = 1;
         flaw_marker("ImpersonateNamedPipeClient", "", "forced_false_return_for_privilege_drop_check");
         return FALSE;
     }
+    forced_named_pipe_impersonation_failed = 0;
     return TRUE;
 }
 
 BOOL WINAPI RevertToSelf(void)
 {
     sink_marker("RevertToSelf", "");
+    if (forced_named_pipe_impersonation_failed)
+    {
+        forced_named_pipe_impersonation_failed = 0;
+        flaw_marker("RevertToSelf", "", "called_after_failed_impersonation");
+    }
     return TRUE;
 }
 
@@ -1145,28 +1309,86 @@ UINT WINAPI GetSystemDirectoryW(LPWSTR lpBuffer, UINT uSize)
 
 DWORD WINAPI SearchPathA(LPCSTR lpPath, LPCSTR lpFileName, LPCSTR lpExtension, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart)
 {
-    (void)lpPath;
     (void)lpExtension;
     copy_string(lpBuffer, nBufferLength, lpFileName ? lpFileName : "found.exe");
     if (lpFilePart != NULL)
     {
         *lpFilePart = lpBuffer;
     }
-    sink_marker("SearchPathA", lpBuffer);
+    search_path_api_marker("SearchPathA", lpPath, lpFileName, lpBuffer);
     return lpBuffer ? (DWORD)strlen(lpBuffer) : 0;
 }
 
 DWORD WINAPI SearchPathW(LPCWSTR lpPath, LPCWSTR lpFileName, LPCWSTR lpExtension, DWORD nBufferLength, LPWSTR lpBuffer, LPWSTR *lpFilePart)
 {
-    (void)lpPath;
+    char path_buffer[512];
+    char file_buffer[512];
+    char result_buffer[512];
     (void)lpExtension;
     copy_wstring(lpBuffer, nBufferLength, lpFileName ? lpFileName : L"found.exe");
     if (lpFilePart != NULL)
     {
         *lpFilePart = lpBuffer;
     }
-    sink_marker_w("SearchPathW", lpBuffer);
+    wide_to_narrow(lpPath, path_buffer, sizeof(path_buffer));
+    wide_to_narrow(lpFileName, file_buffer, sizeof(file_buffer));
+    wide_to_narrow(lpBuffer, result_buffer, sizeof(result_buffer));
+    search_path_api_marker("SearchPathW", path_buffer, file_buffer, result_buffer);
     return lpBuffer ? (DWORD)wcslen(lpBuffer) : 0;
+}
+
+BOOL WINAPI SetEnvironmentVariableA(LPCSTR lpName, LPCSTR lpValue)
+{
+    path_environment_pair_marker("SetEnvironmentVariableA", lpName, lpValue);
+    if (lpName == NULL)
+    {
+        return FALSE;
+    }
+    if (lpValue == NULL)
+    {
+        return unsetenv(lpName) == 0;
+    }
+    return setenv(lpName, lpValue, 1) == 0;
+}
+
+BOOL WINAPI SetEnvironmentVariableW(LPCWSTR lpName, LPCWSTR lpValue)
+{
+    char name_buffer[256];
+    char value_buffer[512];
+    wide_to_narrow(lpName, name_buffer, sizeof(name_buffer));
+    wide_to_narrow(lpValue, value_buffer, sizeof(value_buffer));
+    path_environment_pair_marker("SetEnvironmentVariableW", name_buffer, value_buffer);
+    if (name_buffer[0] == '\0')
+    {
+        return FALSE;
+    }
+    if (lpValue == NULL)
+    {
+        return unsetenv(name_buffer) == 0;
+    }
+    return setenv(name_buffer, value_buffer, 1) == 0;
+}
+
+BOOL WINAPI SetDllDirectoryA(LPCSTR lpPathName)
+{
+    dll_search_directory_marker("SetDllDirectoryA", lpPathName);
+    return TRUE;
+}
+
+BOOL WINAPI SetDllDirectoryW(LPCWSTR lpPathName)
+{
+    char buffer[512];
+    wide_to_narrow(lpPathName, buffer, sizeof(buffer));
+    dll_search_directory_marker("SetDllDirectoryW", buffer);
+    return TRUE;
+}
+
+DLL_DIRECTORY_COOKIE WINAPI AddDllDirectory(LPCWSTR NewDirectory)
+{
+    char buffer[512];
+    wide_to_narrow(NewDirectory, buffer, sizeof(buffer));
+    dll_search_directory_marker("AddDllDirectory", buffer);
+    return fake_handle_kind("dll_directory_cookie");
 }
 
 LSTATUS WINAPI RegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions, DWORD samDesired, HKEY *phkResult)
@@ -1633,16 +1855,25 @@ wchar_t *_wgetenv(const wchar_t *name)
     return wide_from_narrow_static(value);
 }
 
+int putenv(char *envstring)
+{
+    path_environment_marker("putenv", envstring);
+    return set_environment_assignment(envstring);
+}
+
 int _putenv(const char *envstring)
 {
-    char *copy = envstring ? strdup(envstring) : NULL;
-    return copy ? putenv(copy) : -1;
+    path_environment_marker("_putenv", envstring);
+    return set_environment_assignment(envstring);
 }
 
 int _wputenv(const wchar_t *envstring)
 {
     char *copy = narrow_from_wide_alloc(envstring);
-    int result = copy ? putenv(copy) : -1;
+    int result;
+    path_environment_marker("_wputenv", copy);
+    result = set_environment_assignment(copy);
+    free(copy);
     return result;
 }
 
@@ -2108,6 +2339,19 @@ RPC_STATUS UuidCreate(UUID *Uuid)
         memset(Uuid, 0x42, sizeof(*Uuid));
     }
     sink_marker("UuidCreate", "");
+    return RPC_S_OK;
+}
+
+RPC_STATUS RpcImpersonateClient(RPC_BINDING_HANDLE BindingHandle)
+{
+    (void)BindingHandle;
+    sink_marker("RpcImpersonateClient", "");
+    if (env_enabled("MAGUS_JULIET_FAIL_RPC_IMPERSONATE_CLIENT"))
+    {
+        last_error_value = RPC_S_CALL_FAILED;
+        flaw_marker("RpcImpersonateClient", "", "forced_non_ok_return_for_privilege_drop_check");
+        return RPC_S_CALL_FAILED;
+    }
     return RPC_S_OK;
 }
 

@@ -23,6 +23,7 @@ REPORT_REQUIRED_FIELDS = [
     "trigger_condition",
 ]
 REPORTABLE_VERIFICATION_STATUSES = {"confirmed", "stage_c_preserved"}
+PRESERVED_REPORTABLE_RISK_LEVELS = {"P0", "P1"}
 
 
 def missing(row: Dict[str, Any], fields: Iterable[str]) -> List[str]:
@@ -52,6 +53,11 @@ def validate_report(row: Dict[str, Any]) -> List[str]:
             errors.append("trigger_condition must include preconditions, attack_path, route, or evidence_slice")
     if row.get("verification_status") not in REPORTABLE_VERIFICATION_STATUSES:
         errors.append("report record must be based on confirmed verification or preserved Stage C judgment")
+    if (
+        row.get("verification_status") == "stage_c_preserved"
+        and row.get("risk_level") not in PRESERVED_REPORTABLE_RISK_LEVELS
+    ):
+        errors.append("preserved Stage C report record must have risk_level P0 or P1")
     return errors
 
 

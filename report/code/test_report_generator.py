@@ -92,6 +92,17 @@ class FinalReportTests(unittest.TestCase):
         self.assertEqual(row["evidence"]["preservation_reason"], "UNSUPPORTED_ORACLE")
         self.assertEqual(validate_report.validate_report(row), [])
 
+    def test_p2_preserved_stage_c_verdict_is_not_valid_reportable(self):
+        preserved = _preserved_row()
+        preserved["severity"] = "P2"
+        preserved["stage_c_verdict"]["priority"] = "P2"
+        row = generate_report.final_report_rows([preserved])[0]
+
+        self.assertIn(
+            "preserved Stage C report record must have risk_level P0 or P1",
+            validate_report.validate_report(row),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

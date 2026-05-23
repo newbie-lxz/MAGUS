@@ -29,7 +29,7 @@ D 信任这个目录只包含 C 分流出的动态验证候选：`P1`/`P2`，以
 2. 根据 `route`、`attack_path`、`file`、`evidence_slice` 生成 `*.api-plan.json`。
 3. 生成可执行 `*.payload.py` runner。
 4. 如果 C 或 sidecar 提供 `repo_path` 加 `run_cmd` / `poc_cmd` / `test_cmd`，执行 runner。
-5. 按 oracle 判断 reportable 或 failed；confirmed 必须有 route-bound 动态证据，否则输出 failed，例如 `NOT_ROUTE_BOUND`。如果 route 已执行但 D 明确缺少 oracle 能力，输出 `stage_c_preserved` 保留 C 判断，不能写成 `NOT_EXPLOITABLE`。
+5. 按 oracle 判断 reportable 或 failed；confirmed 必须有 route-bound 动态证据，否则输出 failed，例如 `NOT_ROUTE_BOUND`。如果 route 已执行但 D 明确缺少 oracle 能力，只对 Stage C `P0`/`P1` 输出 `stage_c_preserved` 保留 C 判断；`P2` 输出 failed，`failure_code=UNSUPPORTED_ORACLE`，不能写成 `NOT_EXPLOITABLE`。
 6. 输出 runtime trace、失败原因和回流建议。
 7. 外层脚本在 D 结束后把 reportable/failed 结果交给 Report 阶段生成最终漏洞报告。
 

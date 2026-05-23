@@ -17,14 +17,17 @@ typedef struct _UUID {
 typedef unsigned char *RPC_CSTR;
 typedef wchar_t *RPC_WSTR;
 typedef int RPC_STATUS;
+typedef void *RPC_BINDING_HANDLE;
 
 #define RPC_S_OK 0
+#define RPC_S_CALL_FAILED 1726
 
 RPC_STATUS UuidCreate(UUID *Uuid);
 RPC_STATUS UuidToStringA(const UUID *Uuid, RPC_CSTR *StringUuid);
 RPC_STATUS UuidToStringW(const UUID *Uuid, RPC_WSTR *StringUuid);
 RPC_STATUS RpcStringFreeA(RPC_CSTR *String);
 RPC_STATUS RpcStringFreeW(RPC_WSTR *String);
+RPC_STATUS RpcImpersonateClient(RPC_BINDING_HANDLE BindingHandle);
 
 #ifdef UNICODE
 #define UuidToString UuidToStringW

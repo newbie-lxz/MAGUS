@@ -18,6 +18,7 @@ FAILURE_CODES = {
     "UNSUPPORTED_ORACLE",
 }
 REPORTABLE_STATUSES = {"confirmed", "stage_c_preserved"}
+STAGE_C_PRESERVABLE_PRIORITIES = {"P0", "P1"}
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -64,6 +65,8 @@ def validate_confirmed(row: Dict[str, Any]) -> List[str]:
         errors.extend(f"missing {field}" for field in missing(row, ["preservation_reason", "stage_c_verdict"]))
         if row.get("failure_code") != "UNSUPPORTED_ORACLE":
             errors.append("stage_c_preserved record must set failure_code=UNSUPPORTED_ORACLE")
+        if row.get("severity") not in STAGE_C_PRESERVABLE_PRIORITIES:
+            errors.append("stage_c_preserved record must have severity P0 or P1")
     return errors
 
 

@@ -25,6 +25,7 @@ typedef HANDLE HMODULE;
 typedef HANDLE HINSTANCE;
 typedef HANDLE HKEY;
 typedef HANDLE HUSKEY;
+typedef HANDLE DLL_DIRECTORY_COOKIE;
 typedef HANDLE HCRYPTPROV;
 typedef HANDLE HCRYPTKEY;
 typedef HANDLE HCRYPTHASH;
@@ -39,6 +40,13 @@ typedef BYTE *LPBYTE;
 typedef LONG LSTATUS;
 typedef int ALG_ID;
 typedef int FARPROC;
+
+typedef enum _SECURITY_IMPERSONATION_LEVEL {
+    SecurityAnonymous,
+    SecurityIdentification,
+    SecurityImpersonation,
+    SecurityDelegation
+} SECURITY_IMPERSONATION_LEVEL;
 
 typedef struct _SECURITY_ATTRIBUTES {
     DWORD nLength;
@@ -302,6 +310,7 @@ BOOL WINAPI CreateProcessAsUserW(
 
 BOOL WINAPI LogonUserA(LPCSTR lpszUsername, LPCSTR lpszDomain, LPCSTR lpszPassword, DWORD dwLogonType, DWORD dwLogonProvider, HANDLE *phToken);
 BOOL WINAPI LogonUserW(LPCWSTR lpszUsername, LPCWSTR lpszDomain, LPCWSTR lpszPassword, DWORD dwLogonType, DWORD dwLogonProvider, HANDLE *phToken);
+BOOL WINAPI ImpersonateSelf(SECURITY_IMPERSONATION_LEVEL ImpersonationLevel);
 BOOL WINAPI ImpersonateNamedPipeClient(HANDLE hNamedPipe);
 BOOL WINAPI RevertToSelf(void);
 BOOL WINAPI OpenProcessToken(HANDLE ProcessHandle, DWORD DesiredAccess, HANDLE *TokenHandle);
@@ -323,6 +332,11 @@ UINT WINAPI GetSystemDirectoryA(LPSTR lpBuffer, UINT uSize);
 UINT WINAPI GetSystemDirectoryW(LPWSTR lpBuffer, UINT uSize);
 DWORD WINAPI SearchPathA(LPCSTR lpPath, LPCSTR lpFileName, LPCSTR lpExtension, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart);
 DWORD WINAPI SearchPathW(LPCWSTR lpPath, LPCWSTR lpFileName, LPCWSTR lpExtension, DWORD nBufferLength, LPWSTR lpBuffer, LPWSTR *lpFilePart);
+BOOL WINAPI SetEnvironmentVariableA(LPCSTR lpName, LPCSTR lpValue);
+BOOL WINAPI SetEnvironmentVariableW(LPCWSTR lpName, LPCWSTR lpValue);
+BOOL WINAPI SetDllDirectoryA(LPCSTR lpPathName);
+BOOL WINAPI SetDllDirectoryW(LPCWSTR lpPathName);
+DLL_DIRECTORY_COOKIE WINAPI AddDllDirectory(LPCWSTR NewDirectory);
 
 wchar_t *_wgetenv(const wchar_t *name);
 int _putenv(const char *envstring);
@@ -367,6 +381,8 @@ void WINAPI DeleteCriticalSection(CRITICAL_SECTION *lpCriticalSection);
 #define GetWindowsDirectory GetWindowsDirectoryW
 #define GetSystemDirectory GetSystemDirectoryW
 #define SearchPath SearchPathW
+#define SetEnvironmentVariable SetEnvironmentVariableW
+#define SetDllDirectory SetDllDirectoryW
 #define RegOpenKeyEx RegOpenKeyExW
 #define RegCreateKey RegCreateKeyW
 #define RegCreateKeyEx RegCreateKeyExW
@@ -386,6 +402,8 @@ void WINAPI DeleteCriticalSection(CRITICAL_SECTION *lpCriticalSection);
 #define GetWindowsDirectory GetWindowsDirectoryA
 #define GetSystemDirectory GetSystemDirectoryA
 #define SearchPath SearchPathA
+#define SetEnvironmentVariable SetEnvironmentVariableA
+#define SetDllDirectory SetDllDirectoryA
 #define RegOpenKeyEx RegOpenKeyExA
 #define RegCreateKey RegCreateKeyA
 #define RegCreateKeyEx RegCreateKeyExA

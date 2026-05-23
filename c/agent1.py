@@ -628,17 +628,91 @@ def stage_b_static_confirmation_supported(cand):
     return bool(support.get("supported"))
 
 
+def candidate_semantic_text(cand):
+    llm = cand.get("llm_evidence", {}) if isinstance(cand.get("llm_evidence"), dict) else {}
+    parts = [
+        cand.get("route"),
+        cand.get("file"),
+        cand.get("evidence_slice"),
+        llm.get("evidence_slice"),
+    ]
+    for item in llm.get("code_slices", []) if isinstance(llm.get("code_slices"), list) else []:
+        if isinstance(item, dict):
+            parts.append(item.get("text"))
+    return "\n".join(str(part or "") for part in parts)
+
+
+def unguarded_call_offset(text, api_name):
+    pattern = re.compile(rf"\b{re.escape(api_name)}\s*\(")
+    for match in pattern.finditer(text):
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        line_end = text.find("\n", match.start())
+        if line_end < 0:
+            line_end = len(text)
+        line = text[line_start:line_end].strip()
+        if not line or line.startswith("*") or line.startswith("//"):
+            continue
+        prefix = line[: max(0, match.start() - line_start)].strip()
+        if re.search(r"\bif\s*\(?\s*!?$", prefix):
+            continue
+        if re.search(r"\bif\s*\([^)]*$", prefix):
+            continue
+        return match.start()
+    return -1
+
+
+def source_api_safety_net_response(cand):
+    text = candidate_semantic_text(cand)
+    named_pipe_offset = unguarded_call_offset(text, "ImpersonateNamedPipeClient")
+    if named_pipe_offset >= 0:
+        after_call = text[named_pipe_offset:]
+        if "RevertToSelf" in after_call or "Impersonated" in after_call:
+            return {
+                "claim": (
+                    "ImpersonateNamedPipeClient return value appears unchecked before the route "
+                    "continues into success-path privilege handling; D must verify the forced-failure behavior."
+                ),
+                "cwe_candidates": [],
+                "trigger_path": candidate_bound_trigger_path(cand),
+                "preconditions": [
+                    "The impersonation API can fail on this route, and later code depends on impersonation success."
+                ],
+                "confidence": CONFIDENCE_THRESHOLD,
+                "evidence_complete": True,
+                "stability": "source_api_semantic_safety_net",
+            }
+
+    if unguarded_call_offset(text, "RpcImpersonateClient") >= 0:
+        return {
+            "claim": (
+                "RpcImpersonateClient return value appears unchecked on this route; D must verify that "
+                "a forced non-OK status is not propagated or handled."
+            ),
+            "cwe_candidates": [],
+            "trigger_path": candidate_bound_trigger_path(cand),
+            "preconditions": ["RpcImpersonateClient can return a non-OK status on this route."],
+            "confidence": CONFIDENCE_THRESHOLD,
+            "evidence_complete": True,
+            "stability": "source_api_semantic_safety_net",
+        }
+    return None
+
+
 def route_record(cand, responses):
     first_is_vuln = is_vulnerability_response(responses[0]) if responses else False
     vuln_flags = [is_vulnerability_response(resp) for resp in responses]
     vuln_count = sum(1 for flag in vuln_flags if flag)
     any_vuln = bool(vuln_count)
+    final_is_vuln = vuln_flags[-1] if vuln_flags else False
     selected = selected_vulnerability_response(responses)
     contradictions = []
     for resp in responses:
         contradictions.extend(hard_contradictions(resp))
 
     if not any_vuln:
+        safety_net = source_api_safety_net_response(cand)
+        if safety_net:
+            return safety_net, "P1", "candidate_for_d", "source_api_semantic_safety_net", contradictions
         return selected, "P3", "audit_only", "red_team_no_vulnerability", contradictions
 
     confidence = response_confidence(selected)
@@ -650,9 +724,11 @@ def route_record(cand, responses):
             return selected, "P1", "candidate_for_d", "stage_b_static_confirmation_unsupported", contradictions
         return selected, "P0", "static_confirmed", "red_team_static_strong", contradictions
 
-    if not first_is_vuln and any_vuln:
-        return selected, "P1", "candidate_for_d", "corrected_to_vulnerability", contradictions
-    if vuln_count >= 2 and confidence >= CONFIDENCE_THRESHOLD:
+    if final_is_vuln and vuln_count >= 2:
+        if not first_is_vuln:
+            return selected, "P1", "candidate_for_d", "corrected_to_vulnerability", contradictions
+        if len(vuln_flags) >= 2 and not vuln_flags[-2]:
+            return selected, "P1", "candidate_for_d", "red_team_reaffirmed_after_challenge", contradictions
         return selected, "P1", "candidate_for_d", "red_team_stable_needs_dynamic_verification", contradictions
     return selected, "P2", "candidate_for_d", "red_team_vulnerability_once", contradictions
 
