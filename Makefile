@@ -33,6 +33,7 @@ C_CANDIDATES ?= $(B_OUTPUT_DIR)/candidates.for_c.jsonl
 C_OUTPUT ?= c/out/hypotheses.jsonl
 C_TIME_LIMIT_SECONDS ?=
 MIN_SUPPORT ?= 3
+D_CONTEXTS ?=
 D_OUTPUT_DIR ?= d/memberD_verifier/02_run_with_C/output
 REPORT_ROOT ?= report
 REPORT_RUN_NAME ?=
@@ -59,10 +60,10 @@ run-c:
 	python3 pipeline.py c --candidates $(C_CANDIDATES) --output $(C_OUTPUT) $(if $(C_TIME_LIMIT_SECONDS),--time-limit-seconds $(C_TIME_LIMIT_SECONDS),)
 
 run-d:
-	python3 pipeline.py d
+	python3 pipeline.py d $(if $(D_CONTEXTS),--contexts $(D_CONTEXTS),)
 
 run-report:
 	python3 pipeline.py report --d-output-dir $(D_OUTPUT_DIR) --report-root $(REPORT_ROOT) $(if $(REPORT_RUN_NAME),--run-name $(REPORT_RUN_NAME),)
 
 run-abcd:
-	python3 pipeline.py abcd --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) --report-root $(REPORT_ROOT) $(if $(REPORT_RUN_NAME),--report-run-name $(REPORT_RUN_NAME),) $(if $(C_TIME_LIMIT_SECONDS),--c-time-limit-seconds $(C_TIME_LIMIT_SECONDS),)
+	python3 pipeline.py abcd --a-input $(A_INPUT) --a-output $(A_OUTPUT) --b-output-dir $(B_OUTPUT_DIR) --c-output $(C_OUTPUT) --min-support $(MIN_SUPPORT) --report-root $(REPORT_ROOT) $(if $(REPORT_RUN_NAME),--report-run-name $(REPORT_RUN_NAME),) $(if $(C_TIME_LIMIT_SECONDS),--c-time-limit-seconds $(C_TIME_LIMIT_SECONDS),) $(if $(D_CONTEXTS),--d-contexts $(D_CONTEXTS),)

@@ -14,7 +14,7 @@ def _hyp(priority):
         "sample_id": "s",
         "hypothesis_id": f"hyp_{priority.lower()}",
         "priority": priority,
-        "route": "file.c::bad",
+        "route": "file.c::target",
         "file": "file.c",
         "line": 1,
         "evidence_slice": "call:sink",

@@ -120,7 +120,7 @@ class OracleProfileSelectionTests(unittest.TestCase):
     def test_search_path_profile_keeps_runtime_equivalents_when_api_is_matched(self):
         profile = oracle_profiles.build_oracle_profile(
             {
-                "route": "case0 -> PUTENV",
+                "route": "entry -> PUTENV",
                 "claim": "CWE-427 uncontrolled search path element through PATH",
                 "evidence_slice": "PUTENV(data);",
             }

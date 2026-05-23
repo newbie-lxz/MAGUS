@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hypotheses", required=True, type=Path, help="Single Stage C JSONL file to follow")
     parser.add_argument("--done-file", required=True, type=Path, help="File created by the producer when C is finished")
     parser.add_argument("--out-dir", default=Path("output"), type=Path, help="Stage D output directory")
-    parser.add_argument("--contexts", default=FLOW_DIR / "verification_contexts.jsonl", type=Path)
+    parser.add_argument("--contexts", default=None, type=Path, help="Optional explicit verification_contexts JSON/JSONL")
     parser.add_argument("--targets-out", default=FLOW_DIR / "targets.auto.json", type=Path)
     parser.add_argument("--bound-targets-out", default=FLOW_DIR / "targets.executable.json", type=Path)
     parser.add_argument("--poll-interval", default=0.2, type=float, help="Seconds between JSONL polls")
@@ -249,7 +249,9 @@ def run(args: argparse.Namespace) -> int:
     acquire_lock(args.out_dir)
 
     context_index: Optional[ContextIndex] = None
-    if args.contexts.exists():
+    if args.contexts is not None:
+        if not args.contexts.exists():
+            raise ValueError(f"explicit contexts file does not exist: {args.contexts}")
         context_index = context_binder.load_context_index(args.contexts)
 
     prepare_outputs(args.out_dir, args.targets_out, args.bound_targets_out, context_index is not None)

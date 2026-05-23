@@ -79,16 +79,16 @@ class CReadyPriorityTests(unittest.TestCase):
 
     def test_c_ready_priority_boosts_external_input_routes(self):
         environment_route = self._record(
-            file="juliet/CWE114_Process_Control__w32_char_environment_01.c",
-            route="juliet/CWE114_Process_Control__w32_char_environment_01.c::case0",
+            file="project/load_from_environment.c",
+            route="project/load_from_environment.c::configure_runtime_path",
             source_kinds=["environment"],
             sink_types=["memory"],
             seed_tokens=["env:getenv", "call:LoadLibraryA"],
             evidence_slice="data = getenv(\"ADD\"); LoadLibraryA(data);",
         )
         file_route = self._record(
-            file="juliet/CWE114_Process_Control__w32_char_file_01.c",
-            route="juliet/CWE114_Process_Control__w32_char_file_01.c::case0",
+            file="project/load_from_file.c",
+            route="project/load_from_file.c::configure_runtime_path",
             source_kinds=["filesystem"],
             sink_types=["filesystem"],
             seed_tokens=["filesystem:fopen"],
@@ -103,7 +103,7 @@ class CReadyPriorityTests(unittest.TestCase):
         self.assertIn("environment_source", env_priority["components"])
         self.assertIn("filesystem_file_source_without_external_input", file_priority["components"])
 
-    def test_c_ready_priority_keeps_threshold_pass_dominant(self):
+    def test_c_ready_priority_does_not_let_threshold_pass_dominate_high_signal_route(self):
         threshold_route = self._record(
             file="low.c",
             route="low.c::route",
@@ -115,8 +115,8 @@ class CReadyPriorityTests(unittest.TestCase):
         )
         threshold_route["stage_b"]["threshold_pass"] = True
         high_signal_route = self._record(
-            file="juliet/CWE114_Process_Control__w32_char_environment_01.c",
-            route="juliet/CWE114_Process_Control__w32_char_environment_01.c::case0",
+            file="project/load_from_environment.c",
+            route="project/load_from_environment.c::configure_runtime_path",
             source_kinds=["environment"],
             sink_types=["memory"],
             seed_tokens=["env:getenv"],
@@ -125,10 +125,36 @@ class CReadyPriorityTests(unittest.TestCase):
             candidate_count=20,
         )
 
-        self.assertGreater(
+        self.assertLess(
             b_miner.c_ready_priority_payload(threshold_route)["score"],
             b_miner.c_ready_priority_payload(high_signal_route)["score"],
         )
+
+    def test_c_ready_priority_requires_observed_source_not_route_name_only(self):
+        route_named_environment = self._record(
+            file="project/environment_handler.c",
+            route="project/environment_handler.c::configure_path",
+            source_kinds=[],
+            sink_types=["filesystem"],
+            seed_tokens=["call:append_path"],
+            evidence_slice="data = fixed_buffer; append_path(data, DEFAULT_PATH);",
+        )
+        observed_environment = self._record(
+            file="project/environment_handler.c",
+            route="project/environment_handler.c::configure_path_from_input",
+            source_kinds=[],
+            sink_types=["filesystem"],
+            seed_tokens=["env:getenv", "call:append_path"],
+            evidence_slice="data = getenv(\"CONFIG_PATH\"); append_path(data, DEFAULT_PATH);",
+        )
+
+        route_named_priority = b_miner.c_ready_priority_payload(route_named_environment)
+        observed_priority = b_miner.c_ready_priority_payload(observed_environment)
+
+        self.assertNotIn("environment_source", route_named_priority["components"])
+        self.assertIn("filesystem_sink_without_external_input", route_named_priority["components"])
+        self.assertIn("environment_source", observed_priority["components"])
+        self.assertGreater(observed_priority["score"], route_named_priority["score"])
 
 
 if __name__ == "__main__":

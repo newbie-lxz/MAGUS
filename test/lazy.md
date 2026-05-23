@@ -18,7 +18,7 @@ python3 tools/sanitize_juliet_tree.py \
 
 Stage C calls the configured OpenAI-compatible LLM client, so set the required API credentials in the same shell before running a folder command.
 
-For monitored batch testing, use the runner in `test/`. It parses the folder list below, keeps each folder run intact, gives Stage C a two-hour submission budget by default, stops after a completed folder when `(fn_cases + fp_unique_units) / truth_cases > 0.02`, and writes per-folder logs plus CSV/JSONL summaries under `test/out/lazy_batch/<run-id>/`.
+For monitored batch testing, use the runner in `test/`. It parses the folder list below, keeps each folder run intact, gives Stage C a two-hour submission budget by default, records when `(fn_cases + fp_unique_units) / truth_cases > 0.10`, continues to the next folder even when the threshold is exceeded, and writes per-folder logs plus CSV/JSONL summaries under `test/out/lazy_batch/<run-id>/`.
 
 ```bash
 python3 test/run_lazy_batch.py
@@ -60,8 +60,12 @@ run_juliet_folder() {
     --project-id "${cwe_id}" \
     --force
 
+  python3 tools/gen_juliet_verification_contexts.py \
+    --project-id "${cwe_id}" \
+    --out "d/memberD_verifier/02_run_with_C/verification_contexts.${cwe_id}.jsonl"
+
   python3 test/evaluate_juliet_report.py \
-    --run-command "python3 pipeline.py abcd --a-input a/input/srcs.${cwe_id}.in.jsonl --a-output a/out/srcs.${cwe_id}.raw.jsonl --b-output-dir b/b_output_${cwe_id} --c-output c/out/${cwe_id}.hypotheses.jsonl --c-time-limit-seconds ${c_time_limit} --report-run-name ${run_name}" \
+    --run-command "python3 pipeline.py abcd --a-input a/input/srcs.${cwe_id}.in.jsonl --a-output a/out/srcs.${cwe_id}.raw.jsonl --b-output-dir b/b_output_${cwe_id} --c-output c/out/${cwe_id}.hypotheses.jsonl --c-time-limit-seconds ${c_time_limit} --report-run-name ${run_name} --d-contexts d/memberD_verifier/02_run_with_C/verification_contexts.${cwe_id}.jsonl" \
     --d-output-dir "d/memberD_verifier/02_run_with_C/output/${run_name}" \
     --report-run-name "${run_name}" \
     --scope-compile-commands "srcs_sanitized/compile_commands.${cwe_id}.json"

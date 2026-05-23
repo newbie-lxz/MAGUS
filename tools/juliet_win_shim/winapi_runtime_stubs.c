@@ -113,10 +113,6 @@ static const char *payload_value(void)
     const char *payload = getenv("MAGUS_JULIET_PAYLOAD");
     if (payload == NULL || payload[0] == '\0')
     {
-        payload = getenv("MAGUS_CWE15_PAYLOAD");
-    }
-    if (payload == NULL || payload[0] == '\0')
-    {
         return "magus-juliet-controlled-input";
     }
     return payload;
@@ -818,10 +814,6 @@ struct hostent *gethostbyaddr(const char *addr, int len, int type)
 BOOL WINAPI SetComputerNameA(LPCSTR lpComputerName)
 {
     sink_marker("SetComputerNameA", lpComputerName);
-    if (contains_payload(lpComputerName))
-    {
-        printf("MAGUS_CWE15_CONFIRMED external payload reached SetComputerNameA\n");
-    }
     return TRUE;
 }
 

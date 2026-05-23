@@ -29,8 +29,6 @@ DEFAULT_SOURCE_ROOT = REPO_ROOT / "srcs_sanitized"
 DEFAULT_STAGE_B_OUTPUT_DIR = STAGE_B_DIR / "b_output"
 DEFAULT_STAGE_C_OUTPUT = STAGE_C_DIR / "out/hypotheses.jsonl"
 REPORT_RUN_NAME_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
-JULIET_CWE_FOLDER_PATTERN = re.compile(r"^CWE\d+(?:_.+)?$", re.IGNORECASE)
-CWE_PROJECT_PATTERN = re.compile(r"^cwe(\d+)(.*)$", re.IGNORECASE)
 
 
 def resolve_path(raw: str) -> Path:
@@ -44,9 +42,6 @@ def normalize_report_run_name(raw: str) -> str:
     if "/" in name or "\\" in name:
         raise ValueError(f"report run name must be a folder name, not a path: {raw}")
     normalized = REPORT_RUN_NAME_PATTERN.sub("_", name).strip("._-")
-    match = CWE_PROJECT_PATTERN.fullmatch(normalized)
-    if match:
-        normalized = f"CWE{match.group(1)}{match.group(2)}"
     if not normalized:
         raise ValueError(f"report run name has no filesystem-safe characters: {raw}")
     if normalized in {".", ".."}:
@@ -85,40 +80,15 @@ def read_jsonl_objects(path: Path) -> list[dict]:
     return rows
 
 
-def juliet_cwe_folder_from_path(raw: object) -> str:
-    text = str(raw or "").replace("\\", "/").strip()
-    if not text:
-        return ""
-    for part in text.split("/"):
-        if JULIET_CWE_FOLDER_PATTERN.fullmatch(part):
-            return normalize_report_run_name(part)
-    return ""
-
-
 def report_run_name_from_rows(rows: list[dict], context: str) -> str:
-    cwe_folders: set[str] = set()
     project_ids: set[str] = set()
     for row in rows:
-        location = row.get("location") if isinstance(row.get("location"), dict) else {}
-        cwe_folder = (
-            juliet_cwe_folder_from_path(row.get("file"))
-            or juliet_cwe_folder_from_path(row.get("file_path"))
-            or juliet_cwe_folder_from_path(location.get("file_path"))
-            or juliet_cwe_folder_from_path(row.get("route"))
-        )
-        if cwe_folder:
-            cwe_folders.add(cwe_folder)
         project_id = str(row.get("project_id") or "").strip()
         if project_id:
             project_ids.add(normalize_report_run_name(project_id))
 
-    if len(cwe_folders) == 1:
-        return next(iter(cwe_folders))
     if len(project_ids) == 1:
         return next(iter(project_ids))
-    if len(cwe_folders) > 1:
-        joined = ", ".join(sorted(cwe_folders))
-        raise ValueError(f"cannot derive one report run name from multiple CWE source folders in {context}: {joined}")
     if len(project_ids) > 1:
         joined = ", ".join(sorted(project_ids))
         raise ValueError(f"cannot derive one report run name from multiple project_id values in {context}: {joined}")
@@ -285,8 +255,11 @@ def run_stage_c(candidates_path: Path, output_path: Path, time_limit_seconds: fl
     run_command(stage_c_command(candidates_path, output_path, time_limit_seconds), STAGE_C_DIR)
 
 
-def run_stage_d() -> None:
-    run_command(["./01_auto_attack_from_C_linux.sh"], STAGE_D_RUN_DIR)
+def run_stage_d(contexts_path: Path | None = None) -> None:
+    command = ["./01_auto_attack_from_C_linux.sh"]
+    if contexts_path is not None:
+        command.append(str(contexts_path))
+    run_command(command, STAGE_D_RUN_DIR)
 
 
 def run_report(d_output_dir: Path, output_dir: Path) -> None:
@@ -352,6 +325,7 @@ def run_stage_c_with_streaming_d(
     stage_d_output_dir: Path,
     report_root: Path,
     report_run_name: str,
+    contexts_path: Path | None,
 ) -> None:
     ensure_stage_d_python()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -369,6 +343,8 @@ def run_stage_c_with_streaming_d(
             "--out-dir",
             str(stage_d_output_dir),
         ]
+        if contexts_path is not None:
+            d_command.extend(["--contexts", str(contexts_path)])
 
         print("[pipeline] streaming Stage C output into Stage D", flush=True)
         print(f"[pipeline] cwd={STAGE_D_RUN_DIR}", flush=True)
@@ -502,7 +478,12 @@ def main() -> None:
         default=None,
         help="Stage C 可选候选提交时间预算，默认不限制",
     )
-    subparsers.add_parser("d", help="运行 Stage D，并在 D 完成后生成最终报告")
+    parser_d = subparsers.add_parser("d", help="运行 Stage D，并在 D 完成后生成最终报告")
+    parser_d.add_argument(
+        "--contexts",
+        default="",
+        help="可选 D verification_contexts JSON/JSONL；未提供时不加载任何项目特定执行上下文",
+    )
 
     parser_report = subparsers.add_parser("report", help="只从 Stage D 输出生成最终报告")
     parser_report.add_argument(
@@ -518,7 +499,7 @@ def main() -> None:
     parser_report.add_argument(
         "--run-name",
         default="",
-        help="报告运行目录名；为空时从 Stage D 输出中的 CWE 源码目录或 project_id 推导",
+        help="报告运行目录名；为空时从 Stage D 输出中的唯一 project_id 推导",
     )
 
     parser_abcd = subparsers.add_parser("abcd", help="串联运行 Stage A、Stage B，并流式运行 Stage C -> Stage D -> Report")
@@ -554,6 +535,11 @@ def main() -> None:
         "--report-run-name",
         default="",
         help="报告运行目录名，并用于 Stage D 输出子目录 output/<run-name>；为空时使用 Stage A 输入 project_id",
+    )
+    parser_abcd.add_argument(
+        "--d-contexts",
+        default="",
+        help="可选 D verification_contexts JSON/JSONL；未提供时 Stage D 只生成通用 target，不加载项目特定执行上下文",
     )
     args = parser.parse_args()
 
@@ -606,7 +592,7 @@ def main() -> None:
         return
 
     if args.command == "d":
-        run_stage_d()
+        run_stage_d(resolve_path(args.contexts) if args.contexts.strip() else None)
         return
 
     if args.command == "report":
@@ -650,6 +636,7 @@ def main() -> None:
             stage_d_output_dir,
             report_root,
             report_run_name,
+            resolve_path(args.d_contexts) if args.d_contexts.strip() else None,
         )
         return
 

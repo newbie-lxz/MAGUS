@@ -59,7 +59,7 @@ D 不支持 HTTP API targets，因此没有 `base_url`、token、HTTP method、h
 - `target_type`：固定为 `source_api`，历史 `native` 可视为同义。
 - `cases`：每个假设一个 case，key 是 `hypothesis_id`。
 - `payload_kind`：固定为 `api_misuse_plan` 或历史 `native_plan`。
-- `execution_adapter_id`：可选；表示由某个项目/环境级 adapter 补充了执行上下文。adapter 不是 oracle profile，也不是按文件编写。
+- 执行上下文必须来自显式 target 字段或 `verification_contexts` sidecar；核心 target 生成器不自动附加项目/benchmark 运行配置。
 - `source_file`：可疑源文件。
 - `entry_symbol`：入口函数或可触达可疑路径的符号。
 - `api_sequence`：C/C++ 函数调用链或 API 使用序列。

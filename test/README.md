@@ -2,7 +2,7 @@
 
 `evaluate_juliet_report.py` compares the MAGUS final report with Juliet ground truth and writes paper-ready evaluation artifacts.
 
-`run_lazy_batch.py` is the monitored batch wrapper for Juliet source/API misuse folders that are already adapted to the Stage D marker/oracle model. It reads the ordered queue in `test/lazy.md`, runs one CWE folder at a time, stops after a completed folder when the configured mismatch threshold is exceeded, and writes logs plus per-folder metrics under `test/out/lazy_batch/<run-id>/`.
+`run_lazy_batch.py` is the monitored batch wrapper for Juliet source/API misuse folders that are already adapted to the Stage D marker/oracle model. It reads the ordered queue in `test/lazy.md`, runs one CWE folder at a time, records when the configured mismatch threshold is exceeded, continues to the next folder, and writes logs plus per-folder metrics under `test/out/lazy_batch/<run-id>/`.
 
 Default inputs:
 
@@ -66,13 +66,17 @@ python3 pipeline.py gen-input \
   --output a/input/srcs.cwe15.in.jsonl \
   --project-id cwe15 \
   --force
+
+python3 tools/gen_juliet_verification_contexts.py \
+  --project-id cwe15 \
+  --out d/memberD_verifier/02_run_with_C/verification_contexts.cwe15.jsonl
 ```
 
 Then run the full MAGUS pipeline over only that CWE15 Stage A input and evaluate against the same CWE15 scope:
 
 ```bash
 python3 test/evaluate_juliet_report.py \
-  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.cwe15.in.jsonl --a-output a/out/srcs.cwe15.raw.jsonl --b-output-dir b/b_output_cwe15 --c-output c/out/cwe15.hypotheses.jsonl --report-run-name CWE15_External_Control_of_System_or_Configuration_Setting" \
+  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.cwe15.in.jsonl --a-output a/out/srcs.cwe15.raw.jsonl --b-output-dir b/b_output_cwe15 --c-output c/out/cwe15.hypotheses.jsonl --report-run-name CWE15_External_Control_of_System_or_Configuration_Setting --d-contexts d/memberD_verifier/02_run_with_C/verification_contexts.cwe15.jsonl" \
   --d-output-dir d/memberD_verifier/02_run_with_C/output/CWE15_External_Control_of_System_or_Configuration_Setting \
   --report-run-name CWE15_External_Control_of_System_or_Configuration_Setting \
   --scope-compile-commands srcs_sanitized/compile_commands.cwe15.json
@@ -97,6 +101,10 @@ python3 pipeline.py gen-input \
   --compile-commands srcs_sanitized/compile_commands.json \
   --output a/input/srcs.in.jsonl \
   --force
+
+python3 tools/gen_juliet_verification_contexts.py \
+  --project-id srcs_sanitized \
+  --out d/memberD_verifier/02_run_with_C/verification_contexts.srcs_sanitized.jsonl
 ```
 
 Prepare the Stage D Python environment once if it does not exist:
@@ -109,7 +117,7 @@ Then run the full MAGUS pipeline and evaluate it:
 
 ```bash
 python3 test/evaluate_juliet_report.py \
-  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.in.jsonl --a-output a/out/srcs.raw.jsonl --report-run-name srcs_sanitized" \
+  --run-command "python3 pipeline.py abcd --a-input a/input/srcs.in.jsonl --a-output a/out/srcs.raw.jsonl --report-run-name srcs_sanitized --d-contexts d/memberD_verifier/02_run_with_C/verification_contexts.srcs_sanitized.jsonl" \
   --d-output-dir d/memberD_verifier/02_run_with_C/output/srcs_sanitized \
   --report-run-name srcs_sanitized \
   --scope-compile-commands srcs_sanitized/compile_commands.json

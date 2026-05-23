@@ -13,6 +13,11 @@ TARGET_BOUND_FILE="$FLOW/targets.executable.json"
 CONTEXT_FILE="$FLOW/verification_contexts.jsonl"
 TARGET_FILE="$TARGET_AUTO_FILE"
 LOCK_DIR="$FLOW/.stage_d_output.lock"
+CONTEXT_ARG="${1:-${D_CONTEXTS:-}}"
+
+if [[ -n "$CONTEXT_ARG" ]]; then
+  CONTEXT_FILE="$CONTEXT_ARG"
+fi
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "[ERROR] Another Stage D process is using output: $LOCK_DIR"
@@ -46,7 +51,11 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 "$PYTHON" "$ROOT/00_core/gen_targets_from_hypotheses.py" --hypotheses "$C_OUT_DIR" --out "$TARGET_AUTO_FILE" --auto-fill
-if [[ -f "$CONTEXT_FILE" ]]; then
+if [[ -n "$CONTEXT_ARG" ]]; then
+  if [[ ! -f "$CONTEXT_FILE" ]]; then
+    echo "[ERROR] Explicit context file not found: $CONTEXT_FILE"
+    exit 1
+  fi
   "$PYTHON" "$FLOW/bind_verification_contexts.py" --hypotheses "$C_OUT_DIR" --targets "$TARGET_AUTO_FILE" --contexts "$CONTEXT_FILE" --out "$TARGET_BOUND_FILE"
   TARGET_FILE="$TARGET_BOUND_FILE"
 fi

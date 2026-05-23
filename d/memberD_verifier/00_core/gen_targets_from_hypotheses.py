@@ -16,7 +16,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
-from execution_adapters import apply_execution_adapters
 from oracle_profiles import build_oracle_profile, compact_profile_for_json
 
 
@@ -313,8 +312,6 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
 
     if hyp.get("poc_code") or hyp.get("harness_code"):
         case["harness_code"] = hyp.get("poc_code") or hyp.get("harness_code")
-    if auto_fill:
-        apply_execution_adapters(hyp, case)
     return case
 
 
@@ -365,7 +362,7 @@ def main() -> int:
     print(f"generated: {args.out}")
     print(f"projects:  {len(targets['targets'])}")
     print(f"cases:     {total_cases}")
-    print("next: adapter or verification_contexts.jsonl must provide repo_path plus run_cmd/poc_cmd/test_cmd before verifier.py")
+    print("next: explicit targets or verification_contexts JSON/JSONL must provide repo_path plus run_cmd/poc_cmd/test_cmd before verifier.py")
     return 0
 
 

@@ -3,14 +3,12 @@
 # 优化点：并发处理、流式写入、证据精简、结果缓存
 
 import argparse
-import copy
 import json
 import multiprocessing as mp
 import os
 import queue
 import re
 import time
-from collections import deque
 from json import JSONDecodeError
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,9 +16,9 @@ from pathlib import Path
 from openai import OpenAI
 
 # ==================== 配置（可根据实际情况调整）====================
-MODEL_NAME = "deepseek-v4-flash"          # 使用Flash模型，速度更快
-API_KEY = ""
-BASE_URL = "https://api.deepseek.com/v1"
+MODEL_NAME = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
+BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+API_KEY_ENV_VARS = ("DEEPSEEK_API_KEY", "OPENAI_API_KEY")
 CONFIDENCE_THRESHOLD = 0.60               # 放宽到0.60，让更多假设进入D阶段（原0.65）
 STATIC_CONFIDENCE_THRESHOLD = 0.90        # P0：静态强确认；已完成结果进入D做route-bound验证
 MAX_WORKERS = 5                           # 并发线程数，平衡速度与稳定性
@@ -34,10 +32,23 @@ MAX_CALL_CHAIN = 12                       # 调用序列最多保留个数
 MAX_SINK_SOURCE = 5                       # source/sink、trace、代码片段最多保留个数
 MAX_INTERNAL_SUMMARIES = 3                # 内部函数摘要最多保留个数
 C_READY_SCHEMA_VERSION = "stageb.c_ready_candidates.v3"
-POSITIVE_TEMPLATE_REUSE_POLICY = "positive_only"
-JULIET_TEMPLATE_RE = re.compile(r"^(?P<cwe>CWE\d+_.+)__w32_(?P<body>.+)$")
 
-client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=60, max_retries=0)
+_client = None
+
+
+def configured_api_key():
+    for name in API_KEY_ENV_VARS:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    raise RuntimeError("Stage C requires DEEPSEEK_API_KEY or OPENAI_API_KEY")
+
+
+def llm_client():
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=configured_api_key(), base_url=BASE_URL, timeout=60, max_retries=0)
+    return _client
 
 
 # ==================== 数据加载模块 ====================
@@ -135,71 +146,6 @@ def load_candidates(path):
     for index, cand in enumerate(candidates, 1):
         validate_candidate(cand, path, index)
     return candidates
-
-
-def juliet_template_parts(file_path):
-    stem = Path(str(file_path or "")).stem
-    match = JULIET_TEMPLATE_RE.match(stem)
-    if not match:
-        return None
-
-    body = match.group("body")
-    if body.startswith("wchar_t_"):
-        body = body[len("wchar_t_") :]
-    elif body.startswith("char_"):
-        body = body[len("char_") :]
-
-    parts = body.split("_")
-    if len(parts) >= 2 and parts[-2].isdigit() and parts[-1].startswith("case"):
-        flow_id = f"{parts[-2]}_{parts[-1]}"
-    elif parts and re.match(r"^\d+(?:[a-e])?$", parts[-1]):
-        flow_id = parts[-1]
-    else:
-        return None
-    return match.group("cwe"), flow_id
-
-
-def static_support_key(cand):
-    return bool(cand.get("stage_b", {}).get("static_confirmation_support", {}).get("supported"))
-
-
-def template_reuse_signature(cand):
-    parts = juliet_template_parts(cand.get("file"))
-    if not parts:
-        return None
-    cwe_name, flow_id = parts
-    line = cand.get("line")
-    if not isinstance(line, int):
-        return None
-    return (
-        "juliet",
-        str(cand.get("project_id") or ""),
-        cwe_name,
-        flow_id,
-        line,
-        static_support_key(cand),
-    )
-
-
-def build_template_reuse_groups(candidates):
-    groups_by_signature = {}
-    groups = []
-    for index, cand in enumerate(candidates):
-        signature = template_reuse_signature(cand)
-        if signature is None:
-            signature = ("unique", index, cand.get("sample_id"))
-        group = groups_by_signature.get(signature)
-        if group is None:
-            group = {
-                "signature": signature,
-                "members": [],
-                "cursor": 0,
-                "resolved": False,
-            }
-            groups_by_signature[signature] = group
-            groups.append(group)
-        group["members"].append(cand)
-    return groups
 
 
 # ==================== 证据文本构建模块（精简版） ====================
@@ -382,9 +328,9 @@ RED_REVIEW_PROMPT = """你仍然是红队安全审计专家，不是蓝队。请
 **任务**：
 - 如果第一轮已发现漏洞，检查 source/sink 或 API misuse 路径是否真实、是否引用了不存在的代码。
 - 如果第一轮判断为 NO_VULNERABILITY_FOUND，但证据中存在具体可验证漏洞路径，必须纠正为漏洞。
-- 只有发现硬矛盾（路径不可达、sink不存在、source和sink不连通、把good路径当bad路径等）时，才列入 hard_contradictions。
+- 只有发现硬矛盾（路径不可达、sink不存在、source和sink不连通、把安全路径当漏洞路径等）时，才列入 hard_contradictions。
 - 使用B阶段门禁、缺失feature和参考样本约束第一轮判断：这些信号只能说明优先级或异常模式，不能替代真实代码路径。
-- 如果B阶段P0静态确认支持为supported=false，必须复查是否只是把good路径、固定字符串、错误处理或注释文字当成外部可控漏洞路径；代码证据不闭合时降低confidence或标记evidence_complete=false。
+- 如果B阶段P0静态确认支持为supported=false，必须复查是否只是把安全路径、固定字符串、错误处理或注释文字当成外部可控漏洞路径；代码证据不闭合时降低confidence或标记evidence_complete=false。
 
 **输出格式（严格JSON）**：
 {{
@@ -483,7 +429,7 @@ def call_llm(prompt, deadline=None):
         if not has_time_remaining(deadline):
             return llm_failure("time_budget_exhausted_before_retry", f"attempt={attempt}")
         try:
-            request_client = client.with_options(timeout=timeout)
+            request_client = llm_client().with_options(timeout=timeout)
             r = request_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
@@ -586,6 +532,28 @@ def trigger_path_items(resp):
     if value:
         return [value]
     return []
+
+
+def candidate_bound_trigger_path(cand):
+    route = str(cand.get("route") or "").strip()
+    file_path = str(cand.get("file") or "").strip()
+    line = cand.get("line", 0)
+    evidence = str(cand.get("evidence_slice") or "").strip()
+    result = []
+    if evidence or file_path or line:
+        loc = file_path
+        if line not in (None, "", 0):
+            loc = f"{loc}:{line}" if loc else str(line)
+        result.append(
+            {
+                "step": 1,
+                "loc": loc or "unknown",
+                "code": evidence or route or "candidate route evidence",
+            }
+        )
+    if route:
+        result.append({"step": 2, "loc": "route", "function": route})
+    return result
 
 
 def attack_path_strings(resp, cand):
@@ -770,74 +738,6 @@ def build_hypothesis(cand, selected, priority, agent_verdict, routing_reason, co
     return record
 
 
-def candidate_bound_trigger_path(cand):
-    file_path = cand.get("file", "")
-    line = cand.get("line", 0)
-    loc = f"{file_path}:{line}" if file_path else str(line)
-    route = cand.get("route", "")
-    evidence = compact_text(cand.get("evidence_slice", ""), max_chars=320)
-    path = []
-    if evidence:
-        path.append({"step": 1, "loc": loc, "code": evidence})
-    if route:
-        path.append({"step": len(path) + 1, "loc": "route", "code": route})
-    return path
-
-
-def bind_template_response_to_candidate(response, cand):
-    if not isinstance(response, dict):
-        return response
-    bound = copy.deepcopy(response)
-    if is_vulnerability_response(response):
-        bound["trigger_path"] = candidate_bound_trigger_path(cand)
-        notes = str(bound.get("final_notes") or bound.get("review_notes") or "").strip()
-        reuse_note = "Stage C positive template reuse; D verification is bound to this candidate route."
-        if notes:
-            reuse_note = f"{notes} {reuse_note}"
-        if "final_notes" in bound:
-            bound["final_notes"] = reuse_note
-        else:
-            bound["review_notes"] = reuse_note
-    return bound
-
-
-def bind_template_rounds_to_candidate(red_team_rounds, cand):
-    bound_rounds = []
-    for round_item in red_team_rounds or []:
-        if not isinstance(round_item, dict):
-            bound_rounds.append(round_item)
-            continue
-        copied = copy.deepcopy(round_item)
-        copied["response"] = bind_template_response_to_candidate(copied.get("response"), cand)
-        bound_rounds.append(copied)
-    return bound_rounds
-
-
-def responses_from_rounds(red_team_rounds):
-    responses = []
-    for round_item in red_team_rounds or []:
-        if isinstance(round_item, dict):
-            responses.append(round_item.get("response", {}))
-    return responses
-
-
-def template_reused_hypothesis(cand, representative_hyp, signature):
-    red_team_rounds = bind_template_rounds_to_candidate(
-        representative_hyp.get("red_team_rounds", []),
-        cand,
-    )
-    responses = responses_from_rounds(red_team_rounds)
-    selected, priority, decision, reason, contradictions = route_record(cand, responses)
-    hyp = build_hypothesis(cand, selected, priority, decision, reason, contradictions, red_team_rounds)
-    hyp["stage_c_template_reuse"] = {
-        "policy": POSITIVE_TEMPLATE_REUSE_POLICY,
-        "signature": list(signature) if isinstance(signature, tuple) else signature,
-        "representative_sample_id": representative_hyp.get("sample_id"),
-        "representative_hypothesis_id": representative_hyp.get("hypothesis_id"),
-    }
-    return hyp
-
-
 def audit_error_record(cand, exc):
     return {
         "project_id": cand.get("project_id"),
@@ -1003,19 +903,17 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
 
     deadline = None if time_limit_seconds is None else time.monotonic() + time_limit_seconds
     grace_deadline = None if deadline is None else deadline + POST_DEADLINE_GRACE_SECONDS
-    groups = build_template_reuse_groups(candidates)
-    ready_groups = deque(groups)
     submitted_count = 0
-    reused_count = 0
     exhausted_reported = False
     counts = {"d": 0, "p0_d": 0, "audit": 0}
+    next_index = 0
 
     def within_budget():
         return deadline is None or time.monotonic() < deadline
 
     def report_exhausted(pending_count):
         nonlocal exhausted_reported
-        if deadline is None or exhausted_reported or not ready_groups:
+        if deadline is None or exhausted_reported or next_index >= len(candidates):
             return
         exhausted_reported = True
         print(
@@ -1029,22 +927,18 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
     running = {}
 
     def submit_available():
-        nonlocal submitted_count
-        while len(running) < MAX_WORKERS and ready_groups and within_budget():
-            group = ready_groups.popleft()
-            if group["resolved"] or group["cursor"] >= len(group["members"]):
-                continue
-            cand = group["members"][group["cursor"]]
-            group["cursor"] += 1
+        nonlocal submitted_count, next_index
+        while len(running) < MAX_WORKERS and next_index < len(candidates) and within_budget():
+            cand = candidates[next_index]
+            next_index += 1
             process = ctx.Process(target=audit_worker, args=(cand, deadline, result_queue))
             process.start()
-            running[process.pid] = (process, cand, group)
+            running[process.pid] = (process, cand)
             submitted_count += 1
 
     def handle_result(message):
-        nonlocal reused_count
         pid = message.get("pid")
-        process, cand, group = running.pop(pid, (None, None, None))
+        process, cand = running.pop(pid, (None, None))
         if process is not None:
             process.join(timeout=0)
         if cand is None:
@@ -1057,20 +951,6 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
             audit_file,
         )
         counts[bucket] += 1
-        if group is None or group["resolved"]:
-            return
-        if bucket in {"d", "p0_d"}:
-            group["resolved"] = True
-            while group["cursor"] < len(group["members"]):
-                reused_cand = group["members"][group["cursor"]]
-                group["cursor"] += 1
-                reused_hyp = template_reused_hypothesis(reused_cand, hyp, group["signature"])
-                reused_bucket = process_hypothesis_record(reused_hyp, reused_cand, d_file, audit_file)
-                counts[reused_bucket] += 1
-                reused_count += 1
-            return
-        if group["cursor"] < len(group["members"]):
-            ready_groups.append(group)
 
     def drain_results():
         drained = False
@@ -1095,7 +975,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
 
     def terminate_running():
         drain_results()
-        for pid, (process, cand, group) in list(running.items()):
+        for pid, (process, cand) in list(running.items()):
             if not process.is_alive():
                 process.join(timeout=0)
                 if wait_for_worker_result(pid, WORKER_RESULT_DRAIN_GRACE_SECONDS):
@@ -1119,10 +999,10 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
             running.pop(pid, None)
 
     submit_available()
-    if not running and ready_groups:
+    if not running and next_index < len(candidates):
         report_exhausted(0)
 
-    while running or (ready_groups and within_budget()):
+    while running or (next_index < len(candidates) and within_budget()):
         submit_available()
         if drain_results():
             submit_available()
@@ -1145,7 +1025,7 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
             handle_result(result_queue.get(timeout=poll_timeout))
             submit_available()
         except queue.Empty:
-            for pid, (process, cand, group) in list(running.items()):
+            for pid, (process, cand) in list(running.items()):
                 if process.is_alive():
                     continue
                 process.join(timeout=0)
@@ -1164,12 +1044,10 @@ def run_audit_queue(candidates, time_limit_seconds, d_file, audit_file):
                 )
                 counts[bucket] += 1
                 running.pop(pid, None)
-                if group is not None and not group["resolved"] and group["cursor"] < len(group["members"]):
-                    ready_groups.append(group)
             submit_available()
 
-    skipped = len(candidates) - submitted_count - reused_count
-    return counts, submitted_count, skipped, reused_count, len(groups)
+    skipped = len(candidates) - submitted_count
+    return counts, submitted_count, skipped
 
 
 def main():
@@ -1191,17 +1069,14 @@ def main():
         open(output_path, "a", encoding="utf-8", buffering=1) as d_file,
         open(audit_output_path, "a", encoding="utf-8", buffering=1) as audit_file,
     ):
-        counts, submitted_count, skipped_count, reused_count, group_count = run_audit_queue(
+        counts, submitted_count, skipped_count = run_audit_queue(
             candidates,
             args.time_limit_seconds,
             d_file,
             audit_file,
         )
 
-    print(f"[C] template reuse groups: {group_count}/{len(candidates)}")
     print(f"[C] LLM-audited candidates: {submitted_count}/{len(candidates)}")
-    if reused_count:
-        print(f"[C] positive template-reused candidates: {reused_count}")
     if skipped_count:
         print(f"[C] skipped by time budget: {skipped_count}")
     d_candidate_count = counts["d"] + counts["p0_d"]

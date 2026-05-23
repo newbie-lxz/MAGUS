@@ -96,29 +96,26 @@ STATIC_CONFIRMATION_MIN_SINK_SCORE = 0.70
 STATIC_CONFIRMATION_MIN_DEVIATION_SCORE = 0.40
 
 C_PRIORITY_BASE_WEIGHTS = {
-    "threshold_pass": 100.0,
+    "threshold_pass": 2.0,
     "risk_score": 10.0,
     "sink_score": 2.0,
-    "pattern_deviation_score": 1.0,
+    "pattern_deviation_score": 2.0,
     "rarity_score": 0.5,
     "candidate_count": 0.01,
     "static_confirmation_supported": 0.5,
 }
 
 C_PRIORITY_SIGNAL_WEIGHTS = {
-    "environment_source": 8.0,
-    "stdin_source": 8.0,
+    "environment_source": 4.0,
+    "stdin_source": 4.0,
     "network_source_or_sink": 2.0,
     "network_receive_call": 1.4,
     "network_setup_call": 2.0,
     "external_memory_sink": 2.0,
-    "candidate_count_ge_8": 1.0,
-    "candidate_count_ge_12": 2.0,
 }
 
 C_PRIORITY_DEMOTION_WEIGHTS = {
     "main_dispatch_route": -5.0,
-    "relative_path_route": -10.0,
     "filesystem_file_source_without_external_input": -5.0,
     "filesystem_sink_without_external_input": -5.0,
 }
@@ -615,13 +612,13 @@ def score_candidates(
     return candidates
 
 
-def candidate_priority_key(candidate: ScoredCandidate) -> tuple[int, float, float, float, float, int, str, str, str]:
+def candidate_priority_key(candidate: ScoredCandidate) -> tuple[float, float, float, float, int, int, str, str, str]:
     return (
-        -int(candidate.threshold_pass),
-        -candidate.rarity_score,
+        -candidate.risk_score,
         -candidate.pattern_deviation_score,
         -candidate.sink_score,
-        -candidate.risk_score,
+        -candidate.rarity_score,
+        -int(candidate.threshold_pass),
         -candidate.missing_feature_count,
         candidate.project_id,
         candidate.sample_id,
@@ -686,11 +683,11 @@ def c_ready_records(
         record["priority_basis"] = {
             "primary": "c_priority_score_desc",
             "secondary": [
-                "route_aggregated_threshold_pass_desc",
                 "max_risk_score_desc",
                 "max_sink_score_desc",
                 "max_pattern_deviation_score_desc",
                 "max_rarity_score_desc",
+                "route_aggregated_threshold_pass_desc",
                 "candidate_count_desc",
             ],
         }
@@ -921,8 +918,9 @@ def c_ready_priority_policy() -> dict[str, Any]:
         "excludes": [
             "Stage C output",
             "Stage D output",
-            "Juliet bad/good labels",
-            "sanitization map labels",
+            "benchmark answer labels",
+            "sanitization reverse maps",
+            "evaluation outputs",
         ],
     }
 
@@ -933,7 +931,6 @@ def c_ready_priority_payload(record: dict[str, Any]) -> dict[str, Any]:
     sink_types = lower_string_set(stage_b.get("sink_types", []))
     seed_tokens = [str(token).strip().lower() for token in stage_b.get("seed_tokens", []) if str(token).strip()]
     seed_text = " ".join(seed_tokens)
-    route_text = f"{record.get('file', '')} {record.get('route', '')}".lower()
     evidence_text = str(record.get("evidence_slice") or "").lower()
     candidate_count = int(stage_b.get("candidate_count", 0) or 0)
 
@@ -951,10 +948,10 @@ def c_ready_priority_payload(record: dict[str, Any]) -> dict[str, Any]:
         components["static_confirmation_supported"] = C_PRIORITY_BASE_WEIGHTS["static_confirmation_supported"]
 
     external_source = False
-    if "environment" in source_kinds or "getenv" in seed_text or "getenv" in evidence_text or "environment" in route_text:
+    if "environment" in source_kinds or "getenv" in seed_text or "getenv" in evidence_text:
         components["environment_source"] = C_PRIORITY_SIGNAL_WEIGHTS["environment_source"]
         external_source = True
-    if "stdin" in source_kinds or "fgets" in seed_text or "fgets" in evidence_text or "console" in route_text:
+    if "stdin" in source_kinds or "fgets" in seed_text or "fgets" in evidence_text:
         components["stdin_source"] = C_PRIORITY_SIGNAL_WEIGHTS["stdin_source"]
         external_source = True
     if (
@@ -971,17 +968,10 @@ def c_ready_priority_payload(record: dict[str, Any]) -> dict[str, Any]:
         components["network_setup_call"] = C_PRIORITY_SIGNAL_WEIGHTS["network_setup_call"]
     if "memory" in sink_types and external_source:
         components["external_memory_sink"] = C_PRIORITY_SIGNAL_WEIGHTS["external_memory_sink"]
-    if candidate_count >= 8:
-        components["candidate_count_ge_8"] = C_PRIORITY_SIGNAL_WEIGHTS["candidate_count_ge_8"]
-    if candidate_count >= 12:
-        components["candidate_count_ge_12"] = C_PRIORITY_SIGNAL_WEIGHTS["candidate_count_ge_12"]
 
     if Path(str(record.get("file", ""))).name == "main.cpp" or str(record.get("route", "")).endswith("::main"):
         components["main_dispatch_route"] = C_PRIORITY_DEMOTION_WEIGHTS["main_dispatch_route"]
-    if "relativepath" in route_text or "relative_path" in route_text:
-        components["relative_path_route"] = C_PRIORITY_DEMOTION_WEIGHTS["relative_path_route"]
-    file_source_route = "__w32_char_file_" in route_text or "__w32_wchar_t_file_" in route_text
-    if not external_source and (file_source_route or "filesystem" in source_kinds):
+    if not external_source and "filesystem" in source_kinds:
         components["filesystem_file_source_without_external_input"] = (
             C_PRIORITY_DEMOTION_WEIGHTS["filesystem_file_source_without_external_input"]
         )
@@ -1001,15 +991,15 @@ def c_ready_priority_payload(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def c_ready_record_priority_key(record: dict[str, Any]) -> tuple[float, int, float, float, float, float, int, str, str]:
+def c_ready_record_priority_key(record: dict[str, Any]) -> tuple[float, float, float, float, float, int, int, str, str]:
     stage_b = record["stage_b"]
     return (
         -stage_b["c_priority_score"],
-        -int(stage_b["threshold_pass"]),
         -stage_b["max_risk_score"],
         -stage_b["max_sink_score"],
         -stage_b["max_pattern_deviation_score"],
         -stage_b["max_rarity_score"],
+        -int(stage_b["threshold_pass"]),
         -stage_b["candidate_count"],
         record["project_id"],
         record["route"],
@@ -1034,12 +1024,15 @@ def stats_payload(
 ) -> dict[str, Any]:
     passed = [candidate for candidate in candidates if candidate.threshold_pass]
     c_ready_count = len({(candidate.project_id, candidate.route or candidate.sample_id) for candidate in candidates})
+    groups_without_expected_features = sum(1 for model in models.values() if not model.expected_features)
     return {
         "schema_version": "stageb.feature_miner_stats.v1",
         "input_schema_version": SCHEMA_VERSION,
         "c_ready_schema_version": C_READY_SCHEMA_VERSION,
         "total_samples": len(samples),
         "total_groups": len(models),
+        "groups_without_expected_features": groups_without_expected_features,
+        "groups_without_expected_features_ratio": round(groups_without_expected_features / len(models), 4) if models else 0.0,
         "total_patterns": sum(len(model.expected_features) for model in models.values()),
         "total_candidates": len(candidates),
         "c_ready_candidates": c_ready_count,
@@ -1051,20 +1044,20 @@ def stats_payload(
             "min_pattern_deviation_score": STATIC_CONFIRMATION_MIN_DEVIATION_SCORE,
         },
         "candidate_sort_order": [
-            "threshold_pass_desc",
-            "rarity_score_desc",
+            "risk_score_desc",
             "pattern_deviation_score_desc",
             "sink_score_desc",
-            "risk_score_desc",
+            "rarity_score_desc",
+            "threshold_pass_desc",
             "missing_feature_count_desc",
         ],
         "c_ready_sort_order": [
             "c_priority_score_desc",
-            "route_aggregated_threshold_pass_desc",
             "max_risk_score_desc",
             "max_sink_score_desc",
             "max_pattern_deviation_score_desc",
             "max_rarity_score_desc",
+            "route_aggregated_threshold_pass_desc",
             "candidate_count_desc",
         ],
         "passed_threshold": len(passed),

@@ -21,18 +21,15 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 class ReportRunNameTests(unittest.TestCase):
-    def test_stage_d_output_prefers_unique_juliet_cwe_source_folder(self):
+    def test_stage_d_output_uses_unique_project_id(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             out_dir = Path(temp_dir)
             write_jsonl(
                 out_dir / "verification.jsonl",
                 [
                     {
-                        "project_id": "cwe15",
-                        "file": (
-                            "juliet-api-misuse/testcases/"
-                            "CWE15_External_Control_of_System_or_Configuration_Setting/case.c"
-                        ),
+                        "project_id": "libxml2",
+                        "file": "third_party/tests/CWE15_Example/case.c",
                     }
                 ],
             )
@@ -40,16 +37,16 @@ class ReportRunNameTests(unittest.TestCase):
 
             self.assertEqual(
                 pipeline.report_run_name_from_stage_d_output(out_dir),
-                "CWE15_External_Control_of_System_or_Configuration_Setting",
+                "libxml2",
             )
 
-    def test_stage_d_output_uses_normalized_project_id_without_cwe_folder(self):
+    def test_stage_d_output_normalizes_project_id(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             out_dir = Path(temp_dir)
             write_jsonl(out_dir / "verification.jsonl", [])
-            write_jsonl(out_dir / "verification.failed.jsonl", [{"project_id": "cwe15", "file": "src/example.c"}])
+            write_jsonl(out_dir / "verification.failed.jsonl", [{"project_id": "my project", "file": "src/example.c"}])
 
-            self.assertEqual(pipeline.report_run_name_from_stage_d_output(out_dir), "CWE15")
+            self.assertEqual(pipeline.report_run_name_from_stage_d_output(out_dir), "my_project")
 
     def test_juliet_eval_output_defaults_under_run_name(self):
         with tempfile.TemporaryDirectory() as temp_dir:

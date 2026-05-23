@@ -19,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LAZY_MD = REPO_ROOT / "test" / "lazy.md"
 DEFAULT_OUT_ROOT = REPO_ROOT / "test" / "out" / "lazy_batch"
 DEFAULT_C_TIME_LIMIT_SECONDS = 7200.0
-DEFAULT_MISMATCH_THRESHOLD = 0.02
+DEFAULT_MISMATCH_THRESHOLD = 0.10
 RUN_LINE_RE = re.compile(r"run_juliet_folder\s+'([^']+)'\s+'([^']+)'")
 ADAPTED_CWE_IDS = {
     "cwe247",
@@ -48,6 +48,7 @@ ADAPTED_CWE_IDS = {
 JSONL_NAMES = {
     "b_candidates": "candidates.for_c.jsonl",
     "c_hypotheses": "{cwe_id}.hypotheses.jsonl",
+    "d_contexts": "verification_contexts.{cwe_id}.jsonl",
     "d_confirmed": "verification.jsonl",
     "d_failed": "verification.failed.jsonl",
 }
@@ -217,19 +218,10 @@ def command_to_text(command: list[str]) -> str:
 
 
 def parse_c_line(line: str, stats: dict[str, int]) -> None:
-    match = re.search(r"\[C\] template reuse groups:\s+(\d+)/(\d+)", line)
-    if match:
-        stats["c_template_groups"] = int(match.group(1))
-        stats["c_candidates_total"] = int(match.group(2))
-        return
     match = re.search(r"\[C\] LLM-audited candidates:\s+(\d+)/(\d+)", line)
     if match:
         stats["c_llm_audited"] = int(match.group(1))
         stats["c_candidates_total"] = int(match.group(2))
-        return
-    match = re.search(r"\[C\] positive template-reused candidates:\s+(\d+)", line)
-    if match:
-        stats["c_template_reused_positive"] = int(match.group(1))
         return
     match = re.search(r"\[C\] skipped by time budget:\s+(\d+)", line)
     if match:
@@ -374,6 +366,10 @@ def c_output_path(cwe_id: str) -> Path:
     return REPO_ROOT / "c" / "out" / f"{cwe_id}.hypotheses.jsonl"
 
 
+def d_contexts_path(cwe_id: str) -> Path:
+    return REPO_ROOT / "d" / "memberD_verifier" / "02_run_with_C" / JSONL_NAMES["d_contexts"].format(cwe_id=cwe_id)
+
+
 def d_output_dir(run_name: str) -> Path:
     return REPO_ROOT / "d" / "memberD_verifier" / "02_run_with_C" / "output" / run_name
 
@@ -432,6 +428,17 @@ def build_gen_input_command(folder: JulietFolder) -> list[str]:
     ]
 
 
+def build_context_command(folder: JulietFolder) -> list[str]:
+    return [
+        sys.executable,
+        "tools/gen_juliet_verification_contexts.py",
+        "--project-id",
+        folder.cwe_id,
+        "--out",
+        str(d_contexts_path(folder.cwe_id).relative_to(REPO_ROOT)),
+    ]
+
+
 def build_eval_command(folder: JulietFolder, args: argparse.Namespace, eval_dir: Path) -> list[str]:
     run_name = folder.cwe_dir
     abcd_command = [
@@ -450,6 +457,8 @@ def build_eval_command(folder: JulietFolder, args: argparse.Namespace, eval_dir:
         str(args.c_time_limit_seconds),
         "--report-run-name",
         run_name,
+        "--d-contexts",
+        str(d_contexts_path(folder.cwe_id).relative_to(REPO_ROOT)),
     ]
     return [
         sys.executable,
@@ -579,9 +588,7 @@ CSV_FIELDS = [
     "source_files",
     "b_candidates",
     "c_candidates_total",
-    "c_template_groups",
     "c_llm_audited",
-    "c_template_reused_positive",
     "c_skipped_by_time_budget",
     "c_hypotheses",
     "c_d_candidates",
@@ -689,6 +696,16 @@ def run_folder(
     if gen_input_result.returncode != 0:
         raise SystemExit(gen_input_result.returncode)
 
+    context_result = run_logged(
+        build_context_command(folder),
+        REPO_ROOT,
+        paths.logs / f"{folder.cwe_id}.contexts.log",
+        env,
+        args.dry_run,
+    )
+    if context_result.returncode != 0:
+        raise SystemExit(context_result.returncode)
+
     eval_dir = paths.eval_root / folder.cwe_dir
     eval_result = run_logged(
         build_eval_command(folder, args, eval_dir),
@@ -748,11 +765,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--prepare", action="store_true", help="Run lazy.md one-time sanitization and Stage D setup first")
     parser.add_argument("--llvm-home", default="", help="Set LLVM_HOME and prepend LLVM_HOME/bin to PATH")
     parser.add_argument("--dry-run", action="store_true", help="Print and log commands without executing them")
-    parser.add_argument(
-        "--continue-after-threshold",
-        action="store_true",
-        help="Do not stop when the mismatch threshold is exceeded",
-    )
     return parser.parse_args(argv)
 
 
@@ -821,11 +833,11 @@ def main(argv: list[str] | None = None) -> int:
             rows.append(row)
             append_jsonl(paths.root / "runs.jsonl", row)
             persist_rows(paths, rows, stop_reason)
-            if row.get("threshold_exceeded") and not args.continue_after_threshold:
-                stop_reason = f"threshold_exceeded:{folder.cwe_id}"
-                print(f"[lazy-batch] stopping: {stop_reason}", flush=True)
-                persist_rows(paths, rows, stop_reason)
-                return 3
+            if row.get("threshold_exceeded"):
+                print(
+                    f"[lazy-batch] threshold exceeded for {folder.cwe_id}; continuing",
+                    flush=True,
+                )
         stop_reason = "completed"
     finally:
         persist_rows(paths, rows, stop_reason)

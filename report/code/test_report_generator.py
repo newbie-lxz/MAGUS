@@ -18,7 +18,7 @@ def _confirmed_row():
         "severity": "P0",
         "target_type": "source_api",
         "attack_type": "buffer_overflow",
-        "route": "file.c::bad",
+        "route": "file.c::target",
         "file": "file.c",
         "line": 42,
         "evidence_slice": "strcpy(dst, src);",
@@ -56,7 +56,7 @@ class FinalReportTests(unittest.TestCase):
     def test_final_report_row_contains_required_vulnerability_fields(self):
         row = generate_report.final_report_rows([_confirmed_row()])[0]
 
-        self.assertEqual(row["location"], {"file_path": "file.c", "line": 42, "route": "file.c::bad"})
+        self.assertEqual(row["location"], {"file_path": "file.c", "line": 42, "route": "file.c::target"})
         self.assertEqual(row["vulnerability_type"], "buffer_overflow")
         self.assertEqual(row["risk_level"], "P0")
         self.assertIn("attacker controls src", row["trigger_condition"]["preconditions"])

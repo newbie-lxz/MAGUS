@@ -39,8 +39,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-file", required=True, help="C/C++ source file from the Stage C hypothesis")
     parser.add_argument("--entry-symbol", default="", help="Entry symbol from D target generation; kept for traceability")
     parser.add_argument("--route", default="", help="Full Stage C route; used to bind the dynamic run to bad/good scenario")
-    parser.add_argument("--payload", default="magus-juliet-controlled-input", help="Payload returned by shimmed external sources")
-    parser.add_argument("--oracle-profile-id", default="", help="D oracle profile selected for this hypothesis")
+    parser.add_argument(
+        "--payload",
+        default=os.environ.get("MAGUS_D_PAYLOAD", "magus-juliet-controlled-input"),
+        help="Payload returned by shimmed external sources",
+    )
+    parser.add_argument(
+        "--oracle-profile-id",
+        default=os.environ.get("MAGUS_D_ORACLE_PROFILE_ID", ""),
+        help="D oracle profile selected for this hypothesis",
+    )
     parser.add_argument(
         "--confirm-pattern",
         action="append",
@@ -50,6 +58,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cc", default=os.environ.get("MAGUS_CC", "/usr/bin/clang-20"))
     parser.add_argument("--cxx", default=os.environ.get("MAGUS_CXX", "/usr/bin/clang++-20"))
     return parser.parse_args()
+
+
+def env_confirm_patterns() -> list[str]:
+    raw = os.environ.get("MAGUS_D_CONFIRM_PATTERNS_JSON", "").strip()
+    if not raw:
+        return []
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(payload, list):
+        return [str(item) for item in payload if str(item)]
+    return []
 
 
 def load_sanitization_map() -> dict[str, object]:
@@ -388,6 +409,8 @@ def unsupported_oracle_reason(confirm_patterns: list[str], profile_id: str) -> s
 
 def main() -> int:
     args = parse_args()
+    if not args.confirm_pattern:
+        args.confirm_pattern = env_confirm_patterns()
     source = resolve_source(args.source_file)
     require_sanitization_map_for(source)
     scenario = scenario_for(args, source)
@@ -406,7 +429,6 @@ def main() -> int:
         write_runtime_files(tmp_path, args.payload)
         env = os.environ.copy()
         env["MAGUS_JULIET_PAYLOAD"] = args.payload
-        env["MAGUS_CWE15_PAYLOAD"] = args.payload
         env.setdefault("ADD", args.payload)
         env.setdefault("WINDIR", r"C:\Windows")
         configure_failure_environment(env, source)
