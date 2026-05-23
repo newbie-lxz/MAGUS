@@ -9,7 +9,6 @@ __pycache__/
 .codex/.tmp/plugins/
 
 # Stage A generated artifacts and copied input repositories
-/srcs/
 /srcs_*
 a/out/*
 !a/out/.gitkeep
