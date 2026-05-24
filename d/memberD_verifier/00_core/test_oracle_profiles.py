@@ -31,6 +31,21 @@ class OracleProfileSelectionTests(unittest.TestCase):
         self.assertTrue(profile["supported"])
         self.assertIn("MAGUS_ORACLE_SINK name=system tainted=1", profile["confirm_patterns"])
 
+    def test_selects_memory_oob_write_for_cwe122(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "recv -> atoi -> buffer[data]",
+                "claim": "network input is used as an array index without an upper bound check",
+                "cwe_candidates": ["CWE-122", "CWE-129"],
+                "evidence_slice": "if (data >= 0) { buffer[data] = 1; }",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "memory.out_of_bounds_write")
+        self.assertTrue(profile["supported"])
+        self.assertIn("heap-buffer-overflow", profile["confirm_patterns"])
+        self.assertEqual(profile["semantic_model"]["bug_class"], "out_of_bounds_write")
+
     def test_selects_path_environment_update_without_cwe(self):
         profile = oracle_profiles.build_oracle_profile(
             {

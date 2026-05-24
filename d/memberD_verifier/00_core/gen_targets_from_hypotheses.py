@@ -252,6 +252,23 @@ def seed_inputs_for_attack(attack_type: str) -> List[str]:
     ]
 
 
+def runtime_input_for_attack(attack_type: str, hyp: Dict[str, Any]) -> str | None:
+    text = as_text(
+        [
+            hyp.get("file"),
+            hyp.get("route"),
+            hyp.get("claim"),
+            hyp.get("evidence_slice"),
+            hyp.get("cwe_candidates") or hyp.get("CWE_candidates") or hyp.get("cwe_list"),
+        ]
+    ).lower()
+    if attack_type == "buffer_overflow":
+        if "cwe129" in text or "cwe-129" in text or "array index" in text or "index" in text:
+            return "11"
+        return "A" * 512
+    return None
+
+
 def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]:
     attack_type = classify_attack(hyp)
     symbol = entry_symbol(hyp)
@@ -261,6 +278,7 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
     oracle_profile = compact_profile_for_json(build_oracle_profile(hyp))
 
     seed_inputs = seed_inputs_for_attack(attack_type)
+    runtime_input = runtime_input_for_attack(attack_type, hyp)
     input_source = None
 
     case: Dict[str, Any] = {
@@ -310,6 +328,9 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
             "expect_nonzero_exit": True,
         },
     }
+    if runtime_input:
+        case["payload"]["runtime_input"] = runtime_input
+
     explicit_context = hyp.get("verification_context")
     if isinstance(explicit_context, dict) and explicit_context:
         case["verification_context"] = explicit_context

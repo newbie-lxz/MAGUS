@@ -90,6 +90,24 @@ class ExplicitContextTests(unittest.TestCase):
         self.assertTrue(case["oracle"]["expect_nonzero_exit"])
         self.assertNotIn("MAGUS_ROUTE_EXECUTED", case["oracle"].get("required_patterns", []))
 
+    def test_cwe129_buffer_overflow_gets_numeric_runtime_input(self):
+        hyp = {
+            "project_id": "juliet",
+            "sample_id": "s1",
+            "hypothesis_id": "h1",
+            "route": "recv -> atoi -> buffer[data]",
+            "file": "CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_connect_socket_21.cpp",
+            "claim": "network data is converted with atoi and used as an array index",
+            "cwe_candidates": ["CWE-122", "CWE-129"],
+            "evidence_slice": "if (data >= 0) { buffer[data] = 1; }",
+        }
+
+        case = target_gen.make_source_api_case(hyp, auto_fill=True)
+
+        self.assertEqual(case["attack_type"], "buffer_overflow")
+        self.assertEqual(case["oracle_profile_id"], "memory.out_of_bounds_write")
+        self.assertEqual(case["payload"]["runtime_input"], "11")
+
 
 if __name__ == "__main__":
     unittest.main()

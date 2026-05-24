@@ -113,6 +113,7 @@ def execution_env(plan: dict[str, Any]) -> dict[str, str]:
         "MAGUS_D_ORACLE_PROFILE_ID": plan.get("oracle_profile_id"),
         "MAGUS_D_PAYLOAD": payload.get("marker"),
         "MAGUS_D_PAYLOAD_MARKER": payload.get("marker"),
+        "MAGUS_D_RUNTIME_INPUT": payload.get("runtime_input"),
     }
     for key, value in values.items():
         if value not in (None, "", []):

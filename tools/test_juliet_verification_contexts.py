@@ -92,6 +92,26 @@ class JulietHelperOutputTests(unittest.TestCase):
             ["MAGUS_ORACLE_RAN profile=resource.handle_lifecycle.win32"],
         )
 
+    def test_sanitizer_crash_after_bad_entry_counts_as_route_bound(self):
+        stdout = "Calling bad()...\n"
+        stderr = "ERROR: AddressSanitizer: heap-buffer-overflow on address 0x1"
+
+        self.assertTrue(
+            self.runner.route_was_executed(
+                stdout,
+                Path("CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_connect_socket_21.cpp"),
+                "bad",
+                stderr,
+            )
+        )
+
+    def test_memory_profile_enables_asan_flags(self):
+        self.assertIn(
+            "-fsanitize=address",
+            self.runner.sanitizer_flags_for("memory.out_of_bounds_write"),
+        )
+        self.assertEqual(self.runner.sanitizer_flags_for("process.untrusted_library_load"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
