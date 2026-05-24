@@ -110,7 +110,21 @@ class JulietHelperOutputTests(unittest.TestCase):
             "-fsanitize=address",
             self.runner.sanitizer_flags_for("memory.out_of_bounds_write"),
         )
+        self.assertIn(
+            "-fsanitize=address",
+            self.runner.sanitizer_flags_for("memory.out_of_bounds_read"),
+        )
+        self.assertIn(
+            "-fsanitize=address",
+            self.runner.sanitizer_flags_for("memory.use_after_free"),
+        )
         self.assertEqual(self.runner.sanitizer_flags_for("process.untrusted_library_load"), [])
+
+    def test_integer_profile_enables_ubsan_flags(self):
+        flags = self.runner.sanitizer_flags_for("integer.overflow")
+
+        self.assertIn("-fsanitize=undefined,signed-integer-overflow", flags)
+        self.assertNotIn("-fsanitize=address", flags)
 
 
 if __name__ == "__main__":

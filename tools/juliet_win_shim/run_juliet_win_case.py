@@ -33,6 +33,9 @@ POSIX_FD_LIFECYCLE_PROFILE_ID = "resource.fd_lifecycle.user_posix"
 STDIO_LIFECYCLE_PROFILE_ID = "resource.stream_lifecycle.c_stdio"
 WIN32_HANDLE_LIFECYCLE_PROFILE_ID = "resource.handle_lifecycle.win32"
 MEMORY_OOB_PROFILE_ID = "memory.out_of_bounds_write"
+MEMORY_OOB_READ_PROFILE_ID = "memory.out_of_bounds_read"
+MEMORY_UAF_PROFILE_ID = "memory.use_after_free"
+INTEGER_OVERFLOW_PROFILE_ID = "integer.overflow"
 LIFECYCLE_CAPABILITY_ENV = {
     POSIX_FD_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_FD_LEAKS",
     STDIO_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_STREAM_LEAKS",
@@ -40,10 +43,16 @@ LIFECYCLE_CAPABILITY_ENV = {
 }
 SANITIZER_EVIDENCE_PATTERNS = (
     "AddressSanitizer",
+    "UndefinedBehaviorSanitizer",
     "heap-buffer-overflow",
     "stack-buffer-overflow",
     "global-buffer-overflow",
     "dynamic-stack-buffer-overflow",
+    "heap-use-after-free",
+    "stack-use-after-return",
+    "stack-use-after-scope",
+    "runtime error: signed integer overflow",
+    "runtime error: unsigned integer overflow",
 )
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
 SCENARIO_LABELS = {"bad": "case0", "good": "case1"}
@@ -314,8 +323,10 @@ def configure_failure_environment(env: dict[str, str], source: Path, oracle_prof
 
 
 def sanitizer_flags_for(profile_id: str) -> list[str]:
-    if profile_id == MEMORY_OOB_PROFILE_ID:
+    if profile_id in {MEMORY_OOB_PROFILE_ID, MEMORY_OOB_READ_PROFILE_ID, MEMORY_UAF_PROFILE_ID}:
         return ["-fsanitize=address", "-fno-omit-frame-pointer", "-g"]
+    if profile_id == INTEGER_OVERFLOW_PROFILE_ID:
+        return ["-fsanitize=undefined,signed-integer-overflow", "-fno-omit-frame-pointer", "-g"]
     return []
 
 

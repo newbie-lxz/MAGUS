@@ -263,9 +263,20 @@ def runtime_input_for_attack(attack_type: str, hyp: Dict[str, Any]) -> str | Non
         ]
     ).lower()
     if attack_type == "buffer_overflow":
-        if "cwe129" in text or "cwe-129" in text or "array index" in text or "index" in text:
+        if (
+            "cwe129" in text
+            or "cwe-129" in text
+            or "cwe125" in text
+            or "cwe-125" in text
+            or "cwe126" in text
+            or "cwe-126" in text
+            or "array index" in text
+            or "index" in text
+        ):
             return "11"
         return "A" * 512
+    if attack_type == "integer_overflow":
+        return "2147483647"
     return None
 
 

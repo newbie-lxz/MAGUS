@@ -108,6 +108,24 @@ class ExplicitContextTests(unittest.TestCase):
         self.assertEqual(case["oracle_profile_id"], "memory.out_of_bounds_write")
         self.assertEqual(case["payload"]["runtime_input"], "11")
 
+    def test_integer_overflow_gets_boundary_runtime_input(self):
+        hyp = {
+            "project_id": "juliet",
+            "sample_id": "s1",
+            "hypothesis_id": "h1",
+            "route": "recv -> atoi -> multiply",
+            "file": "CWE190_Integer_Overflow__connect_socket_01.c",
+            "claim": "network data can trigger signed integer overflow",
+            "cwe_candidates": ["CWE-190"],
+            "evidence_slice": "data = data * 2;",
+        }
+
+        case = target_gen.make_source_api_case(hyp, auto_fill=True)
+
+        self.assertEqual(case["attack_type"], "integer_overflow")
+        self.assertEqual(case["oracle_profile_id"], "integer.overflow")
+        self.assertEqual(case["payload"]["runtime_input"], "2147483647")
+
 
 if __name__ == "__main__":
     unittest.main()
