@@ -60,6 +60,36 @@ class ExplicitContextTests(unittest.TestCase):
             case["oracle"]["capability_patterns"],
         )
 
+    def test_explicit_hypothesis_verification_context_is_preserved(self):
+        hyp = {
+            "project_id": "repo_source_api_exec",
+            "sample_id": "s1",
+            "hypothesis_id": "h1",
+            "route": "parse_request -> ASN1_OCTET_STRING_new -> dereference",
+            "file": "src/crypto/example.c",
+            "claim": "returned pointer is dereferenced before null check",
+            "evidence_slice": "obj = ASN1_OCTET_STRING_new(); return obj->length;",
+            "verification_context": {
+                "repo_path": "01_demo_test/mock_source_project",
+                "run_cmd": "${PYTHON} poc.py",
+                "oracle": {
+                    "failure_patterns": ["AddressSanitizer", "null pointer"],
+                    "expect_nonzero_exit": True,
+                },
+            },
+        }
+
+        case = target_gen.make_source_api_case(hyp, auto_fill=True)
+
+        self.assertEqual(
+            case["verification_context"]["repo_path"],
+            "01_demo_test/mock_source_project",
+        )
+        self.assertEqual(case["verification_context"]["run_cmd"], "${PYTHON} poc.py")
+        self.assertEqual(case["oracle"]["failure_patterns"], ["AddressSanitizer", "null pointer"])
+        self.assertTrue(case["oracle"]["expect_nonzero_exit"])
+        self.assertNotIn("MAGUS_ROUTE_EXECUTED", case["oracle"].get("required_patterns", []))
+
 
 if __name__ == "__main__":
     unittest.main()

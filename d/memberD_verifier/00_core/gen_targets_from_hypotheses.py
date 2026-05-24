@@ -310,6 +310,15 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
             "expect_nonzero_exit": True,
         },
     }
+    explicit_context = hyp.get("verification_context")
+    if isinstance(explicit_context, dict) and explicit_context:
+        case["verification_context"] = explicit_context
+
+        explicit_oracle = explicit_context.get("oracle")
+        if isinstance(explicit_oracle, dict) and explicit_oracle:
+            case["oracle"] = dict(explicit_oracle)
+            case["oracle"].setdefault("profile_id", oracle_profile.get("profile_id"))
+            case["oracle"].setdefault("profile_supported", bool(oracle_profile.get("supported")))
 
     if hyp.get("poc_code") or hyp.get("harness_code"):
         case["harness_code"] = hyp.get("poc_code") or hyp.get("harness_code")
