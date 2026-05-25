@@ -126,6 +126,17 @@ class JulietHelperOutputTests(unittest.TestCase):
         self.assertIn("-fsanitize=undefined,signed-integer-overflow", flags)
         self.assertNotIn("-fsanitize=address", flags)
 
+    def test_payload_candidates_use_runtime_inputs_json_once_each(self):
+        old_value = self.runner.os.environ.get("MAGUS_D_RUNTIME_INPUTS_JSON")
+        self.runner.os.environ["MAGUS_D_RUNTIME_INPUTS_JSON"] = '["11", "10", "11"]'
+        try:
+            self.assertEqual(self.runner.payload_candidates("10"), ["11", "10"])
+        finally:
+            if old_value is None:
+                self.runner.os.environ.pop("MAGUS_D_RUNTIME_INPUTS_JSON", None)
+            else:
+                self.runner.os.environ["MAGUS_D_RUNTIME_INPUTS_JSON"] = old_value
+
 
 if __name__ == "__main__":
     unittest.main()

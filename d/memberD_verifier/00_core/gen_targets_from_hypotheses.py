@@ -141,8 +141,13 @@ def classify_attack(hyp: Dict[str, Any]) -> str:
         "cwe-120" in text
         or "cwe-121" in text
         or "cwe-122" in text
+        or "cwe-125" in text
+        or "cwe-126" in text
         or "cwe-787" in text
         or "buffer overflow" in text
+        or "out-of-bounds read" in text
+        or "out of bounds read" in text
+        or "越界读" in text
         or "缓冲区溢出" in text
     ):
         return "buffer_overflow"
@@ -252,7 +257,18 @@ def seed_inputs_for_attack(attack_type: str) -> List[str]:
     ]
 
 
-def runtime_input_for_attack(attack_type: str, hyp: Dict[str, Any]) -> str | None:
+def dedupe_text(values: Iterable[str]) -> List[str]:
+    result: List[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def runtime_inputs_for_attack(attack_type: str, hyp: Dict[str, Any]) -> List[str]:
     text = as_text(
         [
             hyp.get("file"),
@@ -273,11 +289,16 @@ def runtime_input_for_attack(attack_type: str, hyp: Dict[str, Any]) -> str | Non
             or "array index" in text
             or "index" in text
         ):
-            return "11"
-        return "A" * 512
+            return dedupe_text(["11", "10", "15", "100", "-1", "2147483647"])
+        return ["A" * 512, "A" * 2048, "A" * 8192]
     if attack_type == "integer_overflow":
-        return "2147483647"
-    return None
+        return dedupe_text(["2147483647", "2147483646", "1073741824", "-2147483648", "-2147483647"])
+    return []
+
+
+def runtime_input_for_attack(attack_type: str, hyp: Dict[str, Any]) -> str | None:
+    inputs = runtime_inputs_for_attack(attack_type, hyp)
+    return inputs[0] if inputs else None
 
 
 def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]:
@@ -289,7 +310,8 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
     oracle_profile = compact_profile_for_json(build_oracle_profile(hyp))
 
     seed_inputs = seed_inputs_for_attack(attack_type)
-    runtime_input = runtime_input_for_attack(attack_type, hyp)
+    runtime_inputs = runtime_inputs_for_attack(attack_type, hyp)
+    runtime_input = runtime_inputs[0] if runtime_inputs else None
     input_source = None
 
     case: Dict[str, Any] = {
@@ -341,6 +363,8 @@ def make_source_api_case(hyp: Dict[str, Any], auto_fill: bool) -> Dict[str, Any]
     }
     if runtime_input:
         case["payload"]["runtime_input"] = runtime_input
+    if runtime_inputs:
+        case["payload"]["runtime_inputs"] = runtime_inputs
 
     explicit_context = hyp.get("verification_context")
     if isinstance(explicit_context, dict) and explicit_context:
