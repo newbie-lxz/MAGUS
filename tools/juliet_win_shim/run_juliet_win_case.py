@@ -41,6 +41,12 @@ LIFECYCLE_ROUTE_EVIDENCE_PATTERNS = (
     "MAGUS_ORACLE_FLAW profile=resource.",
     "MAGUS_JULIET_FLAW profile=resource.",
 )
+PATH_ROUTE_EVIDENCE_PATTERNS = (
+    "reason=tainted_search_path_api",
+    "reason=tainted_search_path_environment",
+    "reason=tainted_dll_search_directory",
+    "reason=unqualified_command_search_path",
+)
 LIFECYCLE_CAPABILITY_ENV = {
     POSIX_FD_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_FD_LEAKS",
     STDIO_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_STREAM_LEAKS",
@@ -392,7 +398,7 @@ def has_sanitizer_evidence(output: str) -> bool:
 def has_route_bound_oracle_evidence(output: str) -> bool:
     if has_sanitizer_evidence(output):
         return True
-    return any(pattern in output for pattern in LIFECYCLE_ROUTE_EVIDENCE_PATTERNS)
+    return any(pattern in output for pattern in (*LIFECYCLE_ROUTE_EVIDENCE_PATTERNS, *PATH_ROUTE_EVIDENCE_PATTERNS))
 
 
 def compile_unit(command: list[str], tmp_path: Path) -> bool:

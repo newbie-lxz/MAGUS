@@ -132,6 +132,19 @@ class JulietHelperOutputTests(unittest.TestCase):
             )
         )
 
+    def test_search_path_flaw_after_bad_entry_counts_as_route_bound(self):
+        stdout = "Calling bad()...\n"
+        oracle_output = "MAGUS_ORACLE_FLAW name=system reason=unqualified_command_search_path value=cmd.exe /c dir"
+
+        self.assertTrue(
+            self.runner.route_was_executed(
+                stdout,
+                Path("CWE426_Untrusted_Search_Path__char_system_21.c"),
+                "bad",
+                oracle_output,
+            )
+        )
+
     def test_scenario_detection_prefers_bad_route_when_good_sink_text_is_present(self):
         args = SimpleNamespace(
             route="bad -> CreateFile -> _close /* GoodSink: CloseHandle */",

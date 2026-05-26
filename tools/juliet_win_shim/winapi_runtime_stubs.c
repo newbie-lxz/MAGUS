@@ -5,6 +5,7 @@
 #include "shlwapi.h"
 #include "rpcdce.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -493,6 +494,66 @@ static void search_path_api_marker(const char *name, const char *path, const cha
     {
         flaw_marker(name, marker_value, "tainted_search_path_api");
     }
+}
+
+static int is_blank_command(const char *command)
+{
+    const unsigned char *cursor = (const unsigned char *)command;
+    if (cursor == NULL)
+    {
+        return 1;
+    }
+    while (*cursor != '\0' && isspace(*cursor))
+    {
+        cursor++;
+    }
+    return *cursor == '\0';
+}
+
+static int is_absolute_command_path(const char *command)
+{
+    const unsigned char *cursor = (const unsigned char *)command;
+    if (cursor == NULL)
+    {
+        return 0;
+    }
+    while (*cursor != '\0' && isspace(*cursor))
+    {
+        cursor++;
+    }
+    if (*cursor == '\'' || *cursor == '"')
+    {
+        cursor++;
+    }
+    if (*cursor == '/')
+    {
+        return 1;
+    }
+    if (cursor[0] == '\\' && cursor[1] == '\\')
+    {
+        return 1;
+    }
+    if (isalpha(cursor[0]) && cursor[1] == ':' && (cursor[2] == '\\' || cursor[2] == '/'))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static void command_search_path_marker(const char *name, const char *command)
+{
+    sink_marker(name, command);
+    if (!is_blank_command(command) && !is_absolute_command_path(command))
+    {
+        flaw_marker(name, command, "unqualified_command_search_path");
+    }
+}
+
+static void command_search_path_marker_w(const char *name, const wchar_t *command)
+{
+    char buffer[512];
+    wide_to_narrow(command, buffer, sizeof(buffer));
+    command_search_path_marker(name, buffer);
 }
 
 static int set_environment_assignment(const char *envstring)
@@ -2213,29 +2274,34 @@ int vswprintf(wchar_t *str, size_t size, const wchar_t *format, va_list ap)
 
 int system(const char *command)
 {
-    sink_marker("system", command);
-    return 0;
+    command_search_path_marker("system", command);
+    return 1;
 }
 
 int _wsystem(const wchar_t *command)
 {
-    sink_marker_w("_wsystem", command);
-    return 0;
+    command_search_path_marker_w("_wsystem", command);
+    return 1;
 }
 
-FILE *popen(const char *command, const char *type)
+static FILE *open_command_pipe(const char *name)
 {
     FILE *file;
-    sink_marker("popen", command);
     file = tmpfile();
     if (file != NULL)
     {
         fputs(payload_value(), file);
         rewind(file);
-        register_stream(file, "popen");
+        register_stream(file, name);
     }
-    (void)type;
     return file;
+}
+
+FILE *popen(const char *command, const char *type)
+{
+    command_search_path_marker("popen", command);
+    (void)type;
+    return open_command_pipe("popen");
 }
 
 int pclose(FILE *stream)
@@ -2245,15 +2311,16 @@ int pclose(FILE *stream)
 
 FILE *_popen(const char *command, const char *type)
 {
-    return popen(command, type);
+    command_search_path_marker("_popen", command);
+    (void)type;
+    return open_command_pipe("_popen");
 }
 
 FILE *_wpopen(const wchar_t *command, const wchar_t *type)
 {
-    char narrow[512];
     (void)type;
-    wide_to_narrow(command, narrow, sizeof(narrow));
-    return popen(narrow, "r");
+    command_search_path_marker_w("_wpopen", command);
+    return open_command_pipe("_wpopen");
 }
 
 int _pclose(FILE *stream)

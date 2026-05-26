@@ -781,6 +781,21 @@ PROFILES: Tuple[OracleProfile, ...] = (
                 "MAGUS_ORACLE_FLAW name=AddDllDirectory reason=tainted_dll_search_directory",
                 "MAGUS_ORACLE_SINK name=AddDllDirectory tainted=1",
             ),
+            "system": (
+                "MAGUS_ORACLE_FLAW name=system reason=unqualified_command_search_path",
+            ),
+            "_wsystem": (
+                "MAGUS_ORACLE_FLAW name=_wsystem reason=unqualified_command_search_path",
+            ),
+            "popen": (
+                "MAGUS_ORACLE_FLAW name=popen reason=unqualified_command_search_path",
+            ),
+            "_popen": (
+                "MAGUS_ORACLE_FLAW name=_popen reason=unqualified_command_search_path",
+            ),
+            "_wpopen": (
+                "MAGUS_ORACLE_FLAW name=_wpopen reason=unqualified_command_search_path",
+            ),
         },
         generic_markers=(
             "MAGUS_ORACLE_FLAW name=SearchPathA reason=tainted_search_path_api",
@@ -793,6 +808,11 @@ PROFILES: Tuple[OracleProfile, ...] = (
             "MAGUS_ORACLE_FLAW name=SetDllDirectoryA reason=tainted_dll_search_directory",
             "MAGUS_ORACLE_FLAW name=SetDllDirectoryW reason=tainted_dll_search_directory",
             "MAGUS_ORACLE_FLAW name=AddDllDirectory reason=tainted_dll_search_directory",
+            "MAGUS_ORACLE_FLAW name=system reason=unqualified_command_search_path",
+            "MAGUS_ORACLE_FLAW name=_wsystem reason=unqualified_command_search_path",
+            "MAGUS_ORACLE_FLAW name=popen reason=unqualified_command_search_path",
+            "MAGUS_ORACLE_FLAW name=_popen reason=unqualified_command_search_path",
+            "MAGUS_ORACLE_FLAW name=_wpopen reason=unqualified_command_search_path",
         ),
         accepted_evidence=(
             "route-bound search path API or PATH update consumed attacker-controlled path text",

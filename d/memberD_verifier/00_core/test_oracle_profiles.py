@@ -184,6 +184,42 @@ class OracleProfileSelectionTests(unittest.TestCase):
             profile["confirm_patterns"],
         )
 
+    def test_selects_cwe426_system_as_untrusted_search_path(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "CWE426_Untrusted_Search_Path__char_system_21_bad -> system",
+                "claim": "CWE-426 untrusted search path through an unqualified command name",
+                "cwe_candidates": ["CWE-426"],
+                "evidence_slice": 'strcpy(data, "cmd.exe /c dir"); system(data);',
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "path.untrusted_search_path")
+        self.assertTrue(profile["supported"])
+        self.assertIn("system", profile["matched_apis"])
+        self.assertIn(
+            "MAGUS_ORACLE_FLAW name=system reason=unqualified_command_search_path",
+            profile["confirm_patterns"],
+        )
+
+    def test_selects_cwe426_wpopen_as_untrusted_search_path(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "route": "CWE426_Untrusted_Search_Path__wchar_t_popen_21_bad -> _wpopen",
+                "claim": "CWE-426 untrusted search path through a wide popen command",
+                "cwe_candidates": ["CWE-426"],
+                "evidence_slice": 'wcscpy(data, L"ls -la"); _wpopen(data, L"wb");',
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "path.untrusted_search_path")
+        self.assertTrue(profile["supported"])
+        self.assertIn("_wpopen", profile["matched_apis"])
+        self.assertIn(
+            "MAGUS_ORACLE_FLAW name=_wpopen reason=unqualified_command_search_path",
+            profile["confirm_patterns"],
+        )
+
     def test_search_path_profile_has_generic_runtime_markers(self):
         profile = oracle_profiles.build_oracle_profile(
             {
