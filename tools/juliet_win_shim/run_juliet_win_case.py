@@ -364,6 +364,17 @@ def sanitizer_flags_for(profile_id: str) -> list[str]:
     return []
 
 
+def juliet_compat_compile_flags_for(path: Path) -> list[str]:
+    if path.suffix.lower() not in {".cpp", ".cc", ".cxx"}:
+        return []
+    return [
+        "-fms-extensions",
+        "-Wno-pointer-to-int-cast",
+        "-Wno-int-to-pointer-cast",
+        "-Wno-void-pointer-to-int-cast",
+    ]
+
+
 def has_sanitizer_evidence(output: str) -> bool:
     return any(pattern in output for pattern in SANITIZER_EVIDENCE_PATTERNS)
 
@@ -403,6 +414,7 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
             unit_compiler,
             "-c",
             *sanitizer_flags,
+            *juliet_compat_compile_flags_for(unit),
             "-D_WIN32",
             "-DINCLUDEMAIN" if unit == entry_unit else "-DMAGUS_COMPANION_UNIT",
             omit_macro,

@@ -167,6 +167,13 @@ class JulietHelperOutputTests(unittest.TestCase):
         self.assertIn("-fsanitize=undefined,signed-integer-overflow", flags)
         self.assertNotIn("-fsanitize=address", flags)
 
+    def test_cpp_juliet_compat_flags_allow_windows_pointer_truncation_cases(self):
+        flags = self.runner.juliet_compat_compile_flags_for(Path("CWE404_example.cpp"))
+
+        self.assertIn("-fms-extensions", flags)
+        self.assertIn("-Wno-pointer-to-int-cast", flags)
+        self.assertEqual(self.runner.juliet_compat_compile_flags_for(Path("CWE404_example.c")), [])
+
     def test_payload_candidates_use_runtime_inputs_json_once_each(self):
         old_value = self.runner.os.environ.get("MAGUS_D_RUNTIME_INPUTS_JSON")
         self.runner.os.environ["MAGUS_D_RUNTIME_INPUTS_JSON"] = '["11", "10", "11"]'
