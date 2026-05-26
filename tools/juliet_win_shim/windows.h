@@ -6,6 +6,10 @@
 #include <stdint.h>
 #include <wchar.h>
 
+/* Keep NULL compatible with Juliet's integer HANDLE casts under clang C. */
+#undef NULL
+#define NULL 0
+
 #ifdef __cplusplus
 extern "C" {
 #endif
