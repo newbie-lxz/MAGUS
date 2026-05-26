@@ -6,6 +6,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def load_module(name: str, path: Path):
@@ -129,6 +130,20 @@ class JulietHelperOutputTests(unittest.TestCase):
                 "bad",
                 oracle_output,
             )
+        )
+
+    def test_scenario_detection_prefers_bad_route_when_good_sink_text_is_present(self):
+        args = SimpleNamespace(
+            route="bad -> CreateFile -> _close /* GoodSink: CloseHandle */",
+            entry_symbol="CWE404_Improper_Resource_Shutdown__w32CreateFile_close_01_bad",
+        )
+
+        self.assertEqual(
+            self.runner.scenario_for(
+                args,
+                Path("CWE404_Improper_Resource_Shutdown__w32CreateFile_close_01.c"),
+            ),
+            "bad",
         )
 
     def test_memory_profile_enables_asan_flags(self):
