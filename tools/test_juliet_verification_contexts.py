@@ -106,7 +106,7 @@ class JulietHelperOutputTests(unittest.TestCase):
         )
 
     def test_lifecycle_flaw_after_bad_entry_counts_as_route_bound(self):
-        stdout = "Calling bad()...\n"
+        stdout = "Calling case0()...\n"
         oracle_output = "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
 
         self.assertTrue(
@@ -119,7 +119,7 @@ class JulietHelperOutputTests(unittest.TestCase):
         )
 
     def test_lifecycle_flaw_does_not_bind_wrong_scenario(self):
-        stdout = "Calling good()...\n"
+        stdout = "Calling case1()...\n"
         oracle_output = "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
 
         self.assertFalse(

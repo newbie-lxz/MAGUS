@@ -278,6 +278,11 @@ def scenario_label(source: Path, scenario: str) -> str:
     return scenario
 
 
+def scenario_labels(source: Path, scenario: str) -> tuple[str, ...]:
+    labels = [scenario_label(source, scenario), SCENARIO_LABELS[scenario], scenario]
+    return tuple(dict.fromkeys(labels))
+
+
 def link_compiler(companions: list[Path], args: argparse.Namespace) -> str:
     if any(path.suffix.lower() in {".cpp", ".cc", ".cxx"} for path in companions):
         return args.cxx
@@ -447,14 +452,14 @@ def compile_case(args: argparse.Namespace, source: Path, tmp_path: Path) -> tupl
 
 
 def route_was_executed(stdout: str, source: Path, scenario: str, oracle_output: str = "") -> bool:
-    label = scenario_label(source, scenario)
-    other_label = scenario_label(source, "good" if scenario == "bad" else "bad")
-    expected_call = f"Calling {label}()..."
-    expected_finish = f"Finished {label}()"
-    unexpected_call = f"Calling {other_label}()..."
-    if expected_call in stdout and expected_finish in stdout and unexpected_call not in stdout:
+    expected_labels = scenario_labels(source, scenario)
+    unexpected_labels = scenario_labels(source, "good" if scenario == "bad" else "bad")
+    expected_call_seen = any(f"Calling {label}()..." in stdout for label in expected_labels)
+    expected_finish_seen = any(f"Finished {label}()" in stdout for label in expected_labels)
+    unexpected_call_seen = any(f"Calling {label}()..." in stdout for label in unexpected_labels)
+    if expected_call_seen and expected_finish_seen and not unexpected_call_seen:
         return True
-    return expected_call in stdout and unexpected_call not in stdout and has_route_bound_oracle_evidence(oracle_output)
+    return expected_call_seen and not unexpected_call_seen and has_route_bound_oracle_evidence(oracle_output)
 
 
 def oracle_confirmed(stdout: str, confirm_patterns: list[str]) -> tuple[bool, list[str]]:
