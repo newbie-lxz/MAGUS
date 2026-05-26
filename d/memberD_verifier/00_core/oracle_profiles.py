@@ -649,7 +649,10 @@ PROFILES: Tuple[OracleProfile, ...] = (
                 "CreateFileW": ("MAGUS_ORACLE_FLAW name=CreateFileW reason=missing_closehandle",),
             },
         ),
-        generic_markers=lifecycle_generic_markers(WIN32_HANDLE_PROFILE_ID),
+        generic_markers=(
+            *lifecycle_generic_markers(WIN32_HANDLE_PROFILE_ID),
+            "MAGUS_ORACLE_FLAW name=CloseHandle reason=duplicate_close",
+        ),
         accepted_evidence=(
             "route-bound Win32 HANDLE lifecycle oracle observed acquire/release/duplicate state on the same HANDLE",
         ),

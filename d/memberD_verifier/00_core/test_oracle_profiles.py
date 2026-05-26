@@ -431,6 +431,26 @@ class OracleProfileSelectionTests(unittest.TestCase):
             profile["confirm_patterns"],
         )
 
+    def test_win32_handle_profile_accepts_closehandle_duplicate_runtime_marker(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "file": (
+                    "juliet-api-misuse/testcases/CWE675_Duplicate_Operations_on_Resource/"
+                    "CWE675_Duplicate_Operations_on_Resource__w32CreateFile_84a.cpp"
+                ),
+                "route": "CWE675_Duplicate_Operations_on_Resource__w32CreateFile_84::case0",
+                "claim": "CWE-675 duplicate CloseHandle on a CreateFile handle",
+                "cwe_candidates": ["CWE-675"],
+                "evidence_slice": "case0 object action closes the same HANDLE twice",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "resource.handle_lifecycle.win32")
+        self.assertIn(
+            "MAGUS_ORACLE_FLAW name=CloseHandle reason=duplicate_close",
+            profile["confirm_patterns"],
+        )
+
     def test_selects_juliet_cwe404_profile_by_acquired_resource_family(self):
         cases = [
             (
