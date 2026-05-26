@@ -206,6 +206,12 @@ class JulietHelperOutputTests(unittest.TestCase):
         self.assertIn("-Wno-pointer-to-int-cast", flags)
         self.assertEqual(self.runner.juliet_compat_compile_flags_for(Path("CWE404_example.c")), [])
 
+    def test_process_shim_declares_wsystem_for_wchar_t_system_cases(self):
+        process_header = Path(__file__).resolve().parents[1] / "tools" / "juliet_win_shim" / "process.h"
+        text = process_header.read_text(encoding="utf-8")
+
+        self.assertIn("int _wsystem(const wchar_t *command);", text)
+
     def test_payload_candidates_use_runtime_inputs_json_once_each(self):
         old_value = self.runner.os.environ.get("MAGUS_D_RUNTIME_INPUTS_JSON")
         self.runner.os.environ["MAGUS_D_RUNTIME_INPUTS_JSON"] = '["11", "10", "11"]'
