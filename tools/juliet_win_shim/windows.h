@@ -6,10 +6,6 @@
 #include <stdint.h>
 #include <wchar.h>
 
-/* Keep NULL compatible with Juliet's integer HANDLE casts under clang C. */
-#undef NULL
-#define NULL 0
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -419,3 +415,9 @@ void WINAPI DeleteCriticalSection(CRITICAL_SECTION *lpCriticalSection);
 #endif
 
 #endif
+
+/* Keep NULL compatible with Juliet's integer HANDLE casts under clang C.
+   This must sit outside the include guard because forced compatibility
+   includes can happen before std_testcase.h redefines NULL as (void *)0. */
+#undef NULL
+#define NULL 0
