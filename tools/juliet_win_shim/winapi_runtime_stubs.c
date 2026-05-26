@@ -1202,7 +1202,7 @@ HANDLE WINAPI CreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitia
     {
         last_error_value = STATUS_NO_MEMORY;
         flaw_marker("CreateMutexA", lpName, "forced_null_return_for_return_value_check");
-        return NULL;
+        return (HANDLE)0;
     }
     return fake_handle();
 }
@@ -1216,7 +1216,7 @@ HANDLE WINAPI CreateMutexW(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitia
     {
         last_error_value = STATUS_NO_MEMORY;
         flaw_marker_w("CreateMutexW", lpName, "forced_null_return_for_return_value_check");
-        return NULL;
+        return (HANDLE)0;
     }
     return fake_handle();
 }
