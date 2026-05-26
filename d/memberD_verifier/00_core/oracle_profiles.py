@@ -173,6 +173,15 @@ LINUX_KERNEL_PROFILE_ID = "resource.lifecycle.linux_kernel"
 LINUX_KERNEL_ACQUIRE_APIS: Tuple[str, ...] = ("filp_open", "get_file", "kmalloc", "kzalloc", "kobject_get")
 LINUX_KERNEL_RELEASE_APIS: Tuple[str, ...] = ("filp_close", "fput", "kfree", "kobject_put")
 
+CPP_ITERATOR_PROFILE_ID = "resource.cpp_iterator_lifecycle"
+CPP_ITERATOR_DEBUG_PATTERNS: Tuple[str, ...] = (
+    "attempt to dereference a singular iterator",
+    "attempt to increment a singular iterator",
+    "attempt to compare a singular iterator",
+    "singular iterator",
+    "safe_iterator",
+)
+
 
 def lifecycle_profile_api_markers(
     profile_id: str,
@@ -363,6 +372,33 @@ PROFILES: Tuple[OracleProfile, ...] = (
             "kind": "integer_safety",
             "bug_class": "integer_overflow",
             "execution_environment": "ubsan_or_harness",
+        },
+    ),
+    OracleProfile(
+        profile_id=CPP_ITERATOR_PROFILE_ID,
+        description="C++ container iterator is used after the container operation invalidates it.",
+        cwe_tokens=("cwe-672", "cwe672"),
+        keywords=(
+            "iterator",
+            "invalidated iterator",
+            "singular iterator",
+            "std::list",
+            "std::vector",
+            "clear",
+            "erase",
+            "operation on resource after expiration",
+        ),
+        api_markers={},
+        generic_markers=CPP_ITERATOR_DEBUG_PATTERNS,
+        accepted_evidence=(
+            "route-bound libstdc++ debug runtime observed invalid iterator use after container invalidation",
+        ),
+        semantic_model={
+            "kind": "cpp_iterator_lifecycle",
+            "family": "cpp_container_iterator",
+            "resource_kind": "container_iterator",
+            "execution_environment": "libstdcxx_debug",
+            "bug_class": "iterator_invalidated_after_container_mutation",
         },
     ),
     OracleProfile(
@@ -881,7 +917,9 @@ def select_profile(hypothesis: Dict[str, Any]) -> Tuple[OracleProfile | None, Li
     haystack_lower = haystack.lower()
     api_names = infer_api_names(hypothesis)
     if _is_cwe672_container_lifetime(haystack_lower, api_names):
-        return None, api_names, 0
+        profile = PROFILE_BY_ID.get(CPP_ITERATOR_PROFILE_ID)
+        if profile is not None:
+            return profile, [], 100
 
     juliet_profile, juliet_matched, juliet_score = _select_juliet_resource_profile(haystack, api_names)
     if juliet_profile is not None:

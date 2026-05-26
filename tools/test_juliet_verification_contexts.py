@@ -167,6 +167,25 @@ class JulietHelperOutputTests(unittest.TestCase):
         self.assertIn("-fsanitize=undefined,signed-integer-overflow", flags)
         self.assertNotIn("-fsanitize=address", flags)
 
+    def test_cpp_iterator_profile_enables_libstdcxx_debug_mode(self):
+        flags = self.runner.sanitizer_flags_for("resource.cpp_iterator_lifecycle")
+
+        self.assertIn("-D_GLIBCXX_DEBUG", flags)
+        self.assertIn("-D_GLIBCXX_DEBUG_PEDANTIC", flags)
+
+    def test_cpp_iterator_debug_error_counts_as_route_bound(self):
+        stdout = "Calling bad()...\n"
+        stderr = "Error: attempt to dereference a singular iterator."
+
+        self.assertTrue(
+            self.runner.route_was_executed(
+                stdout,
+                Path("CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_21.cpp"),
+                "bad",
+                stderr,
+            )
+        )
+
     def test_cpp_juliet_compat_flags_allow_windows_pointer_truncation_cases(self):
         flags = self.runner.juliet_compat_compile_flags_for(Path("CWE404_example.cpp"))
 

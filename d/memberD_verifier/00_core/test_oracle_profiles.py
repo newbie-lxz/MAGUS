@@ -521,7 +521,7 @@ class OracleProfileSelectionTests(unittest.TestCase):
                     profile["confirm_patterns"],
                 )
 
-    def test_cwe672_container_lifetime_is_not_misclassified_as_fd_lifecycle(self):
+    def test_cwe672_container_lifetime_selects_cpp_iterator_profile(self):
         profile = oracle_profiles.build_oracle_profile(
             {
                 "file": (
@@ -535,9 +535,10 @@ class OracleProfileSelectionTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(profile["profile_id"], "unsupported.unclassified_source_api")
-        self.assertFalse(profile["supported"])
+        self.assertEqual(profile["profile_id"], "resource.cpp_iterator_lifecycle")
+        self.assertTrue(profile["supported"])
         self.assertNotEqual(profile["profile_id"], "resource.fd_lifecycle.user_posix")
+        self.assertIn("attempt to dereference a singular iterator", profile["confirm_patterns"])
 
     def test_selects_linux_kernel_lifecycle_separately_from_user_space_open(self):
         profile = oracle_profiles.build_oracle_profile(

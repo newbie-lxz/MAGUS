@@ -36,6 +36,7 @@ MEMORY_OOB_PROFILE_ID = "memory.out_of_bounds_write"
 MEMORY_OOB_READ_PROFILE_ID = "memory.out_of_bounds_read"
 MEMORY_UAF_PROFILE_ID = "memory.use_after_free"
 INTEGER_OVERFLOW_PROFILE_ID = "integer.overflow"
+CPP_ITERATOR_PROFILE_ID = "resource.cpp_iterator_lifecycle"
 LIFECYCLE_ROUTE_EVIDENCE_PATTERNS = (
     "MAGUS_ORACLE_FLAW profile=resource.",
     "MAGUS_JULIET_FLAW profile=resource.",
@@ -57,6 +58,13 @@ SANITIZER_EVIDENCE_PATTERNS = (
     "stack-use-after-scope",
     "runtime error: signed integer overflow",
     "runtime error: unsigned integer overflow",
+)
+CPP_ITERATOR_EVIDENCE_PATTERNS = (
+    "attempt to dereference a singular iterator",
+    "attempt to increment a singular iterator",
+    "attempt to compare a singular iterator",
+    "singular iterator",
+    "safe_iterator",
 )
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
 SCENARIO_LABELS = {"bad": "case0", "good": "case1"}
@@ -361,6 +369,8 @@ def sanitizer_flags_for(profile_id: str) -> list[str]:
         return ["-fsanitize=address", "-fno-omit-frame-pointer", "-g"]
     if profile_id == INTEGER_OVERFLOW_PROFILE_ID:
         return ["-fsanitize=undefined,signed-integer-overflow", "-fno-omit-frame-pointer", "-g"]
+    if profile_id == CPP_ITERATOR_PROFILE_ID:
+        return ["-D_GLIBCXX_DEBUG", "-D_GLIBCXX_DEBUG_PEDANTIC", "-g"]
     return []
 
 
@@ -376,7 +386,7 @@ def juliet_compat_compile_flags_for(path: Path) -> list[str]:
 
 
 def has_sanitizer_evidence(output: str) -> bool:
-    return any(pattern in output for pattern in SANITIZER_EVIDENCE_PATTERNS)
+    return any(pattern in output for pattern in (*SANITIZER_EVIDENCE_PATTERNS, *CPP_ITERATOR_EVIDENCE_PATTERNS))
 
 
 def has_route_bound_oracle_evidence(output: str) -> bool:
