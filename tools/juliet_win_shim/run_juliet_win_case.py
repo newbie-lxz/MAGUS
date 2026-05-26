@@ -72,6 +72,12 @@ CPP_ITERATOR_EVIDENCE_PATTERNS = (
     "singular iterator",
     "safe_iterator",
 )
+COMPILER_GENERATED_ROUTE_PATTERNS = (
+    "__cxx_global_var_init",
+    "_global__sub_i_",
+    "_global__sub_d_",
+    "__static_initialization_and_destruction_0",
+)
 SOURCE_SUFFIXES = (".c", ".cpp", ".cc", ".cxx")
 SCENARIO_LABELS = {"bad": "case0", "good": "case1"}
 COMPAT_HEADER = SHIM_DIR / "juliet_win_compat.h"
@@ -278,6 +284,22 @@ def scenario_for(args: argparse.Namespace, source: Path) -> str:
     if "good" in text:
         return "good"
     return "bad"
+
+
+def route_has_scenario_token(args: argparse.Namespace) -> bool:
+    text = desanitize_text(f"{args.route} {args.entry_symbol}").lower()
+    return any(token in text for token in ("bad", "good", "case0", "case1"))
+
+
+def route_is_compiler_generated(args: argparse.Namespace) -> bool:
+    text = desanitize_text(f"{args.route} {args.entry_symbol}").lower()
+    if any(pattern in text for pattern in COMPILER_GENERATED_ROUTE_PATTERNS):
+        return True
+    return bool(re.search(r"(?:c1|c2|d1|d2)ev(?:\b|_)", text))
+
+
+def route_requires_explicit_scenario(args: argparse.Namespace) -> bool:
+    return args.oracle_profile_id == CPP_ITERATOR_PROFILE_ID and route_is_compiler_generated(args)
 
 
 def omit_macro_for(source: Path, scenario: str) -> str:
@@ -530,6 +552,13 @@ def main() -> int:
     source = resolve_source(args.source_file)
     require_sanitization_map_for(source)
     scenario = scenario_for(args, source)
+    if route_requires_explicit_scenario(args) and not route_has_scenario_token(args):
+        print(
+            f"{NOT_ROUTE_BOUND_MARKER} expected_scenario={scenario} "
+            f"entry_symbol={args.entry_symbol or '<unknown>'} source_file={source} "
+            f"main_source={source} reason=compiler_generated_route"
+        )
+        return 1
 
     for compiler in {args.cc, args.cxx}:
         if not Path(compiler).exists():

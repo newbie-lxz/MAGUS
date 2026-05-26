@@ -199,6 +199,43 @@ class JulietHelperOutputTests(unittest.TestCase):
             )
         )
 
+    def test_cpp_iterator_rejects_compiler_generated_route_without_scenario(self):
+        args = SimpleNamespace(
+            route="CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_68a.cpp::__cxx_global_var_init.2",
+            entry_symbol="__cxx_global_var_init.2",
+            oracle_profile_id="resource.cpp_iterator_lifecycle",
+        )
+
+        self.assertTrue(self.runner.route_is_compiler_generated(args))
+        self.assertFalse(self.runner.route_has_scenario_token(args))
+        self.assertTrue(self.runner.route_requires_explicit_scenario(args))
+
+    def test_cpp_iterator_rejects_implicit_cpp_destructor_route_without_scenario(self):
+        args = SimpleNamespace(
+            route=(
+                "CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_67a.cpp::"
+                "_ZN69CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_6711_structTypeD2Ev"
+            ),
+            entry_symbol="_ZN69CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_6711_structTypeD2Ev",
+            oracle_profile_id="resource.cpp_iterator_lifecycle",
+        )
+
+        self.assertTrue(self.runner.route_is_compiler_generated(args))
+        self.assertFalse(self.runner.route_has_scenario_token(args))
+
+    def test_cpp_iterator_accepts_case0_route_even_when_mangled(self):
+        args = SimpleNamespace(
+            route=(
+                "CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_62b.cpp::"
+                "_ZN69CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_6211case0SourceEv"
+            ),
+            entry_symbol="_ZN69CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_6211case0SourceEv",
+            oracle_profile_id="resource.cpp_iterator_lifecycle",
+        )
+
+        self.assertFalse(self.runner.route_is_compiler_generated(args))
+        self.assertTrue(self.runner.route_has_scenario_token(args))
+
     def test_cpp_juliet_compat_flags_allow_windows_pointer_truncation_cases(self):
         flags = self.runner.juliet_compat_compile_flags_for(Path("CWE404_example.cpp"))
 
