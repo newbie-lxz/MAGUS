@@ -20,7 +20,7 @@ typedef unsigned short WORD;
 typedef unsigned char BYTE;
 typedef unsigned char UCHAR;
 typedef uintptr_t ULONG_PTR;
-typedef void *HANDLE;
+typedef intptr_t HANDLE;
 typedef HANDLE HMODULE;
 typedef HANDLE HINSTANCE;
 typedef HANDLE HKEY;

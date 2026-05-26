@@ -105,6 +105,32 @@ class JulietHelperOutputTests(unittest.TestCase):
             )
         )
 
+    def test_lifecycle_flaw_after_bad_entry_counts_as_route_bound(self):
+        stdout = "Calling bad()...\n"
+        oracle_output = "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+
+        self.assertTrue(
+            self.runner.route_was_executed(
+                stdout,
+                Path("CWE404_Improper_Resource_Shutdown__open_fclose_72a.cpp"),
+                "bad",
+                oracle_output,
+            )
+        )
+
+    def test_lifecycle_flaw_does_not_bind_wrong_scenario(self):
+        stdout = "Calling good()...\n"
+        oracle_output = "MAGUS_ORACLE_FLAW profile=resource.fd_lifecycle.user_posix reason=wrong_release_api"
+
+        self.assertFalse(
+            self.runner.route_was_executed(
+                stdout,
+                Path("CWE404_Improper_Resource_Shutdown__open_fclose_72a.cpp"),
+                "bad",
+                oracle_output,
+            )
+        )
+
     def test_memory_profile_enables_asan_flags(self):
         self.assertIn(
             "-fsanitize=address",

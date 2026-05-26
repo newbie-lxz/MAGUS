@@ -766,6 +766,19 @@ PROFILES: Tuple[OracleProfile, ...] = (
 
 
 API_NAMES = tuple(sorted({api for profile in PROFILES for api in profile.api_names}, key=len, reverse=True))
+PROFILE_BY_ID = {profile.profile_id: profile for profile in PROFILES}
+
+JULIET_CWE404_FAMILY_RE = re.compile(
+    r"CWE404_Improper_Resource_Shutdown__([A-Za-z0-9]+)_([A-Za-z0-9]+)_",
+    re.IGNORECASE,
+)
+
+JULIET_CWE404_SOURCE_PROFILES = {
+    "open": POSIX_FD_PROFILE_ID,
+    "fopen": STDIO_PROFILE_ID,
+    "freopen": STDIO_PROFILE_ID,
+    "w32createfile": WIN32_HANDLE_PROFILE_ID,
+}
 
 
 def _token_words(value: str) -> List[str]:
@@ -802,9 +815,29 @@ def _score_profile(profile: OracleProfile, haystack_lower: str, api_names: Itera
     return score
 
 
+def _select_juliet_cwe404_profile(haystack: str, api_names: List[str]) -> Tuple[OracleProfile | None, List[str], int]:
+    match = JULIET_CWE404_FAMILY_RE.search(haystack)
+    if not match:
+        return None, api_names, 0
+    source_api = match.group(1).lower()
+    profile_id = JULIET_CWE404_SOURCE_PROFILES.get(source_api)
+    if not profile_id:
+        return None, api_names, 0
+    profile = PROFILE_BY_ID.get(profile_id)
+    if profile is None:
+        return None, api_names, 0
+    matched = [api for api in api_names if api in profile.api_markers]
+    return profile, matched, 100
+
+
 def select_profile(hypothesis: Dict[str, Any]) -> Tuple[OracleProfile | None, List[str], int]:
-    haystack_lower = hypothesis_text(hypothesis).lower()
+    haystack = hypothesis_text(hypothesis)
+    haystack_lower = haystack.lower()
     api_names = infer_api_names(hypothesis)
+    juliet_profile, juliet_matched, juliet_score = _select_juliet_cwe404_profile(haystack, api_names)
+    if juliet_profile is not None:
+        return juliet_profile, juliet_matched, juliet_score
+
     best: Tuple[OracleProfile | None, int] = (None, 0)
     for profile in PROFILES:
         score = _score_profile(profile, haystack_lower, api_names)

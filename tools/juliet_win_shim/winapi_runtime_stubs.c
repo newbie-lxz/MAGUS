@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -153,6 +154,34 @@ static MAGUS_STREAM_STATE *find_stream_state(FILE *stream)
     return NULL;
 }
 
+static MAGUS_STREAM_STATE *find_stream_state_from_int(int value)
+{
+    size_t i;
+    for (i = 0; i < stream_state_count; i++)
+    {
+        if ((int)(intptr_t)stream_states[i].stream == value)
+        {
+            return &stream_states[i];
+        }
+    }
+    return NULL;
+}
+
+static MAGUS_FD_STATE *find_fd_state_from_pointer(const void *value)
+{
+    uintptr_t raw = (uintptr_t)value;
+    if (raw > (uintptr_t)INT_MAX)
+    {
+        return NULL;
+    }
+    return find_fd_state((int)raw);
+}
+
+static MAGUS_HANDLE_STATE *find_handle_state_from_pointer(const void *value)
+{
+    return find_handle_state((HANDLE)(intptr_t)value);
+}
+
 static void register_key(HCRYPTKEY key, ALG_ID alg)
 {
     if (key == NULL || key_state_count >= sizeof(key_states) / sizeof(key_states[0]))
@@ -268,6 +297,8 @@ static void flaw_marker_w(const char *name, const wchar_t *value, const char *re
 static int tracked_close_fd(const char *name, int fd)
 {
     MAGUS_FD_STATE *state;
+    MAGUS_HANDLE_STATE *handle_state;
+    MAGUS_STREAM_STATE *stream_state;
     if (fd < 0)
     {
         lifecycle_flaw_marker("resource.fd_lifecycle.user_posix", name, "", "failed_acquire_used");
@@ -283,12 +314,29 @@ static int tracked_close_fd(const char *name, int fd)
         }
         state->closed = 1;
     }
+    else
+    {
+        handle_state = find_handle_state((HANDLE)(intptr_t)fd);
+        if (handle_state != NULL)
+        {
+            lifecycle_flaw_marker("resource.handle_lifecycle.win32", name, "", "wrong_release_api");
+            return -1;
+        }
+        stream_state = find_stream_state_from_int(fd);
+        if (stream_state != NULL)
+        {
+            lifecycle_flaw_marker("resource.stream_lifecycle.c_stdio", name, "", "wrong_release_api");
+            return -1;
+        }
+    }
     return close(fd);
 }
 
 static int tracked_close_stream(const char *name, FILE *stream)
 {
     MAGUS_STREAM_STATE *state;
+    MAGUS_FD_STATE *fd_state;
+    MAGUS_HANDLE_STATE *handle_state;
     int fd;
     if (stream == NULL)
     {
@@ -304,6 +352,23 @@ static int tracked_close_stream(const char *name, FILE *stream)
             return EOF;
         }
         state->closed = 1;
+    }
+    else
+    {
+        fd_state = find_fd_state_from_pointer(stream);
+        if (fd_state != NULL)
+        {
+            lifecycle_flaw_marker("resource.fd_lifecycle.user_posix", name, "", "wrong_release_api");
+            return EOF;
+        }
+        handle_state = find_handle_state_from_pointer(stream);
+        if (handle_state != NULL)
+        {
+            lifecycle_flaw_marker("resource.handle_lifecycle.win32", name, "", "wrong_release_api");
+            return EOF;
+        }
+        lifecycle_flaw_marker("resource.stream_lifecycle.c_stdio", name, "", "wrong_release_api");
+        return EOF;
     }
     fflush(stream);
     fd = fileno(stream);
@@ -1009,6 +1074,8 @@ DWORD WINAPI WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds)
 BOOL WINAPI CloseHandle(HANDLE hObject)
 {
     MAGUS_HANDLE_STATE *state;
+    MAGUS_FD_STATE *fd_state;
+    MAGUS_STREAM_STATE *stream_state;
     if (hObject == NULL || hObject == INVALID_HANDLE_VALUE)
     {
         flaw_marker("CloseHandle", "", "invalid_or_failed_handle_used");
@@ -1026,6 +1093,23 @@ BOOL WINAPI CloseHandle(HANDLE hObject)
     }
     else
     {
+        intptr_t raw_handle_value = (intptr_t)hObject;
+        fd_state = NULL;
+        if (raw_handle_value >= 0 && raw_handle_value <= INT_MAX)
+        {
+            fd_state = find_fd_state((int)raw_handle_value);
+        }
+        if (fd_state != NULL)
+        {
+            lifecycle_flaw_marker("resource.fd_lifecycle.user_posix", "CloseHandle", "", "wrong_release_api");
+            return FALSE;
+        }
+        stream_state = find_stream_state((FILE *)(uintptr_t)hObject);
+        if (stream_state != NULL)
+        {
+            lifecycle_flaw_marker("resource.stream_lifecycle.c_stdio", "CloseHandle", "", "wrong_release_api");
+            return FALSE;
+        }
         flaw_marker("CloseHandle", "", "unrecognized_handle_or_wrong_close_api");
         return FALSE;
     }
@@ -2064,11 +2148,11 @@ static int fopen_flags_from_mode(const char *mode)
     return read_write ? O_RDWR : O_RDONLY;
 }
 
-FILE *fopen(const char *path, const char *mode)
+static FILE *tracked_open_stream(const char *name, const char *path, const char *mode)
 {
     int fd;
     FILE *stream;
-    sink_marker("fopen", path);
+    sink_marker(name, path);
     fd = open(path, fopen_flags_from_mode(mode), 0666);
     if (fd < 0)
     {
@@ -2080,8 +2164,19 @@ FILE *fopen(const char *path, const char *mode)
         close(fd);
         return NULL;
     }
-    register_stream(stream, "fopen");
+    register_stream(stream, name);
     return stream;
+}
+
+FILE *fopen(const char *path, const char *mode)
+{
+    return tracked_open_stream("fopen", path, mode);
+}
+
+FILE *freopen(const char *path, const char *mode, FILE *stream)
+{
+    (void)stream;
+    return tracked_open_stream("freopen", path, mode);
 }
 
 int fclose(FILE *stream)

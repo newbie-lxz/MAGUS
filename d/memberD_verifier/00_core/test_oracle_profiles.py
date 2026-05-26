@@ -395,6 +395,52 @@ class OracleProfileSelectionTests(unittest.TestCase):
             profile["confirm_patterns"],
         )
 
+    def test_selects_juliet_cwe404_profile_by_acquired_resource_family(self):
+        cases = [
+            (
+                "juliet-api-misuse/testcases/CWE404_Improper_Resource_Shutdown/"
+                "CWE404_Improper_Resource_Shutdown__fopen_w32CloseHandle_01.c",
+                "fopen -> CloseHandle",
+                "resource.stream_lifecycle.c_stdio",
+            ),
+            (
+                "juliet-api-misuse/testcases/CWE404_Improper_Resource_Shutdown/"
+                "CWE404_Improper_Resource_Shutdown__freopen_w32CloseHandle_01.c",
+                "freopen -> CloseHandle",
+                "resource.stream_lifecycle.c_stdio",
+            ),
+            (
+                "juliet-api-misuse/testcases/CWE404_Improper_Resource_Shutdown/"
+                "CWE404_Improper_Resource_Shutdown__open_fclose_01.c",
+                "open -> fclose",
+                "resource.fd_lifecycle.user_posix",
+            ),
+            (
+                "juliet-api-misuse/testcases/CWE404_Improper_Resource_Shutdown/"
+                "CWE404_Improper_Resource_Shutdown__w32CreateFile_fclose_01.c",
+                "CreateFile -> fclose",
+                "resource.handle_lifecycle.win32",
+            ),
+        ]
+
+        for file_name, route, expected_profile_id in cases:
+            with self.subTest(file_name=file_name):
+                profile = oracle_profiles.build_oracle_profile(
+                    {
+                        "file": file_name,
+                        "route": route,
+                        "cwe_candidates": ["CWE-404"],
+                        "claim": "Juliet improper resource shutdown route closes with the wrong API family",
+                    }
+                )
+
+                self.assertEqual(profile["profile_id"], expected_profile_id)
+                self.assertTrue(profile["supported"])
+                self.assertIn(
+                    f"MAGUS_ORACLE_FLAW profile={expected_profile_id} reason=wrong_release_api",
+                    profile["confirm_patterns"],
+                )
+
     def test_selects_linux_kernel_lifecycle_separately_from_user_space_open(self):
         profile = oracle_profiles.build_oracle_profile(
             {

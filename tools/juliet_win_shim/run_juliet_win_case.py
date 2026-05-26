@@ -36,6 +36,10 @@ MEMORY_OOB_PROFILE_ID = "memory.out_of_bounds_write"
 MEMORY_OOB_READ_PROFILE_ID = "memory.out_of_bounds_read"
 MEMORY_UAF_PROFILE_ID = "memory.use_after_free"
 INTEGER_OVERFLOW_PROFILE_ID = "integer.overflow"
+LIFECYCLE_ROUTE_EVIDENCE_PATTERNS = (
+    "MAGUS_ORACLE_FLAW profile=resource.",
+    "MAGUS_JULIET_FLAW profile=resource.",
+)
 LIFECYCLE_CAPABILITY_ENV = {
     POSIX_FD_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_FD_LEAKS",
     STDIO_LIFECYCLE_PROFILE_ID: "MAGUS_JULIET_REPORT_STREAM_LEAKS",
@@ -359,6 +363,12 @@ def has_sanitizer_evidence(output: str) -> bool:
     return any(pattern in output for pattern in SANITIZER_EVIDENCE_PATTERNS)
 
 
+def has_route_bound_oracle_evidence(output: str) -> bool:
+    if has_sanitizer_evidence(output):
+        return True
+    return any(pattern in output for pattern in LIFECYCLE_ROUTE_EVIDENCE_PATTERNS)
+
+
 def compile_unit(command: list[str], tmp_path: Path) -> bool:
     build = run_checked(command, REPO_ROOT)
     if build.returncode == 0:
@@ -444,7 +454,7 @@ def route_was_executed(stdout: str, source: Path, scenario: str, oracle_output: 
     unexpected_call = f"Calling {other_label}()..."
     if expected_call in stdout and expected_finish in stdout and unexpected_call not in stdout:
         return True
-    return expected_call in stdout and unexpected_call not in stdout and has_sanitizer_evidence(oracle_output)
+    return expected_call in stdout and unexpected_call not in stdout and has_route_bound_oracle_evidence(oracle_output)
 
 
 def oracle_confirmed(stdout: str, confirm_patterns: list[str]) -> tuple[bool, list[str]]:
