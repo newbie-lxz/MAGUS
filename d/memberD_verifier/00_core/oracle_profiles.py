@@ -498,7 +498,7 @@ PROFILES: Tuple[OracleProfile, ...] = (
     OracleProfile(
         profile_id=POSIX_FD_PROFILE_ID,
         description="User-space file descriptor lifecycle is invalid, duplicated, transferred, or missing release.",
-        cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
+        cwe_tokens=("cwe-404", "cwe404", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
         keywords=(
             "file descriptor",
             "fd leak",
@@ -544,7 +544,7 @@ PROFILES: Tuple[OracleProfile, ...] = (
     OracleProfile(
         profile_id=STDIO_PROFILE_ID,
         description="C stdio stream lifecycle is invalid, transferred, or missing the matching close operation.",
-        cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
+        cwe_tokens=("cwe-404", "cwe404", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
         keywords=(
             "stdio",
             "file stream",
@@ -585,7 +585,7 @@ PROFILES: Tuple[OracleProfile, ...] = (
     OracleProfile(
         profile_id=WIN32_HANDLE_PROFILE_ID,
         description="Win32 HANDLE lifecycle is invalid, duplicated, or missing the matching CloseHandle operation.",
-        cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
+        cwe_tokens=("cwe-404", "cwe404", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
         keywords=(
             "win32 handle",
             "handle leak",
@@ -641,7 +641,7 @@ PROFILES: Tuple[OracleProfile, ...] = (
     OracleProfile(
         profile_id=LINUX_KERNEL_PROFILE_ID,
         description="Linux kernel resource lifecycle is invalid, leaked, or released with the wrong kernel API family.",
-        cwe_tokens=("cwe-404", "cwe404", "cwe-672", "cwe672", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
+        cwe_tokens=("cwe-404", "cwe404", "cwe-675", "cwe675", "cwe-773", "cwe773", "cwe-775", "cwe775"),
         keywords=(
             "linux kernel",
             "kernel resource",
@@ -768,17 +768,47 @@ PROFILES: Tuple[OracleProfile, ...] = (
 API_NAMES = tuple(sorted({api for profile in PROFILES for api in profile.api_names}, key=len, reverse=True))
 PROFILE_BY_ID = {profile.profile_id: profile for profile in PROFILES}
 
-JULIET_CWE404_FAMILY_RE = re.compile(
-    r"CWE404_Improper_Resource_Shutdown__([A-Za-z0-9]+)_([A-Za-z0-9]+)_",
-    re.IGNORECASE,
+JULIET_RESOURCE_SOURCE_RES: Tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"CWE404_Improper_Resource_Shutdown__([A-Za-z0-9]+)_([A-Za-z0-9]+)_",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"CWE675_Duplicate_Operations_on_Resource__([A-Za-z0-9]+)_",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"CWE775_Missing_Release_of_File_Descriptor_or_Handle__([A-Za-z0-9]+)_",
+        re.IGNORECASE,
+    ),
 )
 
-JULIET_CWE404_SOURCE_PROFILES = {
+JULIET_RESOURCE_SOURCE_PROFILES = {
     "open": POSIX_FD_PROFILE_ID,
     "fopen": STDIO_PROFILE_ID,
     "freopen": STDIO_PROFILE_ID,
     "w32createfile": WIN32_HANDLE_PROFILE_ID,
 }
+
+RESOURCE_LIFECYCLE_API_NAMES = frozenset(
+    (*POSIX_FD_ACQUIRE_APIS, *POSIX_FD_RELEASE_APIS, *POSIX_FD_TRANSFER_APIS, *POSIX_FD_DUP_APIS)
+    + (*STDIO_ACQUIRE_APIS, *STDIO_RELEASE_APIS)
+    + (*WIN32_HANDLE_ACQUIRE_APIS, *WIN32_HANDLE_RELEASE_APIS, *WIN32_HANDLE_DUP_APIS)
+    + (*LINUX_KERNEL_ACQUIRE_APIS, *LINUX_KERNEL_RELEASE_APIS)
+)
+
+CWE672_CONTAINER_TERMS = (
+    "std::list",
+    "std::vector",
+    "list int",
+    "vector int",
+    "iterator",
+    "invalidated iterator",
+    "after clear",
+    "clear",
+    "erase",
+    "push_back",
+)
 
 
 def _token_words(value: str) -> List[str]:
@@ -815,12 +845,28 @@ def _score_profile(profile: OracleProfile, haystack_lower: str, api_names: Itera
     return score
 
 
-def _select_juliet_cwe404_profile(haystack: str, api_names: List[str]) -> Tuple[OracleProfile | None, List[str], int]:
-    match = JULIET_CWE404_FAMILY_RE.search(haystack)
-    if not match:
+def _has_cwe_token(haystack_lower: str, cwe_number: str) -> bool:
+    return _contains_token(haystack_lower, f"cwe-{cwe_number}") or _contains_token(haystack_lower, f"cwe{cwe_number}")
+
+
+def _is_cwe672_container_lifetime(haystack_lower: str, api_names: List[str]) -> bool:
+    if not _has_cwe_token(haystack_lower, "672"):
+        return False
+    if any(api in RESOURCE_LIFECYCLE_API_NAMES for api in api_names):
+        return False
+    return any(term in haystack_lower or _contains_token(haystack_lower, term) for term in CWE672_CONTAINER_TERMS)
+
+
+def _select_juliet_resource_profile(haystack: str, api_names: List[str]) -> Tuple[OracleProfile | None, List[str], int]:
+    source_api = ""
+    for pattern in JULIET_RESOURCE_SOURCE_RES:
+        match = pattern.search(haystack)
+        if match:
+            source_api = match.group(1).lower()
+            break
+    if not source_api:
         return None, api_names, 0
-    source_api = match.group(1).lower()
-    profile_id = JULIET_CWE404_SOURCE_PROFILES.get(source_api)
+    profile_id = JULIET_RESOURCE_SOURCE_PROFILES.get(source_api)
     if not profile_id:
         return None, api_names, 0
     profile = PROFILE_BY_ID.get(profile_id)
@@ -834,7 +880,10 @@ def select_profile(hypothesis: Dict[str, Any]) -> Tuple[OracleProfile | None, Li
     haystack = hypothesis_text(hypothesis)
     haystack_lower = haystack.lower()
     api_names = infer_api_names(hypothesis)
-    juliet_profile, juliet_matched, juliet_score = _select_juliet_cwe404_profile(haystack, api_names)
+    if _is_cwe672_container_lifetime(haystack_lower, api_names):
+        return None, api_names, 0
+
+    juliet_profile, juliet_matched, juliet_score = _select_juliet_resource_profile(haystack, api_names)
     if juliet_profile is not None:
         return juliet_profile, juliet_matched, juliet_score
 

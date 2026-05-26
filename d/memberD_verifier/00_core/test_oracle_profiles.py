@@ -441,6 +441,104 @@ class OracleProfileSelectionTests(unittest.TestCase):
                     profile["confirm_patterns"],
                 )
 
+    def test_selects_juliet_cwe675_profile_by_acquired_resource_family(self):
+        cases = [
+            (
+                "juliet-api-misuse/testcases/CWE675_Duplicate_Operations_on_Resource/"
+                "CWE675_Duplicate_Operations_on_Resource__freopen_21.c",
+                "freopen -> fclose -> fclose",
+                "resource.stream_lifecycle.c_stdio",
+            ),
+            (
+                "juliet-api-misuse/testcases/CWE675_Duplicate_Operations_on_Resource/"
+                "CWE675_Duplicate_Operations_on_Resource__open_21.c",
+                "open -> close -> close",
+                "resource.fd_lifecycle.user_posix",
+            ),
+            (
+                "juliet-api-misuse/testcases/CWE675_Duplicate_Operations_on_Resource/"
+                "CWE675_Duplicate_Operations_on_Resource__w32CreateFile_21.c",
+                "CreateFile -> CloseHandle -> CloseHandle",
+                "resource.handle_lifecycle.win32",
+            ),
+        ]
+
+        for file_name, route, expected_profile_id in cases:
+            with self.subTest(file_name=file_name):
+                profile = oracle_profiles.build_oracle_profile(
+                    {
+                        "file": file_name,
+                        "route": route,
+                        "cwe_candidates": ["CWE-675"],
+                        "claim": "Juliet duplicate operation route releases the same resource twice",
+                    }
+                )
+
+                self.assertEqual(profile["profile_id"], expected_profile_id)
+                self.assertTrue(profile["supported"])
+                self.assertIn(
+                    f"MAGUS_ORACLE_FLAW profile={expected_profile_id} reason=duplicate_release",
+                    profile["confirm_patterns"],
+                )
+
+    def test_selects_juliet_cwe775_profile_by_acquired_resource_family(self):
+        cases = [
+            (
+                "juliet-api-misuse/testcases/CWE775_Missing_Release_of_File_Descriptor_or_Handle/"
+                "CWE775_Missing_Release_of_File_Descriptor_or_Handle__fopen_no_close_21.c",
+                "fopen -> no close",
+                "resource.stream_lifecycle.c_stdio",
+            ),
+            (
+                "juliet-api-misuse/testcases/CWE775_Missing_Release_of_File_Descriptor_or_Handle/"
+                "CWE775_Missing_Release_of_File_Descriptor_or_Handle__open_no_close_21.c",
+                "open -> no close",
+                "resource.fd_lifecycle.user_posix",
+            ),
+            (
+                "juliet-api-misuse/testcases/CWE775_Missing_Release_of_File_Descriptor_or_Handle/"
+                "CWE775_Missing_Release_of_File_Descriptor_or_Handle__w32CreateFile_no_close_21.c",
+                "CreateFile -> no close",
+                "resource.handle_lifecycle.win32",
+            ),
+        ]
+
+        for file_name, route, expected_profile_id in cases:
+            with self.subTest(file_name=file_name):
+                profile = oracle_profiles.build_oracle_profile(
+                    {
+                        "file": file_name,
+                        "route": route,
+                        "cwe_candidates": ["CWE-775"],
+                        "claim": "Juliet missing release route leaks the acquired resource",
+                    }
+                )
+
+                self.assertEqual(profile["profile_id"], expected_profile_id)
+                self.assertTrue(profile["supported"])
+                self.assertIn(
+                    f"MAGUS_ORACLE_FLAW profile={expected_profile_id} reason=missing_release",
+                    profile["confirm_patterns"],
+                )
+
+    def test_cwe672_container_lifetime_is_not_misclassified_as_fd_lifecycle(self):
+        profile = oracle_profiles.build_oracle_profile(
+            {
+                "file": (
+                    "juliet-api-misuse/testcases/CWE672_Operation_on_Resource_After_Expiration_or_Release/"
+                    "CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_21.cpp"
+                ),
+                "route": "std::list<int>::iterator -> data.clear() -> *iterator",
+                "cwe_candidates": ["CWE-672"],
+                "claim": "Iterator is used after the std::list resource is invalidated by clear().",
+                "evidence_slice": "list<int>::iterator i = data.begin(); data.clear(); printIntLine(*i);",
+            }
+        )
+
+        self.assertEqual(profile["profile_id"], "unsupported.unclassified_source_api")
+        self.assertFalse(profile["supported"])
+        self.assertNotEqual(profile["profile_id"], "resource.fd_lifecycle.user_posix")
+
     def test_selects_linux_kernel_lifecycle_separately_from_user_space_open(self):
         profile = oracle_profiles.build_oracle_profile(
             {
